@@ -9,7 +9,7 @@ $cardinalDir = $_POST['cardinalDir'];
 
 $theVarsStr = "$placeName,$placeNameState,$distanceNumber,$GNIS_NAME,$mouthOrOutlet,$cardinalDir";
 
-$command = escapeshellcmd("python3 ../py/findSiteName.py \"$theVarsStr\"");
+$command = escapeshellcmd("python3 ../backEnd/Namer.py \"$theVarsStr\"");
 $output = shell_exec($command);
 echo json_encode($output);
 

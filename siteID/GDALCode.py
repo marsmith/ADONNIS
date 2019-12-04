@@ -251,7 +251,7 @@ def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFE
             # Check to make sure e does not have a restricted FCode
             # Restricted FCodes are 42807
             fCode = int(e.GetFieldAsString(lineFCode_index))
-            if fCode == 42807 or fCode == 33600 or fCode == 56600:
+            if fCode == 42807 or fCode == 33600:
                 continue # Skip this line, ignore it completely
             
             _npt = e.GetGeometryRef().GetPointCount()
@@ -699,9 +699,11 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
                         l_geom = startingLine.GetGeometryRef()
                         ucBuff = ucPoint.Buffer(1)
                         ldiff = l_geom.Difference(ucBuff)
-                        assert(ldiff.GetGeometryCount() == 2)
+                        if ldiff.GetGeometryCount() != 2:
+                            ucToLower_Frac = ldiff.Length() / l_geom.Length()
+                        else:
+                            ucToLower_Frac = ldiff.GetGeometryRef(1).Length() / l_geom.Length()
 
-                        ucToLower_Frac = ldiff.GetGeometryRef(1).Length() / l_geom.Length()
                         lengthP = orderedList[fIndex].length * ucToLower_Frac
                         
                         YAY = orderedList[fIndex].downstreamSite.assignedID - (lengthP * UL)

@@ -7,11 +7,10 @@ import sys
 import json
 
 def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, folderPath, siteLayerName):
-    beg = ""
+    beg = []
     if mouthOrOutlet != "":
-        beg = "Near " + mouthOrOutlet + " of " + GNIS_Name
-    else:
-        beg = GNIS_Name
+        beg.append("Near " + mouthOrOutlet + " of " + GNIS_Name)
+    beg.append(GNIS_Name)
         
     dis = []
     if distance <= 1:
@@ -22,7 +21,7 @@ def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, fol
         if "south" in cardinalDir:
             dis.append("below")
         dis.append(cardinalDir + " of")
-        dis.append(str(distance) + " miles " + cardinalDir + " of")
+        dis.append(str(round(distance,2)) + " miles " + cardinalDir + " of")
 
     else:
         dis.append("near")
@@ -35,7 +34,10 @@ def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, fol
     
     end = placeName + ", " + State
 
-    possibilities = [str(beg) + " " + str(i) + " " + str(end) for i in dis]
+    possibilities = []
+    for b in beg:
+        for d in dis:
+            possibilities.append(str(b) + " " + str(d) + " " + str(end))
 
     poss = sorted(possibilities, key = len)
 
@@ -50,10 +52,9 @@ def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, fol
                 poss.remove(p)
     
     return poss
-
 a = sys.argv[1]
 k = a.split(",")
-pos = Namer(k[0], k[1], float(k[2]), k[3], k[4], k[5], "/Users/nicknack/Downloads/GDAL_DATA_PR", "ProjectedSites")
+pos = Namer(k[0], k[1], float(k[2]), k[3], k[4], k[5], "../data/", "ProjectedSites")
 
 res = {'Results':pos}
 results = json.dumps(res)

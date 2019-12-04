@@ -457,3 +457,15 @@ class TestProject(unittest.TestCase):
         print(newSite)
         if checkIfSiteExists(folderPath, siteLayerName, newSite):
             print("This site already exists!!!! X(")
+
+    def test_zerogeometryLine(self):
+        x = 43.34607771415082
+        y = -75.05865229132792
+        folderPath = PATH
+        siteLayerName = "ProjectedSites"
+        lineLayerName = "NHDFlowline_Project_SplitFINAL"
+
+        newSite = determineNewSiteID(x,y,folderPath,siteLayerName,lineLayerName)
+        print(newSite)
+        if checkIfSiteExists(folderPath, siteLayerName, newSite):
+            print("This site already exists!!!! X(")
