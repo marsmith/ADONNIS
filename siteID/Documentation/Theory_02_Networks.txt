@@ -1,0 +1,77 @@
+A Network is a relationship between nodes; a graph (in mathematical and computer science terms). A node can be anything, 
+cars, people, you name it!
+
+In our case, a Network is a collection of Site objects and Flow objects.
+
+A Site is a location in the network where a Flow ends, or meets another flow or two, or even three sometimes! :o
+Each Site has a Simple ID#, an [AssignedID] #, a LatLong object, and other fields specific to the internals of the program.
+Each site also knows what else it connects to. These are stored as tuples in flowsCon, a list of tuples
+    (Site im connected to, relationship to me, Flow that gets me there)
+        Site <0>  (obj),    UPSTREAM_CON    , Flow <2> (obj)    <------- If this is in flowsCon for Site<1>, we can say Site<0> is 
+                                                                         upstream of Site <1> and is reachable by Flow #2
+* Note: A Simple ID is NOT the same as an AssignedID.
+
+[Simple ID vs AssignedID]
+A SimpleID is just an integer which is assigned to each node on the network, just to help establish relationships.
+An AssignedID is the final SiteID object which is associated with every Site object on the Network.
+
+["Fake-Site" vs. Real-Site]
+A "Fake-Site" is a Site object which has no AssignedID in the begining. A Real-Site is a Site object
+which DOES have an AssignedID in the begining. It will corespond to its real-world equivalent.
+The two are also differentiable via a boolean called "isl", like this:
+    site = (a site object)
+    if site.isl:
+        print("This site is a real one")
+
+
+A Flow represents a stretch of river,stream, or water path between two places. 
+Each Flow has a length, a ReachCode, and a simple ID #.
+Each Flow also stores an upstreamSite, and a downstreamSite. 
+
+* Note: Multiple Flow's can have the same upstream or downstreamSite
+
+If multiple Flows share the same upstreamSite and then reconnect to each other,
+this is a Loop case
+
+[Loops]
+Loops occur in nature typically in a "daisy-chained" river, where due to natural forces, a river
+may develop islands in the middle. When these show up in the Line Data, these can form loops.
+
+This program handles loops by treating the connecting Flow at the top as unadressable however it still remains accessible.
+To know if a Flow is unadressable, simply use:
+    <myFlowObject>.unadressable
+
+Flows which are Unadressable will not be able to be used to generate a new SiteID, so be careful!
+
+
+------<-------(1)----------<-----(2)----<------- ...
+                |                 |                     In this case, the flow from 3 to 2 will probably end up unadressable,
+                |-------(3)----<--|                     But 1 to 3 is not effected. This is a downside if you need to be very specific but 
+                                                        Works well if the loop is small and you dont need to worry.
+
+
+[Calculating Network-Wide Values]
+
+Length: To recalculate the total length of a network, you must call:
+    <network>.recalculateTotalLength()
+    This must be calculated before calling one of the ID algorithms
+
+Unit Length: To change the unit length used, just change the following class var
+    <network>.unitLength = 2 # Assigns UL to be 2
+    By default, this is set to 1
+
+ThisAndUpstream: *Stored in Flow; tells us from a particular flow how much distance of network
+                    is upstream of us + the length of the current flow. Useful for
+                    determining how much address space to assign. This must be calculated before 
+                    calling one of the ID algorithms
+    <network>.calculateUpstreamDistances()
+
+Strailer Numbers: *Stored in Flow; tells us the Strailer number for a particular Flow.
+    <network>.calcStrailer()
+    This must be calculated before calling one of the ID algorithms
+
+    For more details on what a Strailer Number is, use google, I am not the best source here.
+
+
+Sink: A sink is a Site which appears at the most downstream point in the Network.
+

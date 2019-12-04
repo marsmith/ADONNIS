@@ -1,0 +1,34 @@
+A SiteID is a class; it stores the groundwater site_no broken up into sections
+A groundwater site_no is typically a 8-10 digit number.
+
+0100       4623     05
+[    VALUE   ]     [Extension]
+
+The VALUE portion is the 8 digit part. If the number is 8 digits long only, it has no Extension
+The EXTENSION portion is only added on if there exists ID's with the same VALUE portion.
+    There is no explicit check for this, it is based on mathematics of adding or subtracting distances from a SiteID class
+
+[ Operations ]
+
+Addition
+    (SiteID + SiteID)
+        Not really implemented, but will return what happens if you add each Site's full ID'same
+        together. There are no extension checks, no safeguards. 
+    (SiteID + number)
+        This will return a new SiteID based on the number you are adding to it.
+        If we tick over to a SiteID greater in VALUE to the previous while were adding, we increase the VALUE
+        portion but leave the extension blank
+
+        Example:
+
+        01204561 + 4 = 01204565
+
+        0120456070 + 4 = 01204564
+
+        
+        To make this number dependent on the Unit Length of a network, simply do
+        SiteID + (number * UL) to take into account UnitLength
+    
+Subtraction
+
+

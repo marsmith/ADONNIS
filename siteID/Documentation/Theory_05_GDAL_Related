@@ -1,0 +1,41 @@
+[ Shapefile Operations ]
+
+A shapefile is a file used to contain geometry data. This geometry data can then
+be used to represent things on the planet, in our case we use "Projected Geometry Data"
+which is "proected" into a Projected Coordinate System
+
+A Projected Coordinate System is a way to convert a globe-like Geographic Coordinate System
+way of pinpointing location (latitude,longitude) in degrees into a flat map using standard
+distance units like meters, or feet.
+
+This is useful when performing calculations such as seeing how many Sites exist within 5 km of a user
+clicking somewhere
+
+* Note: All incomming shapefiles must be pre-projected into EPSG:26918, or NAD83 UTM Zone 18n
+* before the program runs. This is to save on runtime while the program is running
+
+[ The Expanding Buffer ]
+
+The first operation of the program is to import the shapefile data and then "plot"
+a user's click (x,y) in the Projected Coordinate System onto the existing line data.
+A circle is drawn around the x,y; initially it is a minimum size of 1 km, but if no
+pre-existing sites exist in that area to use as a reference, the circle will be expanded
+by 1 km until it reaches a maximum allowed size.
+
+This maximum allowed size is determined by a few things (order lower to higher value):
+    A recommended value (based on the density of sites in the state and a clump factor (a scalar))
+    A fixed max cap (Used as a maximum to prevent python from not responding)
+
+All the lines that fall within the max-cap are candidates to be added. Only the site
+
+[ Network Isolation ]
+
+A Network is isolated from the lines inside the circle (buffer) and any real sites which may exist.
+"Fake-Sites" are also included (these are wherever two lines or more meet or at the ends of lines)
+
+This isolated network is used in determining what the ID of a new site should be 
+(See Interpolation and See Network)
+
+
+
+

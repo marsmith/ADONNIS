@@ -1,0 +1,46 @@
+1. Click on a flowline
+2. Using the reach-code, lookup data to pull
+3. Pull Flowline and all connected to it
+4. Form a network from this 
+
+5. Calculate Upstream dist
+6. Calculate total length
+
+
+7. Do a buffer on Flowline select and NY_Sitefile
+8. Add sites which fall within buffer (a generous one)
+9. Plot sites onto the line
+10. Isolate subnet from downstream of the new-site to upstream along each branch until reaching another site
+    or the ends
+11. Focus on this Subnet; Calculate Unit Length
+
+
+SCENARIO A
+
+--(0)-----(*)-------|-------(0)     New Point is surrounded by 
+                    |               existing sites or ends of branches
+                    |-----------
+
+Solve for ID using proportional alg and unit length
+
+
+SCENARIO B
+
+-------(*)-------|-------(0)     New Point is semi-surrounded by 
+                 |               existing sites or ends of branches ( not on one side)
+                 |-----------
+
+12. Poll for surrounding networks (Look for networks in a radius expanding outward until we can form convex hulls
+which surround the new-site network)
+13. For Each surrounding network
+    a. Calculate total length
+    b. Calculate this and upstreama
+    b. Calculate unit length (by snapping on existing sites and doing math)
+    c. If network has no sites on it, add for it to have address space allocated?
+        PROBLEM!
+
+SCENARIO C
+
+----------(*)-------|---------------    New Point is alone on the network
+                    |               
+                    |-----------

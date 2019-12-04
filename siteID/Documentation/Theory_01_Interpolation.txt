@@ -1,0 +1,45 @@
+From Wikipedia:
+"In the mathematical field of numerical analysis, interpolation is a type of estimation,
+     a method of constructing new data points within the range of a discrete set of known data points"
+
+In the Site-Maker Addonis project, we use this at the final and crucial stage of determining
+what the new SiteID should be. It requires that we define a set range of values which
+it can be, and this is done before in the (population of the "fake-sites") step.
+
+--> "fake-site's can be found in Theory_02_Networks.txt"
+
+[ Interpolating to find the SiteID ]
+
+
+Assuming we have a populated network, we find the line in the network (Flow) which
+coresponds to the line the user clicked on with the x,y coordinate.
+
+clickedFlow = (the Flow in the network which I clicked on)
+
+Each Flow object in a network has an upstreamSite and a downstreamSite
+defined. These are what are given assignedID's in the various stages of the overview.
+
+If we label them by assignedID's, they may look like this
+
+<01203949> UPSTREAM SITE or US#
+|
+|
+|
+|              If we clicked where the x is,
+x              then we know what range x's ID can be!
+|
+|
+<01203956> DOWNSTREAM SITE or DS#
+
+If x is 1/3 upstream of the DOWNSTREAM_SITE, we can say that x is 1/3 the difference in ID from the upstream site and the
+downstream one. Lets call this fraction F
+Lets call the length of the flowline L
+
+delta# = 01203956 - 01203949 = 7
+
+If we say that for every m, a new ID may be assigned, the network's unit length (UL) is 1. 
+This is the easiest case but does not always happen
+
+newID = (delta# * F)
+
+

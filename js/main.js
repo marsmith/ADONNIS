@@ -1,0 +1,1025 @@
+var map;
+var markers;
+var markerArray;
+var siteArray;
+
+var marker;
+
+var collectedData = {
+	placeName: "",
+	placeNameState: "",
+	distanceNumber: undefined,
+	GNIS_NAME: "",
+	mouthOrOutlet: "",
+	cardinalDir: ""
+};
+
+var closestPoint;
+
+function toRadian(num) {
+    return num * (Math.PI / 180);
+}
+
+function toDegree(num) {
+    return num * (180 / Math.PI);
+}
+
+function getHorizontalBearing(fromLat, fromLon, toLat, toLon) {
+    fromLat = toRadian(fromLat);
+    fromLon = toRadian(fromLon);
+    toLat = toRadian(toLat);
+    toLon = toRadian(toLon);
+
+    let dLon = toLon - fromLon;
+    let x = Math.tan(toLat / 2 + Math.PI / 4);
+    let y = Math.tan(fromLat / 2 + Math.PI / 4);
+    let dPhi = Math.log(x / y);
+    if (Math.abs(dLon) > Math.PI) {
+        if (dLon > 0.0) {
+            dLon = -(2 * Math.PI - dLon);
+        } else {
+            dLon = (2 * Math.PI + dLon);
+        }
+    }
+
+    return (toDegree(Math.atan2(dLon, dPhi)) + 360) % 360;
+}
+
+function getBoundingBox(centerPoint, distance) {
+	var MIN_LAT, MAX_LAT, MIN_LON, MAX_LON, R, radDist, degLat, degLon, radLat, radLon, minLat, maxLat, minLon, maxLon, deltaLon;
+	if (distance < 0) {
+	  return 'Illegal arguments';
+	}
+	// helper functions (degrees<–>radians)
+	Number.prototype.degToRad = function () {
+	  return this * (Math.PI / 180);
+	};
+	Number.prototype.radToDeg = function () {
+	  return (180 * this) / Math.PI;
+	};
+	// coordinate limits
+	MIN_LAT = (-90).degToRad();
+	MAX_LAT = (90).degToRad();
+	MIN_LON = (-180).degToRad();
+	MAX_LON = (180).degToRad();
+	// Earth's radius (km)
+	R = 6378.1;
+	// angular distance in radians on a great circle
+	radDist = distance / R;
+	// center point coordinates (deg)
+	degLat = centerPoint[0];
+	degLon = centerPoint[1];
+	// center point coordinates (rad)
+	radLat = degLat.degToRad();
+	radLon = degLon.degToRad();
+	// minimum and maximum latitudes for given distance
+	minLat = radLat - radDist;
+	maxLat = radLat + radDist;
+	// minimum and maximum longitudes for given distance
+	minLon = void 0;
+	maxLon = void 0;
+	// define deltaLon to help determine min and max longitudes
+	deltaLon = Math.asin(Math.sin(radDist) / Math.cos(radLat));
+	if (minLat > MIN_LAT && maxLat < MAX_LAT) {
+	  minLon = radLon - deltaLon;
+	  maxLon = radLon + deltaLon;
+	  if (minLon < MIN_LON) {
+		minLon = minLon + 2 * Math.PI;
+	  }
+	  if (maxLon > MAX_LON) {
+		maxLon = maxLon - 2 * Math.PI;
+	  }
+	}
+	// a pole is within the given distance
+	else {
+	  minLat = Math.max(minLat, MIN_LAT);
+	  maxLat = Math.min(maxLat, MAX_LAT);
+	  minLon = MIN_LON;
+	  maxLon = MAX_LON;
+	}
+	return [
+	  minLon.radToDeg(),
+	  minLat.radToDeg(),
+	  maxLon.radToDeg(),
+	  maxLat.radToDeg()
+	];
+}
+
+function getSpPoint(A,B,C){
+    var x1=A.x, y1=A.y, x2=B.x, y2=B.y, x3=C.x, y3=C.y;
+    var px = x2-x1, py = y2-y1, dAB = px*px + py*py;
+    var u = ((x3 - x1) * px + (y3 - y1) * py) / dAB;
+    var x = x1 + u * px, y = y1 + u * py;
+    return {x:x, y:y}; //this is D
+}
+
+function calcIsInsideLineSegment(line1, line2, pnt) {
+    var L2 = ( ((line2.x - line1.x) * (line2.x - line1.x)) + ((line2.y - line1.y) * (line2.y - line1.y)) );
+    if(L2 == 0) return false;
+    var r = ( ((pnt.x - line1.x) * (line2.x - line1.x)) + ((pnt.y - line1.y) * (line2.y - line1.y)) ) / L2;
+
+    return (0 <= r) && (r <= 1);
+}
+
+function distance(lat1, lon1, lat2, lon2, unit = 'K') {
+	if ((lat1 == lat2) && (lon1 == lon2)) {
+		return 0;
+	}
+	else {
+		var radlat1 = Math.PI * lat1/180;
+		var radlat2 = Math.PI * lat2/180;
+		var theta = lon1-lon2;
+		var radtheta = Math.PI * theta/180;
+		var dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);
+		if (dist > 1) {
+			dist = 1;
+		}
+		dist = Math.acos(dist);
+		dist = dist * 180/Math.PI;
+		dist = dist * 60 * 1.1515;
+		if (unit=="K") { dist = dist * 1.609344 }
+		if (unit=="N") { dist = dist * 0.8684 }
+		return dist;
+	}
+}
+
+function on() {
+	document.getElementById("overlay").style.display = "block";
+}
+
+function off() {
+	document.getElementById("overlay").style.display = "none";
+}
+
+function printElement(elem) {
+    var domClone = elem.cloneNode(true);
+    
+    var $printSection = document.getElementById("printSection");
+    
+    if (!$printSection) {
+        var $printSection = document.createElement("div");
+        $printSection.id = "printSection";
+        document.body.appendChild($printSection);
+    }
+    
+    $printSection.innerHTML = "";
+    $printSection.appendChild(domClone);
+    window.print();
+}
+
+function showFoundData() {
+	map.closePopup();
+	off();
+	console.log(collectedData);
+	$('#siteData').modal('show');
+	var siteNamesString = "";
+	for (const siteName of collectedData.suggSiteNames.Results) {
+		siteNamesString += "<h5>- " + siteName + "</h5>";
+	}
+	$('#siteDataForm').html('<form action=""><b>Suggested Site Names (that haven\'t been taken):</b><br>' + siteNamesString + '<b>Site ID:</b><br><h5>' + collectedData.siteID + '</h5><b>Altitude:</b><br><input type="text" name="altitude" value="' + collectedData.altitude + '"><br><b>Country Code:</b><br><input type="text" name="countryCode" value="' + collectedData.countryCode + '"><br><b>Timezone Code:</b><br><input type="text" name="timeZoneCode" value="' + collectedData.timeZoneCode + '"><br><b>contr Drainage Area:</b><br><input type="text" name="contrDrainageArea" value="' + collectedData.contrDrainageArea + '"><br><b>HUC:</b><br><input type="text" name="HUC" value="' + collectedData.HUC + '"><br><b>HUC Name:</b><br><input type="text" name="HUCName" value="' + collectedData.HUCName + '"><br><b>State FIPS:</b><br><input type="text" name="stateFIPS" value="' + collectedData.stateFIPS + '"><br><b>County FIPS:</b><br><input type="text" name="countyFIPS" value="' + collectedData.countyFIPS + '"><br><b>State:</b><br><input type="text" name="state" value="' + collectedData.state + '"><br><b>State Code:</b><br><input type="text" name="stateCode" value="' + collectedData.stateCode + '"><br><b>County:</b><br><input type="text" name="county" value="' + collectedData.county + '"><br><br><input type="submit" value="Submit"></form>');
+}
+
+//ajax functions
+
+function ajaxSiteName () {
+	on();
+	return $.ajax({ 
+		type : 'post',
+		url: "../php/siteName.php", 
+		dataType: 'json', 
+		data: 
+        {
+				'placeName' : collectedData.placeName,
+				'placeNameState' : collectedData.placeNameState,
+				'distanceNumber' : collectedData.distanceNumber,
+				'GNIS_NAME' : collectedData.GNIS_NAME,
+				'mouthOrOutlet' : collectedData.mouthOrOutlet,
+				'cardinalDir' : collectedData.cardinalDir
+        },
+		success: function(theResult){
+			collectedData.suggSiteNames = JSON.parse(theResult);
+		}});
+}
+
+function ajaxSiteID () {
+	on();
+	return $.ajax({ 
+		type : 'post',
+		url: "../php/siteID.php", 
+		dataType: 'json', 
+		data: 
+        {
+				'lat' : collectedData.coords.lat,
+				'lng' : collectedData.coords.lng
+        },
+		success: function(theResult1){
+			var siteIDJSON = JSON.parse(theResult1);
+			if (siteIDJSON && siteIDJSON.Results.length > 0) {
+				collectedData.siteID = siteIDJSON.Results;
+			} else {
+				collectedData.siteID = "Needs revision.";
+			}
+		}});
+}
+
+
+function ajaxHUCInfo (e) {
+	on();
+	return $.ajax({ 
+		url: "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/6/query?where=1%3D1&text=&objectIds=&time=&geometry=" + e.latlng.lng + "%2C" + e.latlng.lat + "&geometryType=esriGeometryPoint&inSR=4269&spatialRel=esriSpatialRelWithin&relationParam=&outFields=HUC12%2CNAME&returnGeometry=false&returnTrueCurves=false&maxAllowableOffset=&geometryPrecision=&outSR=&having=&returnIdsOnly=false&returnCountOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&gdbVersion=&historicMoment=&returnDistinctValues=false&resultOffset=&resultRecordCount=&queryByDistance=&returnExtentOnly=false&datumTransformation=&parameterValues=&rangeValues=&quantizationParameters=&f=pjson", 
+		dataType: 'json', 
+		success: function(result){
+			collectedData.HUC = result.features[0].attributes.HUC12;
+			collectedData.HUCName = result.features[0].attributes.NAME;
+		}});
+}
+
+function ajaxContrDrainageArea (e) {
+	// on();
+	// return $.ajax({ 
+	// 	url: "https://streamstats.usgs.gov/streamstatsservices/watershed.geojson?rcode=NY&xlocation=" + e.latlng.lng + "&ylocation=" + e.latlng.lat + "&crs=4326&includeparameters=false&includeflowtypes=false&includefeatures=true&simplify=true", 
+	// 	dataType: 'json', 
+	// 	success: function(result1){ 
+	// 		if (result1.featurecollection[1] && result1.featurecollection[1].feature.features[0]) {
+	// 			collectedData.contrDrainageArea = result1.featurecollection[1].feature.features[0].properties.Shape_Area;
+	// 			collectedData.contrDrainageArea *= 10.764;
+	// 		}
+	// }});
+}
+
+function ajaxTimeZoneCode (e) {
+	on();
+	return $.ajax({ 
+		url: "https://api.timezonedb.com/v2.1/get-time-zone?key=FOG5KOCJ8U4T&format=json&by=position&lat=" + e.latlng.lat + "&lng=" + e.latlng.lng, 
+		dataType: 'json', 
+		success: function(result2){ 
+			collectedData.timeZoneCode = result2.abbreviation;
+		}
+	});
+}
+
+function ajaxAltitude (e) {
+ 	// on();
+	// return $.ajax({ 
+	// 	url: "https://nationalmap.gov/epqs/pqs.php?x=" + e.latlng.lng + "&y=" + e.latlng.lat + "&units=Feet&output=json", 
+	// 	dataType: 'json', 
+	// 	success: function(result3){ 
+	// 		collectedData.altitude = result3.USGS_Elevation_Point_Query_Service.Elevation_Query.Elevation;
+	// 	}
+	// });
+}
+
+function ajaxCountryCode (e) {
+	on();
+	return $.ajax({ 
+		url: "https://nominatim.openstreetmap.org/reverse?format=json&lat=" + e.latlng.lat + "&lon=" +  e.latlng.lng + "&zoom=18&addressdetails=1", 
+		dataType: 'json', 
+		success: function(result4){ 
+			collectedData.countryCode = result4.address.country_code;
+		}
+	});
+}
+
+function ajaxCountyStateFIPS (e) {
+	on();
+	return $.ajax({ 
+		url: "https://geo.fcc.gov/api/census/block/find?latitude=" + e.latlng.lat + "&longitude=" + e.latlng.lng + "&showall=false&format=json", 
+		dataType: 'json', 
+		success: function(result5){ 
+			collectedData.county = result5.County.name;
+			collectedData.state = result5.State.name;
+			collectedData.stateCode = result5.State.code;
+
+			collectedData.stateFIPS = result5.State.FIPS;
+			collectedData.countyFIPS = result5.County.FIPS;
+		}
+	});
+}
+
+function ajaxGNISNameReachCode (e) {
+	on();
+	return $.ajax({ 
+		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&distance=2000&units=esriSRUnit_Meter&outFields=*&returnGeometry=false&f=pjson", 
+		dataType: 'json', 
+		success: function(result6){ 
+			var theFeatures = result6.features;
+			for (var feature of theFeatures) {
+				if (feature.attributes.GNIS_NAME) {
+					collectedData.GNIS_NAME = feature.attributes.GNIS_NAME;
+					collectedData.REACHCODE = feature.attributes.REACHCODE;
+					break;
+				}
+			}
+		}
+	});
+}
+
+function ajaxNearbyPlace (e) {
+	on();
+	return $.ajax({ 
+		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=2000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson", 
+		dataType: 'json', 
+		success: function(result6){
+			console.log("THE LINK BELOW:");
+			console.log("https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=2000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson");
+			var theFeatures = result6.features;
+			var smallestDistFeatureFeature = undefined;
+			var smallestDistFeature = Number.MAX_VALUE;
+			var smallestDistFeatureIndex = -1;
+			for (var feature of theFeatures) {
+				var points = [];				
+				for (const point of feature.geometry.paths[0]) {
+					points.push(new L.LatLng(point[1], point[0]));
+				}
+				var firstpolyline = new L.Polyline(points, {
+					color: 'red',
+					weight: 3,
+					opacity: 0.5,
+					smoothFactor: 1
+				});
+				firstpolyline.addTo(map);
+
+				if (feature.attributes.GNIS_NAME) {
+					var smallestDist = "";
+					var smallestDistIndex;
+					for (var i = 0; i < feature.geometry.paths[0].length; i++) {
+						var theDist = distance(e.latlng.lat, e.latlng.lng, feature.geometry.paths[0][i][1], feature.geometry.paths[0][i][0]);
+						if (smallestDist == "") {
+							smallestDist = theDist;
+							smallestDistIndex = 0;
+						} else {
+							if (theDist < smallestDist) {
+								smallestDist = theDist;
+								smallestDistIndex = i;
+							}
+						}
+					}
+					if (smallestDist < smallestDistFeature) {
+						smallestDistFeature = smallestDist;
+						smallestDistFeatureIndex = smallestDistIndex;
+						smallestDistFeatureFeature = feature;
+					}
+				}
+			}
+
+			var feature = smallestDistFeatureFeature;
+			var firstPoint = [feature.geometry.paths[0][0][1], feature.geometry.paths[0][0][0]];
+			var lastPoint = [feature.geometry.paths[0][feature.geometry.paths[0].length-1][1], feature.geometry.paths[0][feature.geometry.paths[0].length-1][0]];
+
+			var circle1 = L.circle(firstPoint, {
+				color: 'blue',
+				fillColor: 'blue',
+				fillOpacity: 0.5,
+				radius: 250
+			}).addTo(map);
+
+			var circle2 = L.circle(lastPoint, {
+				color: 'green',
+				fillColor: 'green',
+				fillOpacity: 0.5,
+				radius: 250
+			}).addTo(map);
+
+			collectedData.GNIS_NAME = feature.attributes.GNIS_NAME;
+			collectedData.REACHCODE = feature.attributes.REACHCODE;
+
+			//find nearest coordinate
+			var smallestDist = smallestDistFeature;
+			var smallestDistIndex = smallestDistFeatureIndex;
+
+			//find if near mouth or outlet
+			var calcDist = .05 * feature.geometry.paths[0].length;
+			if (calcDist < 1) {
+				calcDist = 1;
+			}
+			calcDist = Math.round(calcDist);
+			if (smallestDistIndex <= calcDist) {
+				collectedData.mouthOrOutlet = "mouth";
+			} else if (smallestDistIndex >= feature.geometry.paths[0].length - 1 - calcDist) {
+				collectedData.mouthOrOutlet = "outlet";
+			}
+
+			//now find whether left or right of smallestDistIndex is closer
+			
+			var leftDist = Number.MAX_VALUE;
+			var rightDist = Number.MAX_VALUE;
+			//left
+			if (smallestDistIndex != 0) {
+				leftDist = distance(e.latlng.lat, e.latlng.lng, feature.geometry.paths[0][smallestDistIndex - 1][1], feature.geometry.paths[0][smallestDistIndex - 1][0]);
+			}
+
+			if (smallestDistIndex != feature.geometry.paths[0].length - 1) {
+				rightDist = distance(e.latlng.lat, e.latlng.lng, feature.geometry.paths[0][smallestDistIndex + 1][1], feature.geometry.paths[0][smallestDistIndex + 1][0]);
+			}
+			console.log("leftDist: " + leftDist + "\n" + "rightDist: " + rightDist);
+			var leftCoordOfLine;
+			var rightCoordOfLine;
+			if (leftDist < rightDist) {
+				leftCoordOfLine = feature.geometry.paths[0][smallestDistIndex - 1];
+				rightCoordOfLine = feature.geometry.paths[0][smallestDistIndex];
+			} else {
+				leftCoordOfLine = feature.geometry.paths[0][smallestDistIndex];
+				rightCoordOfLine = feature.geometry.paths[0][smallestDistIndex + 1];
+			}
+
+			//now calculate closest "nonreal" point on line
+			var A = {
+				x : leftCoordOfLine[1],
+				y : leftCoordOfLine[0]
+			};
+
+			var B = {
+				x : rightCoordOfLine[1],
+				y : rightCoordOfLine[0]
+			};
+
+			var C = {
+				x : e.latlng.lat,
+				y : e.latlng.lng
+			};
+
+			var D = getSpPoint(A,B,C);
+
+			//check if the projected point is in the line segment
+
+			var isInLineSegm = calcIsInsideLineSegment(A,B,D);
+
+			if (!isInLineSegm) {
+				D.x = feature.geometry.paths[0][smallestDistIndex][1];
+				D.y = feature.geometry.paths[0][smallestDistIndex][0];
+			}
+
+			closestPoint = D;
+			closestPoint.latlng = {
+				lat : closestPoint.x,
+				lng : closestPoint.y
+			};
+			marker.setLatLng(closestPoint.latlng);
+
+			var latLngs = [ marker.getLatLng() ];
+			var markerBounds = L.latLngBounds(latLngs);
+			map.fitBounds(markerBounds);
+			map.setZoom(12);
+
+			collectedData.coords = closestPoint.latlng;
+			off();
+			var popup = L.popup()
+			.setLatLng(closestPoint.latlng)
+			.setContent('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr">Yes</button>')
+			.openOn(map);
+			$("#notCorr").click(function(){
+				location.reload();
+			}); 
+			$("#yesCorr").click(function(){
+				map.closePopup();
+				on();
+			});
+
+			//get nearest cities
+
+			/*
+
+			https://txdata.usgs.gov/search_api/2.1/services.ashx/search?lat_min=5&lat_max=5&lon_min=5&lon_max=5&include_state=false&include_zip_code=false&include_area_code=false&include_usgs_sw=false&include_usgs_gw=false&include_usgs_sp=false&include_usgs_at=false&include_usgs_ot=false&include_huc2=false&include_huc4=false&include_huc6=false&include_huc8=false&include_huc10=false&include_huc12=false
+
+			*/
+
+			//var theBoundingBox = getBoundingBox([D.x,D.y],currentDistance);
+			$.ajax({ 
+				url: "https://cartowfs.nationalmap.gov/arcgis/rest/services/geonames/MapServer/4/query?geometry=" + D.y +"," + D.x + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson", 
+				dataType: 'json', 
+				async: false,
+				success: function(result7){ 
+					//see if found any
+					var theFeatures = result7.features;
+					var howMany = theFeatures.length;
+					if (howMany > 0) {
+						var closestDist = Number.MAX_VALUE;
+						var closestFeature = undefined;
+						var closestCoords = undefined;
+						for (var feature of theFeatures) {
+							var theCoords = feature.geometry.points[0];
+							var currDist = distance(D.y, D.x, theCoords[0], theCoords[1]) / 1.609344;
+							if (currDist < closestDist) {
+								closestDist = currDist;
+								closestFeature = feature;
+								closestCoords = theCoords;
+							}
+						}
+
+						collectedData.placeName = closestFeature.attributes.gaz_name;
+						
+						var distMiles = closestDist;
+
+						collectedData.distanceNumber = distMiles;
+						collectedData.placeNameState = closestFeature.attributes.state_alpha;
+						
+						var n = getHorizontalBearing(closestCoords[0], closestCoords[1], D.y, D.x);
+						console.log("horizontal bearing: " + n);
+
+						//find cardinal direction from bearing
+
+						if (n < 112.5 && n >= 67.5) {
+							collectedData.cardinalDir = "north";
+						} else if (n < 67.5 && n >= 22.5) {
+							collectedData.cardinalDir = "north east";
+						} else if (n < 22.5 || n >= 337.5) {
+							collectedData.cardinalDir = "east";
+						} else if (n < 337.5 && n >= 292.5) {
+							collectedData.cardinalDir = "south east";
+						} else if (n < 292.5 && n >= 247.5) {
+							collectedData.cardinalDir = "south";
+						} else if (n < 247.5 && n >= 202.5) {
+							collectedData.cardinalDir = "south west";
+						} else if (n < 202.5 && n >= 157.5) {
+							collectedData.cardinalDir = "west";
+						} else {
+							collectedData.cardinalDir = "north west";
+						}
+					}
+				}
+			});
+		}
+	});
+}
+
+
+
+
+
+
+//main document ready function
+$(document).ready(function () {
+
+	document.getElementById("btnPrint").onclick = function () {
+		printElement(document.getElementById("printThis"));
+	}
+
+	//initialize basemap
+	var worldImagery = L.tileLayer("https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}", {
+		attribution: 'Copyright: &copy; 2013 Esri, DeLorme, NAVTEQ'
+	});
+	var worldBoundAndPlacesRef = L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", {
+		attribution: 'Copyright: &copy; 2013 Esri, DeLorme, NAVTEQ'
+	});
+
+	//initialize map
+	map = new L.Map('map', {
+		center: new L.LatLng(42.75, -75.5),
+		zoom: 7,
+		layers: [worldImagery, worldBoundAndPlacesRef],
+		attributionControl: false,
+		zoomControl: false
+	});
+	markers = new L.FeatureGroup();
+	map.addLayer(markers);
+
+	$("#legendButton").click(function () {
+		legendButtonFunction();
+	});
+
+	//marker click override listener
+	markers.on('click', onMarkerClick);
+
+
+
+	map.on('click', function(e) {
+		console.log(e.latlng);
+		var latlng = map.mouseEventToLatLng(e.originalEvent);
+		console.log(latlng.lat + ', ' + latlng.lng);
+		
+		var popup = L.popup()
+		.setLatLng(e.latlng)
+		.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc">No</button><button type="button" class="btn btn-primary" id="yesLoc">Yes</button>')
+		.openOn(map);
+		$("#yesLoc").click(function(){
+			map.closePopup();
+			if (marker) { // check
+				map.removeLayer(marker); // remove
+			}
+			marker = new L.Marker(e.latlng, { draggable: true }).addTo(map); // set
+			marker.on('dragend', function(ev) {
+				ev.latlng = ev.target.getLatLng();
+				var popup1 = L.popup()
+				.setLatLng(ev.latlng)
+				.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc1">No</button><button type="button" class="btn btn-primary" id="yesLoc1">Yes</button>')
+				.openOn(map);
+				$("#yesLoc1").click(function(){
+					map.closePopup();
+					e.latlng = ev.latlng;
+					$.when(ajaxHUCInfo(ev), ajaxContrDrainageArea(ev), ajaxTimeZoneCode(ev), ajaxAltitude(ev), ajaxCountryCode(ev), ajaxCountyStateFIPS(ev), ajaxGNISNameReachCode(ev), ajaxNearbyPlace(ev)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
+						$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
+							showFoundData();
+						});
+					});
+				});
+				$("#noLoc1").click(function(){
+					marker.setLatLng(e.latlng);
+					map.closePopup();
+				});
+			});
+			$.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxGNISNameReachCode(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
+				$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
+					showFoundData();
+				});
+			});
+		}); 
+		$("#noLoc").click(function(){
+			map.closePopup();
+		});
+	});
+
+	$("#coordsSubmit").click(function(){
+		var lati = $('#latitude').val();
+		var longi = $('#longitude').val();
+
+		//make sure both fields are filled out
+		if (lati == "" || longi == "") {
+			alert("You must fill in both fields!");
+		} else {
+			$('#coordModal').modal('hide');
+			//run script with lat and long
+
+			var e = {
+				latlng : {
+					lat: lati,
+					lng: longi
+				},
+			};
+
+			map.closePopup();
+			if (marker) { // check
+				map.removeLayer(marker); // remove
+			}
+			marker = new L.Marker(e.latlng, { draggable: true }).addTo(map); // set
+			marker.on('dragend', function(ev) {
+				ev.latlng = ev.target.getLatLng();
+				var popup1 = L.popup()
+				.setLatLng(ev.latlng)
+				.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc1">No</button><button type="button" class="btn btn-primary" id="yesLoc1">Yes</button>')
+				.openOn(map);
+				$("#yesLoc1").click(function(){
+					map.closePopup();
+					e.latlng = ev.latlng;
+					$.when(ajaxHUCInfo(ev), ajaxContrDrainageArea(ev), ajaxTimeZoneCode(ev), ajaxAltitude(ev), ajaxCountryCode(ev), ajaxCountyStateFIPS(ev), ajaxGNISNameReachCode(ev), ajaxNearbyPlace(ev)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
+						$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
+							showFoundData();
+						});
+					});
+				});
+				$("#noLoc1").click(function(){
+					marker.setLatLng(e.latlng);
+					map.closePopup();
+				});
+			});
+			$.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxGNISNameReachCode(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
+				$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
+					showFoundData();
+				});
+			});
+		}
+		return false;
+	});
+	//end document ready function
+});
+
+function legendButtonFunction() {
+	$("#legend").toggle();
+	map.invalidateSize();
+	return false;
+}
+
+function onMarkerClick(e) {
+	map.panTo(e.latlng);
+
+	console.log("Marker clicked", e.layer.options.siteData.currentConditions.BEACH_CONDITIONS, setPopupColor(e.layer.options.siteData.currentConditions.BEACH_CONDITIONS), e.layer.options.siteData);
+	if (loadAllSites && e.layer.options.siteData.STATE !== stateOfClickedMarker) {
+		console.log("changed the tabs!");
+		// if (e.layer.options.siteData.STATE == "OH") {
+		// 	$("#changingTabs").load(encodeURI('aboutOH.html'));
+		// } else {
+		// 	$("#changingTabs").load(encodeURI('aboutNY_PA.html')); //maybe make this part only run if changing to ohio or from ohio? see if necessary.
+		// }
+	}
+
+	stateOfClickedMarker = e.layer.options.siteData.STATE;
+
+	if (e.layer.options.siteData.STATE == "OH" || e.layer.options.siteData.STATE == "PA") {
+		$('#3rdTab').html('<a href="#tab3" data-toggle="tab"><i class="fa fa-info-circle"></i>&nbsp;&nbsp;<span class="beachName"></span> Details</a>');
+		$('#beachDetails').load(encodeURI('details/' + e.layer.options.siteData.BEACH_NAME + '.html'));
+	} else {
+		$('#3rdTab').empty();
+		$('#beachDetails').empty();
+	}
+
+	//update modal template with actual site data
+	$('.beachName').html(e.layer.options.siteData.BEACH_NAME);
+
+	//check if we have today's date
+	if (e.layer.options.siteData.currentConditions.DATE == moment().format('YYYY-MM-DD')) {
+		//show badge indicating current day
+		$('#conditionsDate').html(e.layer.options.siteData.currentConditions.DATE + '&nbsp;&nbsp;<span class="badge">Today</span>');
+	} else {
+		//otherwise just show date
+		$('#conditionsDate').html(e.layer.options.siteData.currentConditions.DATE);
+	}
+
+	//set out of season beach conditions in marker popup
+	//if ((e.layer.options.siteData.WEB_ENABLED == 2) && offSeason()) {
+	if (e.layer.options.siteData.WEB_ENABLED == 2) {
+		$('#beachConditionBar').attr('style', 'padding:3px;color:white;background-color:#d3d3d3');
+		$('#beachCondition').html('Off-Season&nbsp;&nbsp;<i data-toggle="popover" data-content="Generally, the recreational season is Memorial Day to Labor Day" class="fa fa-info-circle fa-lg"></i>');
+	} else {
+		//set beach conditions in marker popup
+		$('#beachConditionBar').attr('style', 'padding:3px;color:white;background-color:' + setPopupColor(e.layer.options.siteData.currentConditions.BEACH_CONDITIONS));
+		$('#beachCondition').html(e.layer.options.siteData.currentConditions.BEACH_CONDITIONS + '&nbsp;&nbsp;<i  data-toggle="popover" data-content="' + setConditionPopup(e.layer.options.siteData.currentConditions.BEACH_CONDITIONS) + '" class="fa fa-info-circle fa-lg"></i>&nbsp;&nbsp;' + e.layer.options.siteData.currentConditions.BEACH_REASON);
+	}
+	if (e.layer.options.siteData.STATE == "OH") {
+		$('#beachguard').html("<p>&nbsp;&nbsp;Additional water-quality information may be available at <a href='https://publicapps.odh.ohio.gov/BeachGuardPublic/Default.aspx' target='_blank'>BeachGuard</a> operated by Ohio Department of Health.</p>");
+	} else {
+		$('#beachguard').empty();
+	}
+
+	//show lake temp
+	$('#lakeTemp').html(e.layer.options.siteData.currentConditions.LAKE_TEMP_F);
+
+	//show map and directions
+	displayMapAt(e.layer.options.siteData.LATITUDE, e.layer.options.siteData.LONGITUDE, 12)
+	$('#directions').attr('href', 'https://maps.google.com/maps?q=' + e.layer.options.siteData.LATITUDE + ',' + e.layer.options.siteData.LONGITUDE);
+
+	//update recent conditions table with a fresh header row
+	$('#recentConditionsTable').html('<tr><th>Date</th><th>E.coli (CFU/100mL)</th><th>Estimated E.coli (CFU/100mL)&nbsp;&nbsp;<i data-toggle="popover" data-content="The model estimated value provides a quantitative prediction of E.coli concentration." class="fa fa-info-circle fa-lg"></i> </th><th>Probability of Exceeding&nbsp;&nbsp;<i data-toggle="popover" data-content="The probability of exceeding provides a percentage that the state standard of 235 colony forming units will be surpassed." class="fa fa-info-circle fa-lg"></i></th><th>Error Type</th><th>Predicted Water Quality</th></tr>');
+
+	if (!$.isEmptyObject(e.layer.options.siteData.recentConditions)) {
+		$.each(e.layer.options.siteData.recentConditions, function () {
+			$('#recentConditionsTable').append('<tr><td>' + this.DATE + '</td><td>' + this.LAB_ECOLI + '</td><td>' + this.NOWCAST_ECOLI + '</td><td>' + this.NOWCAST_PROBABILITY + '</td><td>' + this.ERROR_TYPE + '</td><td>' + this.BEACH_CONDITIONS + '</td></tr>');
+		});
+	}
+
+	/*
+	//loop over extra beach data lookup file
+	$.each(beachData , function() {
+		}
+	});
+	*/
+
+	//make sure first tab is default
+	$('#markerModal a:first').tab('show');
+
+	//show modal
+	$('#markerModal').modal('show');
+
+	//turn on popover click
+	$('[data-toggle="popover"]').popover({
+		placement: 'bottom'
+	});
+
+	//close popovers when anywhere else is clicked
+	$('html').on('mouseup', function (e) {
+		if (!$(e.target).closest('.popover').length) {
+			$('.popover').each(function () {
+				$(this.previousSibling).popover('hide');
+			});
+		}
+	});
+}
+
+function idify(str) {
+	return str.replace(/\s+/g, '-').toLowerCase();
+}
+
+function getSites() {
+	on();
+
+	//get list of beaches
+	$.ajax({
+		type: "GET",
+		url: "getbeaches.php",
+		data: {
+		},
+		success: function (data) {
+
+			//write sites to global object
+			siteArray = $.parseJSON(data);
+
+			//call drawsites
+			drawSites(siteArray);
+		},
+		complete: function () {
+			//run initial query
+			var currentDay = moment().format('YYYY-MM-DD');
+
+			//commented out for debugging
+			querySites(currentDay);
+			//querySites("2014-07-28");
+		}
+	});
+
+
+}
+
+function drawSites(siteArray) {
+
+
+	//create layerGroup for sites and add to map
+	markerArray = [];
+
+	//loop over list of beaches
+	$.each(siteArray, function (i, curSite) {
+
+		var customMarker = L.Marker.extend({
+			options: {
+				siteData: ''
+			}
+		});
+
+		/*var randomNumber = Math.floor((Math.random() * 10) + 1);
+		if (randomNumber < 5) {
+			curSite.STATE = 'NY';
+		}
+		if (randomNumber >= 5) {
+			curSite.STATE = 'OH';
+		}*/
+
+		//add sites
+		var curMarker = new customMarker([parseFloat(curSite.LATITUDE), parseFloat(curSite.LONGITUDE)], {
+			siteData: curSite
+		});
+		if (!loadAllSites) {
+			if (curMarker.options.siteData.STATE == theChosenState) {
+				//finally, create the default marker
+				var curMarkerSymbol = L.AwesomeMarkers.icon({
+					prefix: 'fa',
+					icon: '',
+					markerColor: 'lightgray'
+				});
+
+				//set icon
+				curMarker.setIcon(curMarkerSymbol);
+
+				//add to map
+				markers.addLayer(curMarker);
+
+				//push to array for zooming
+				markerArray.push([parseFloat(curSite.LATITUDE), parseFloat(curSite.LONGITUDE)]);
+			}
+		} else {
+			//finally, create the default marker
+				var curMarkerSymbol = L.AwesomeMarkers.icon({
+					prefix: 'fa',
+					icon: '',
+					markerColor: 'lightgray'
+				});
+
+				//set icon
+				curMarker.setIcon(curMarkerSymbol);
+
+				//add to map
+				markers.addLayer(curMarker);
+
+				//push to array for zooming
+				markerArray.push([parseFloat(curSite.LATITUDE), parseFloat(curSite.LONGITUDE)]);
+		}
+	});
+
+	//$('.selectpicker').selectpicker('refresh'); pretty sure can remove since don't need state drop down any more
+
+	//check if we've already zoomed
+	if (!zoomFlag) {
+		//zoom to points
+		var bounds = L.latLngBounds(markerArray);
+		map.fitBounds(bounds, {
+			padding: [100, 100]
+		});
+	}
+	//zoomFlag = true; //don't think you need this
+	off();
+}
+
+function querySites(queryValue, $btn) {
+	queryDateGlobal = queryValue;
+
+	//update text
+	$('#currentDate').html(queryValue);
+
+	//get beach status for last 7 days
+	$.ajax({
+		type: "GET",
+		url: "getconditions.php",
+		data: {
+			'queryDate': queryValue,
+			'timeFrame': timeFrame
+		},
+		success: function (data) {
+
+			//parse out conditions to json
+			var conditionsArray = $.parseJSON(data);
+
+			//sort the array by date, descending
+			conditionsArray.sort(function (a, b) {
+				a = new Date(a.DATE);
+				b = new Date(b.DATE);
+				//return a>b ? -1 : a<b ? 1 : 0;
+				return b - a;
+			});
+
+			//loop over list of beach marker graphics
+			markers.eachLayer(function (curMarker) {
+
+				//initialize conditions objects
+				curMarker.options.siteData.recentConditions = {};
+				curMarker.options.siteData.currentConditions = {};
+
+				//set default conditions
+				curMarker.options.siteData.currentConditions.LAKE_TEMP_F = 'n/a';
+				curMarker.options.siteData.currentConditions.BEACH_CONDITIONS = 'No Condition Reported';
+				curMarker.options.siteData.currentConditions.BEACH_REASON = '';
+				curMarker.options.siteData.currentConditions.DATE = queryValue;
+
+				//finally, create the marker with awesomeMarkers
+				//if ((curMarker.options.siteData.WEB_ENABLED == '2') && offSeason()) {
+				if (curMarker.options.siteData.WEB_ENABLED == '2') {
+					var curMarkerSymbol = L.AwesomeMarkers.icon({
+						prefix: 'fa',
+						icon: '',
+						markerColor: 'lightgray'
+					});
+				} else {
+					var curMarkerSymbol = L.AwesomeMarkers.icon({
+						prefix: 'fa',
+						icon: '',
+						markerColor: 'blue'
+					});
+				}
+
+				//set icon
+				curMarker.setIcon(curMarkerSymbol);
+
+				//get beach temp with separate ajax call to exports table
+				$.ajax({
+					type: "GET",
+					url: "getexport.php",
+					data: {
+						'queryDate': queryValue,
+						'USGSID': curMarker.options.siteData.ENDDAT_CODE
+					},
+					success: function (data) {
+
+						//parse out export table data to json
+						var exportTableData = $.parseJSON(data);
+
+						//make sure there is a temperature value
+						if (exportTableData[0] && exportTableData[0].LAKE_TEMP_C) {
+
+							//convert lake temp to F and round
+							var lakeTempF = (exportTableData[0].LAKE_TEMP_C * (9 / 5) + 32).toFixed(1);
+						}
+
+						//get conditions for current beach in loop
+						$.each(conditionsArray, function (i, curCondition) {
+
+							//draw beach with color for condition
+							if (curMarker.options.siteData.BEACH_NAME == curCondition.BEACH_NAME) {
+
+								//if we are at the queried date, set the symbol
+								if (curCondition.DATE == queryValue) {
+
+									var curMarkerSymbol = L.AwesomeMarkers.icon({
+										prefix: 'fa',
+										icon: '',
+										markerColor: setMarkerColor(curCondition.BEACH_CONDITIONS)
+									});
+
+									//set icon
+									curMarker.setIcon(curMarkerSymbol);
+
+									//add condition to siteData object
+									curMarker.options.siteData.currentConditions = curCondition;
+
+									//add lake temp to current conditions object
+									curMarker.options.siteData.currentConditions.LAKE_TEMP_F = lakeTempF;
+
+									console.log(curCondition.BEACH_NAME, '.  Condition: ', curCondition.BEACH_CONDITIONS, '. Date: ' + curCondition.DATE, '. Lake Temp (c): ' + curMarker.options.siteData.currentConditions.LAKE_TEMP_F);
+
+								}
+
+								//write to recent conditions object of marker
+								curMarker.options.siteData.recentConditions[curCondition.DATE] = curCondition;
+
+							}
+						});
+					},
+					complete: function () {
+						//reset button
+						$btn ? $btn.button('reset') : '';
+					}
+				});
+			});
+		}
+	});
+}
+
+function toPascalCase(str) {
+	return $.map(str.split(/\s|_/), function (word) {
+		return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+	}).join(" ")
+}

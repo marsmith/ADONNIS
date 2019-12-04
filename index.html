@@ -1,0 +1,343 @@
+﻿<!doctype html>
+<html lang="en">
+
+<head>
+	<base target="_parent">
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="">
+	<meta name="author" content="">
+	<title>Adonnis</title>
+
+	<!-- CSS -->
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css"
+	integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+	crossorigin=""/>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.2/css/bootstrap-select.css" />
+	<link rel="stylesheet" href="css/datepicker3.css" />
+	<link rel="stylesheet" href="css/style.css" />
+	<link rel="stylesheet" type="text/css" href="css/common.css">
+	<style>
+		.leaflet-popup-content {
+			max-width: 115px;
+			height: 70px;
+			/*overflow-y: scroll;*/
+		}
+
+		.leaflet-popup-close-button {
+  			display: none;
+		}
+
+		@media screen {
+			#printSection {
+				display: none;
+			}
+		}
+
+		@media print {
+			body * {
+				visibility:hidden;
+			}
+			#printSection, #printSection * {
+				visibility:visible;
+			}
+			#printSection {
+				position:absolute;
+				left:0;
+				top:0;
+			}
+		}
+
+	</style>
+
+	<!-- JS -->
+	<script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js"
+  integrity="sha512-GffPMF3RvMeYyc1LWMHtK8EbPv0iNZ8/oTtHPx9/cc2ILxQ+u905qIwdpULaqDkyBKgOaB57QTMg7ztg8Jm2Og=="
+  crossorigin=""></script>
+	<script src="https://code.jquery.com/jquery-1.11.0.min.js"></script>
+	<script src="js/leaflet.awesome-markers.min.js"></script>
+	<script src="js/bootstrap-datepicker.js"></script>
+	<script src="js/moment.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.2/js/bootstrap-select.js"></script>
+	<script src="js/main.js"></script>
+</head>
+
+<body id="body">
+	<!-- Modal -->
+	<div class="modal fade" id="siteData" role="dialog">
+		<div class="modal-dialog modal-md">
+			<div class="modal-content">
+			<div class="modal-header">
+				<button type="button" class="close" data-dismiss="modal">&times;</button>
+				<h4 class="modal-title">Data</h4>
+			</div>
+			<div class="modal-body">
+				<div id="printThis"><div id="siteDataForm"></div></div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+				<button id="btnPrint" type="button" class="btn btn-default">Print</button>
+			</div>
+			</div>
+		</div>
+	</div>
+	<div id="overlay" align="center" style="display: none;z-index: 1000000;">
+		<div id="text"><i class="fa fa-cog fa-spin" style="font-size:100px"></i></div>
+	</div>
+	<div id='topnav'>
+		<div class="navbar navbar-default navbar-fixed-top" role="navigation">
+            <div class="navbar-header">
+                <button id="aboutButton" type="button" class="btn btn-info navbar-btn pull-right" onclick="$('#aboutModal').modal('show'); return false;"><i class="fa fa-info-circle"></i><span class="hidden-xs">&nbsp;&nbsp;About</span></button>
+				<button id="legendButton" type="button" class="btn btn-info navbar-btn pull-right"><i class="fa fa-list-ul"></i><span class="hidden-xs">&nbsp;&nbsp;Legend</span></button>
+				<button id="coordButton" type="button" class="btn btn-info navbar-btn pull-right" onclick="$('#coordModal').modal('show'); return false;"><i class="fa fa-map-marker" aria-hidden="true"></i><span class="hidden-xs">&nbsp;&nbsp;Enter Coords Manually</span></button>
+                <a class="navbar-brand" href="https://www.usgs.gov"><img class='hidden-xs' style='display:inline-block;' src="images/usgs_logo.png" /><img class='visible-xs' style='display:inline-block;' src="images/usgs_logo_small.png" /><span class='hidden-xs' style='font-size:20px;display:inline-block;'>&nbsp;&nbsp;Adonnis</span><span class='visible-xs' style='font-size:9px;display:inline-block;'>Adonnis</span></a>
+            </div>
+		</div>
+	</div>
+	<div id="legend" class="legend" style="display:none;">
+		<p>To query another date, use the datepicker below:</p>
+		<div style="margin:5px;" class="row">
+			<div class="btn-group pull-left">
+				<div class="input-group" style="width:150px;float:left;">
+					<input type="button" class="input-sm form-control datepicker"></input>
+					<span class="input-group-btn">
+					<button id="dateQueryButton" data-loading-text="Loading..." type="button" class="btn btn-sm btn-primary">Load Day</button>
+				  </span>
+				</div>
+				<!-- /input-group -->
+			</div>
+		</div>
+
+		<div style="margin:6px;">
+			<table>
+				<tr>
+					<td><img src="images/marker-blue.png" /></td>
+					<td>&nbsp;&nbsp;No condition reported</td>
+				</tr>
+				<tr>
+					<td><img src="images/marker-green.png" /></td>
+					<td>&nbsp;&nbsp;Good Condition</td>
+				</tr>
+				<tr>
+					<td><img src="images/marker-red.png" /></td>
+					<td>&nbsp;&nbsp;Advisory Condition</td>
+				</tr>
+				<tr>
+					<td><img src="images/marker-black.png" /></td>
+					<td>&nbsp;&nbsp;Site Closed</td>
+				</tr>
+				<td><img src="images/marker-gray.png" /></td>
+				<td>&nbsp;&nbsp;Off Season</td>
+				</tr>
+			</table>
+			<div style="width: 250px;">
+				<b>Note:</b> Sites are closed only in in NY. OH and PA do not close sites,
+					instead, advisories are posted when conditions are predicted to be above
+					the recreational threshold.</div>
+
+		</div>
+	</div>
+
+
+	<div id="map" style="cursor: crosshair;"></div>
+
+	<!-- BEGIN USGS Footer Template -->
+	<div id="usgsfooter">
+
+		<div class="navbar navbar-inverse navbar-fixed-bottom visible-tablet-mobile" role="navigation">
+			<div class="navbar-header">
+
+				<span class='visible-tablet-mobile'>
+	<p id="usgsfooterbar">
+	<span class='hidden-xs'>
+		<a href="https://www.usgs.gov/laws/accessibility.html" target="_blank" title="Accessibility Policy (Section 508)">Accessibility</a>
+		<a href="https://www.usgs.gov/foia/" target="_blank" title="Freedom of Information Act">FOIA</a>
+		<a href="https://www.usgs.gov/laws/privacy.html" target="_blank" title="Privacy policies of the U.S. Geological Survey.">Privacy</a>
+		<a href="https://www.usgs.gov/laws/policies_notices.html" target="_blank" title="Policies and notices that govern information posted on USGS Web sites.">Policies and Notices</a>
+		<a href="https://usa.gov/" target="_blank" title="USA.gov" style="float:right;">USA.gov</a>
+	</span>
+				<span class='visible-xs' style='font-size: 6px;'>
+		<a href="https://www.usgs.gov/laws/accessibility.html" target="_blank" title="Accessibility Policy (Section 508)">Accessibility</a>
+		<a href="https://www.usgs.gov/foia/" target="_blank" title="Freedom of Information Act">FOIA</a>
+		<a href="https://www.usgs.gov/laws/privacy.html" target="_blank" title="Privacy policies of the U.S. Geological Survey.">Privacy</a>
+		<a href="https://www.usgs.gov/laws/policies_notices.html" target="_blank" title="Policies and notices that govern information posted on USGS Web sites.">Policies and Notices</a>
+		<a href="https://usa.gov/" target="_blank" title="USA.gov" style="float:right;">USA.gov</a>
+	</span>
+				</p>
+				</span>
+
+				<span class='visible-tablet-mobile'>
+	<p id="usgsfootertext" style="font-size: 0;position: relative;">
+			<!--<span class='hidden-xs'><span class='visible-tablet-mobile'><a href="https://usa.gov/"><img src="images/footer_graphic_usagov.jpg" alt="USA.gov logo" title="USAGov: Government Made Easy" width="90" height="26" /></a></span></span>
+				<span class='visible-xs'><span class='visible-tablet-mobile'><a href="https://usa.gov/"><img src="images/footer_graphic_usagov.jpg" alt="USA.gov logo" title="USAGov: Government Made Easy" width="45" height="13" /></a></span></span>-->
+
+				<span style="position: absolute;top: 50%;margin-top:-10.5px;right:7px;"><iframe src="https://www.facebook.com/plugins/like.php?href=https://www.facebook.com/USGSNewYork&width=106&layout=button_count&action=like&size=small&show_faces=false&share=true&height=46&appId=422636224532398" width="125" height="25" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowTransparency="true"></iframe></span>
+
+				<span class='hidden-xs'><span class='visible-tablet-mobile' style='font-size:12px; color:white'><a href="https://www.doi.gov/" style='font-size:12px; color:white'>U.S. Department of the Interior</a> | <a href="https://www.usgs.gov/" style='font-size:12px; color:white'>U.S. Geological Survey</a><br /></span></span>
+				<span class='visible-xs'><span class='visible-tablet-mobile' style='font-size:6px; color:white'><a href="https://www.doi.gov/" style='font-size:6px; color:white'>U.S. Department of the Interior</a> | <a href="https://www.usgs.gov/" style='font-size:6px; color:white'>U.S. Geological Survey</a><br /></span></span>
+
+				<span class='hidden-xs'><span class='visible-tablet-mobile' style='font-size:12px; color:white'>URL: <a href="https://ny.water.usgs.gov/maps/nowcast/" title="https://ny.water.usgs.gov/maps/nowcast/" style='font-size:12px; color:white'>https://ny.water.usgs.gov/maps/nowcast/</a><br /></span></span>
+				<span class='visible-xs'><span class='visible-tablet-mobile' style='font-size:6px; color:white'>URL: <a href="https://ny.water.usgs.gov/maps/nowcast/" title="https://ny.water.usgs.gov/maps/nowcast/" style='font-size:6px; color:white'>https://ny.water.usgs.gov/maps/nowcast/</a><br /></span></span>
+
+				<span class='hidden-xs'><span class='visible-tablet-mobile' style='font-size:12px; color:white'>Page Contact Information: <a href="mailto:marsmith@usgs.gov" style='font-size:12px; color:white' target="_blank">Website Manager</a><br /></span></span>
+				<span class='visible-xs'><span class='visible-tablet-mobile' style='font-size:6px; color:white'>Page Contact Information: <a href="mailto:marsmith@usgs.gov" style='font-size:6px; color:white' target="_blank">Website Manager</a><br /></span></span>
+
+				<span class='hidden-xs'><span class='visible-tablet-mobile' style='font-size:12px; color:white'>Page Last Modified: Thursday, May 9, 2019</span></span>
+				<span class='visible-xs'><span class='visible-tablet-mobile' style='font-size:6px; color:white'>Page Last Modified: Thursday, May 9, 2019</span></span>
+				</p>
+				</span>
+			</div>
+		</div>
+	</div>
+	<!-- END USGS Footer Template -->
+
+	<div id="markerModal" class="modal fade" tabindex="-1" role="dialog">
+		<div class="modal-dialog modal-lg">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button class="close" type="button" data-dismiss="modal" aria-hidden="true" style="color:gray;">&times;</button>
+					<h4 class="modal-title"><span class="beachName"></span> Conditions</h4>
+				</div>
+				<div id="popupModal" class="modal-body">
+					<ul class="nav nav-tabs" id="tabs">
+						<li role="presentation" class="active"><a href="#tab1" data-toggle="tab"><i class="fa fa-caret-square-o-right"></i>&nbsp;&nbsp;Current Conditions</a></li>
+						<li role="presentation" id="recentCond"><a href="#tab2" data-toggle="tab"><i class="fa fa-calendar"></i>&nbsp;&nbsp;Recent Conditions</a></li>
+						<li role="presentation" id="3rdTab"></li>
+						<!--<div id="3rdTab"></div>-->
+					</ul>
+					<div class="tab-content">
+						<div class="tab-pane active" id="tab1">
+							</br>
+							<table class="table table-hover">
+								<tr>
+									<td><strong>Date: </strong></td>
+									<td><span id="conditionsDate"></span></td>
+								</tr>
+								<tr>
+									<td><strong>Beach Name: </strong></td>
+									<td><span class="beachName"></span></td>
+								</tr>
+								<tr>
+									<td><strong>Lake Temperature (&deg;F): </strong></td>
+									<td><span id="lakeTemp"></span></td>
+								</tr>
+								<tr>
+									<td><strong>Condition: </strong></td>
+									<td>
+										<div id="beachConditionBar" class="conditionsBar"><span id="beachCondition"></span></div>
+									</td>
+								</tr>
+							</table>
+							<div id="beachguard"></div>
+							<div id="gmap"></div>
+							<a style="display:inline-block;" id="directions" href="" target="_blank" class="btn btn-sm btn-default pull-right" type="button"><span><i class="fa fa-globe"></i></span>&nbsp;&nbsp;Directions</a></br>
+							</br>
+						</div>
+						<div class="tab-pane" id="tab2">
+							</br>
+							<div class="row">
+								<!-- <div id="timeFrameDropDownHide" class="col-sm-6">
+									<select id='chooseTimeFrame' class='selectpicker' data-width='fit' data-selected-text-format='count' title='<b><font color="darkred">Choose Time Frame</font></b>'>
+										<option value="7days">7 days</option>
+										<option value="season">Whole season</option>
+									</select>
+								</div> -->
+								<div class="col-sm-6" id="showPieChartContainer"><button id="showPieChart" type="button" class="btn btn-success">NowCast's Accuracy</button></div>
+							</div>
+
+							<table id="recentConditionsTable" class="table table-condensed table-striped table-hover">
+							</table>
+							<div class="row">
+								<div id="piechart" class="center" style="display:none;"></div>
+							</div>
+							<div class="row">
+								<div id="piechart2" class="center" style="display:none;"></div>
+							</div>
+							<div class="row">
+								<div id="chartLegend" style="display:none;">
+									<table class="table table-condensed center-table">
+											<thead>
+												<tr>
+													<th>Color</th>
+													<th>Value</th>
+												</tr>
+											</thead>
+											<tr>
+												<td style="background-color:#C0392B;"></td>
+												<td>Correct Exceed</td>
+											</tr>
+											<tr>
+												<td style="background-color:#229954;"></td>
+												<td>Correct Non-Exceed</td>
+											</tr>
+											<tr>
+												<td style="background-color:#A9DFBF;"></td>
+												<td>False Exceed</td>
+											</tr>
+											<tr>
+												<td style="background-color:#E6B0AA;"></td>
+												<td>False Non-Exceed</td>
+											</tr>
+										</table>
+								</div>
+								<div id="infoText" class='well' style="display:none;margin:20px;"></div>
+							</div>
+						</div>
+						<div class="tab-pane" id="tab3">
+							</br>
+							<!--#include virtual="details/generalpicture.html" -->
+							<div id="beachDetails"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- /.modal-content -->
+		</div>
+		<!-- /.modal-dialog -->
+	</div>
+	<!-- /.modal -->
+
+	<div id="aboutModal" class="modal fade" tabindex="-1" role="dialog">
+		<div class="modal-dialog modal-lg">
+			<div class="modal-content">
+				<div id="changingTabs"></div>
+			</div>
+			<!-- /.modal-content -->
+		</div>
+		<!-- /.modal-dialog -->
+	</div>
+	<!-- /.modal -->
+
+	<!-- Modal -->
+	<div class="modal fade" id="coordModal" role="dialog">
+		<div class="modal-dialog modal-sm">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal">&times;</button>
+					<h4 class="modal-title">Enter Coordinates Manually</h4>
+				</div>
+				<div class="modal-body">
+					<form>
+						<div class="form-group">
+							<label for="latitude">Latitude:</label>
+							<input type="text" class="form-control" id="latitude">
+						</div>
+						<div class="form-group">
+							<label for="longitude">Longitude:</label>
+							<input type="text" class="form-control" id="longitude">
+						</div>
+						<button id="coordsSubmit" type="submit" class="btn btn-default">Submit</button>
+					</form>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
