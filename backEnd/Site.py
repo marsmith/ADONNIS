@@ -1,3 +1,6 @@
+#!/usr/bin/python3.6
+
+
 from LatLong import *
 from SiteID import *
 

@@ -1,3 +1,6 @@
+#!/usr/bin/python3.6
+
+
 import numpy
 
 degree_sign= u'\N{DEGREE SIGN}'

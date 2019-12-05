@@ -1,3 +1,6 @@
+#!/usr/bin/python3.6
+
+
 from Precompiler import *
 import unittest
 import numpy

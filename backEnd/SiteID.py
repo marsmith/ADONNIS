@@ -1,3 +1,6 @@
+#!/usr/bin/python3.6
+
+
 degree_sign= u'\N{DEGREE SIGN}'
 
 class SiteID(object):

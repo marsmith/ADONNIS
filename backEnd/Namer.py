@@ -1,3 +1,6 @@
+#!/usr/bin/python3.6
+
+
 from osgeo import gdal
 from osgeo import ogr
 from osgeo import osr

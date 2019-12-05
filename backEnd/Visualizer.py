@@ -1,3 +1,6 @@
+#!/usr/bin/python3.6
+
+
 import platform
 #import plotly
 # from  plotly import graph_objects as go
