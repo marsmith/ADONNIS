@@ -17,7 +17,8 @@ var collectedData = {
 };
 
 var closestPoint;
-
+var globFeature;
+var globSmallestDistIndex;
 function toRadian(num) {
     return num * (Math.PI / 180);
 }
@@ -217,8 +218,15 @@ function printElement(elem) {
     window.print();
 }
 
+function callAjaxCalls(e) {
+	$.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxGNISNameReachCode(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
+		$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
+			showFoundData();
+		});
+	});
+}
+
 function showFoundData() {
-	map.closePopup();
 	off();
 	console.log(collectedData);
 	$('#siteData').modal('show');
@@ -374,16 +382,11 @@ function ajaxGNISNameReachCode (e) {
 	});
 }
 
-function ajaxNearbyPlace (e) {
-	counter += 15;
-	on();
-	return $.ajax({ 
+function getSnappedPointThenRun (e) {
+	$.ajax({ 
 		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=2000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson", 
 		dataType: 'json', 
 		success: function(result6){
-			counter += 15;
-			console.log("THE LINK BELOW:");
-			console.log("https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=2000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson");
 			var theFeatures = result6.features;
 			var smallestDistFeatureFeature = undefined;
 			var smallestDistFeature = Number.MAX_VALUE;
@@ -442,24 +445,10 @@ function ajaxNearbyPlace (e) {
 				radius: 250
 			}).addTo(map);
 
-			collectedData.GNIS_NAME = feature.attributes.GNIS_NAME;
-			collectedData.REACHCODE = feature.attributes.REACHCODE;
-
 			//find nearest coordinate
 			var smallestDist = smallestDistFeature;
 			var smallestDistIndex = smallestDistFeatureIndex;
-
-			//find if near mouth or outlet
-			var calcDist = .05 * feature.geometry.paths[0].length;
-			if (calcDist < 1) {
-				calcDist = 1;
-			}
-			calcDist = Math.round(calcDist);
-			if (smallestDistIndex <= calcDist) {
-				collectedData.mouthOrOutlet = "mouth";
-			} else if (smallestDistIndex >= feature.geometry.paths[0].length - 1 - calcDist) {
-				collectedData.mouthOrOutlet = "outlet";
-			}
+			globSmallestDistIndex = smallestDistIndex;
 
 			//now find whether left or right of smallestDistIndex is closer
 			
@@ -473,7 +462,6 @@ function ajaxNearbyPlace (e) {
 			if (smallestDistIndex != feature.geometry.paths[0].length - 1) {
 				rightDist = distance(e.latlng.lat, e.latlng.lng, feature.geometry.paths[0][smallestDistIndex + 1][1], feature.geometry.paths[0][smallestDistIndex + 1][0]);
 			}
-			console.log("leftDist: " + leftDist + "\n" + "rightDist: " + rightDist);
 			var leftCoordOfLine;
 			var rightCoordOfLine;
 			if (leftDist < rightDist) {
@@ -523,90 +511,101 @@ function ajaxNearbyPlace (e) {
 			map.fitBounds(markerBounds);
 			map.setZoom(12);
 
-			collectedData.coords = closestPoint.latlng;
-			off();
 			var popup = L.popup()
 			.setLatLng(closestPoint.latlng)
 			.setContent('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr">Yes</button>')
 			.openOn(map);
 			$("#notCorr").click(function(){
-				location.reload();
+				map.closePopup();
 			}); 
 			$("#yesCorr").click(function(){
 				map.closePopup();
-				on();
-			});
-
-			//get nearest cities
-
-			/*
-
-			https://txdata.usgs.gov/search_api/2.1/services.ashx/search?lat_min=5&lat_max=5&lon_min=5&lon_max=5&include_state=false&include_zip_code=false&include_area_code=false&include_usgs_sw=false&include_usgs_gw=false&include_usgs_sp=false&include_usgs_at=false&include_usgs_ot=false&include_huc2=false&include_huc4=false&include_huc6=false&include_huc8=false&include_huc10=false&include_huc12=false
-
-			*/
-
-			//var theBoundingBox = getBoundingBox([D.x,D.y],currentDistance);
-			$.ajax({ 
-				url: "https://cartowfs.nationalmap.gov/arcgis/rest/services/geonames/MapServer/4/query?geometry=" + D.y +"," + D.x + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson", 
-				dataType: 'json', 
-				async: false,
-				success: function(result7){ 
-					//see if found any
-					var theFeatures = result7.features;
-					var howMany = theFeatures.length;
-					if (howMany > 0) {
-						var closestDist = Number.MAX_VALUE;
-						var closestFeature = undefined;
-						var closestCoords = undefined;
-						for (var feature of theFeatures) {
-							var theCoords = feature.geometry.points[0];
-							var currDist = distance(D.y, D.x, theCoords[0], theCoords[1]) / 1.609344;
-							if (currDist < closestDist) {
-								closestDist = currDist;
-								closestFeature = feature;
-								closestCoords = theCoords;
-							}
-						}
-
-						collectedData.placeName = closestFeature.attributes.gaz_name;
-						
-						var distMiles = closestDist;
-
-						collectedData.distanceNumber = distMiles;
-						collectedData.placeNameState = closestFeature.attributes.state_alpha;
-						
-						var n = getHorizontalBearing(closestCoords[0], closestCoords[1], D.y, D.x);
-						console.log("horizontal bearing: " + n);
-
-						//find cardinal direction from bearing
-
-						if (n < 112.5 && n >= 67.5) {
-							collectedData.cardinalDir = "north";
-						} else if (n < 67.5 && n >= 22.5) {
-							collectedData.cardinalDir = "north east";
-						} else if (n < 22.5 || n >= 337.5) {
-							collectedData.cardinalDir = "east";
-						} else if (n < 337.5 && n >= 292.5) {
-							collectedData.cardinalDir = "south east";
-						} else if (n < 292.5 && n >= 247.5) {
-							collectedData.cardinalDir = "south";
-						} else if (n < 247.5 && n >= 202.5) {
-							collectedData.cardinalDir = "south west";
-						} else if (n < 202.5 && n >= 157.5) {
-							collectedData.cardinalDir = "west";
-						} else {
-							collectedData.cardinalDir = "north west";
-						}
-					}
-				}
+				collectedData.coords = closestPoint.latlng;
+				collectedData.coords.x = closestPoint.x;
+				collectedData.coords.y = closestPoint.y;
+				globFeature = feature;
+				callAjaxCalls(e);
 			});
 		}
 	});
 }
 
+function ajaxNearbyPlace (e) {
 
+	counter += 15;
+	on();
 
+	var feature = globFeature;
+	collectedData.GNIS_NAME = feature.attributes.GNIS_NAME;
+	collectedData.REACHCODE = feature.attributes.REACHCODE;
 
+	//find if near mouth or outlet
+	var calcDist = .05 * feature.geometry.paths[0].length;
+	if (calcDist < 1) {
+		calcDist = 1;
+	}
+	calcDist = Math.round(calcDist);
+	if (globSmallestDistIndex <= calcDist) {
+		collectedData.mouthOrOutlet = "mouth";
+	} else if (globSmallestDistIndex >= feature.geometry.paths[0].length - 1 - calcDist) {
+		collectedData.mouthOrOutlet = "outlet";
+	}
+
+	return $.ajax({ 
+		url: "https://cartowfs.nationalmap.gov/arcgis/rest/services/geonames/MapServer/4/query?geometry=" + collectedData.coords.y +"," + collectedData.coords.x + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson", 
+		dataType: 'json',
+		success: function(result7){ 
+			//see if found any
+			var theFeatures = result7.features;
+			var howMany = theFeatures.length;
+			if (howMany > 0) {
+				var closestDist = Number.MAX_VALUE;
+				var closestFeature = undefined;
+				var closestCoords = undefined;
+				for (var feature of theFeatures) {
+					var theCoords = feature.geometry.points[0];
+					var currDist = distance(collectedData.coords.y, collectedData.coords.x, theCoords[0], theCoords[1]) / 1.609344;
+					if (currDist < closestDist) {
+						closestDist = currDist;
+						closestFeature = feature;
+						closestCoords = theCoords;
+					}
+				}
+
+				collectedData.placeName = closestFeature.attributes.gaz_name;
+				console.log("HEREEEEEEDFD!");
+				
+				var distMiles = closestDist;
+
+				collectedData.distanceNumber = distMiles;
+				collectedData.placeNameState = closestFeature.attributes.state_alpha;
+				
+				var n = getHorizontalBearing(closestCoords[0], closestCoords[1], collectedData.coords.y, collectedData.coords.x);
+				console.log("horizontal bearing: " + n);
+
+				//find cardinal direction from bearing
+
+				if (n < 112.5 && n >= 67.5) {
+					collectedData.cardinalDir = "north";
+				} else if (n < 67.5 && n >= 22.5) {
+					collectedData.cardinalDir = "north east";
+				} else if (n < 22.5 || n >= 337.5) {
+					collectedData.cardinalDir = "east";
+				} else if (n < 337.5 && n >= 292.5) {
+					collectedData.cardinalDir = "south east";
+				} else if (n < 292.5 && n >= 247.5) {
+					collectedData.cardinalDir = "south";
+				} else if (n < 247.5 && n >= 202.5) {
+					collectedData.cardinalDir = "south west";
+				} else if (n < 202.5 && n >= 157.5) {
+					collectedData.cardinalDir = "west";
+				} else {
+					collectedData.cardinalDir = "north west";
+				}
+			}
+		}
+	});
+}
 
 
 //main document ready function
@@ -668,22 +667,14 @@ $(document).ready(function () {
 				$("#yesLoc1").click(function(){
 					map.closePopup();
 					e.latlng = ev.latlng;
-					$.when(ajaxHUCInfo(ev), ajaxContrDrainageArea(ev), ajaxTimeZoneCode(ev), ajaxAltitude(ev), ajaxCountryCode(ev), ajaxCountyStateFIPS(ev), ajaxGNISNameReachCode(ev), ajaxNearbyPlace(ev)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
-						$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
-							showFoundData();
-						});
-					});
+					getSnappedPointThenRun(ev);
 				});
 				$("#noLoc1").click(function(){
 					marker.setLatLng(e.latlng);
 					map.closePopup();
 				});
 			});
-			$.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxGNISNameReachCode(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
-				$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
-					showFoundData();
-				});
-			});
+			getSnappedPointThenRun(e);
 		}); 
 		$("#noLoc").click(function(){
 			map.closePopup();
@@ -722,22 +713,14 @@ $(document).ready(function () {
 				$("#yesLoc1").click(function(){
 					map.closePopup();
 					e.latlng = ev.latlng;
-					$.when(ajaxHUCInfo(ev), ajaxContrDrainageArea(ev), ajaxTimeZoneCode(ev), ajaxAltitude(ev), ajaxCountryCode(ev), ajaxCountyStateFIPS(ev), ajaxGNISNameReachCode(ev), ajaxNearbyPlace(ev)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
-						$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
-							showFoundData();
-						});
-					});
+					getSnappedPointThenRun(ev);
 				});
 				$("#noLoc1").click(function(){
 					marker.setLatLng(e.latlng);
 					map.closePopup();
 				});
 			});
-			$.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxGNISNameReachCode(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7, a8){
-				$.when(ajaxSiteName(), ajaxSiteID()).done(function(a9, a10){
-					showFoundData();
-				});
-			});
+			getSnappedPointThenRun(e);
 		}
 		return false;
 	});
