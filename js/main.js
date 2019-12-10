@@ -153,7 +153,7 @@ function on() {
 		var progress = setInterval(function() {
 		var $bar = $('.bar');
 	
-		if ($bar.width()==500) {
+		if ($bar.width()>=500) {
 		  
 			// complete
 			showFoundData();
@@ -413,22 +413,6 @@ function getSnappedPointThenRun (e) {
 			}
 
 			var feature = smallestDistFeatureFeature;
-			var firstPoint = [feature.geometry.paths[0][0][1], feature.geometry.paths[0][0][0]];
-			var lastPoint = [feature.geometry.paths[0][feature.geometry.paths[0].length-1][1], feature.geometry.paths[0][feature.geometry.paths[0].length-1][0]];
-
-			var circle1 = L.circle(firstPoint, {
-				color: 'blue',
-				fillColor: 'blue',
-				fillOpacity: 0.5,
-				radius: 250
-			}).addTo(map);
-
-			var circle2 = L.circle(lastPoint, {
-				color: 'green',
-				fillColor: 'green',
-				fillOpacity: 0.5,
-				radius: 250
-			}).addTo(map);
 
 			//find nearest coordinate
 			var smallestDist = smallestDistFeature;
@@ -496,9 +480,9 @@ function getSnappedPointThenRun (e) {
 			map.fitBounds(markerBounds);
 			map.setZoom(12);
 
-			var popup = L.popup()
+			var popup = L.popup({offset: L.point(0,-50)})
 			.setLatLng(closestPoint.latlng)
-			.setContent('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr">Yes</button>')
+			.setContent('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr" style = "float:right;">Yes</button>')
 			.openOn(map);
 			$("#notCorr").click(function(){
 				map.closePopup();
@@ -632,21 +616,22 @@ $(document).ready(function () {
 		var latlng = map.mouseEventToLatLng(e.originalEvent);
 		console.log(latlng.lat + ', ' + latlng.lng);
 		
-		var popup = L.popup()
+		if (marker) { // check
+			map.removeLayer(marker); // remove
+		}
+		marker = new L.Marker(e.latlng, { draggable: true }).addTo(map); // set
+
+		var popup = L.popup({offset: L.point(0,-50)})
 		.setLatLng(e.latlng)
-		.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc">No</button><button type="button" class="btn btn-primary" id="yesLoc">Yes</button>')
+		.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc">No</button><button type="button" class="btn btn-primary" id="yesLoc" style = "float:right;">Yes</button>')
 		.openOn(map);
 		$("#yesLoc").click(function(){
 			map.closePopup();
-			if (marker) { // check
-				map.removeLayer(marker); // remove
-			}
-			marker = new L.Marker(e.latlng, { draggable: true }).addTo(map); // set
 			marker.on('dragend', function(ev) {
 				ev.latlng = ev.target.getLatLng();
 				var popup1 = L.popup()
 				.setLatLng(ev.latlng)
-				.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc1">No</button><button type="button" class="btn btn-primary" id="yesLoc1">Yes</button>')
+				.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc1">No</button><button type="button" class="btn btn-primary" id="yesLoc1" style = "float:right;">Yes</button>')
 				.openOn(map);
 				$("#yesLoc1").click(function(){
 					map.closePopup();
@@ -692,7 +677,7 @@ $(document).ready(function () {
 				ev.latlng = ev.target.getLatLng();
 				var popup1 = L.popup()
 				.setLatLng(ev.latlng)
-				.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc1">No</button><button type="button" class="btn btn-primary" id="yesLoc1">Yes</button>')
+				.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc1">No</button><button type="button" class="btn btn-primary" id="yesLoc1" style = "float:right;">Yes</button>')
 				.openOn(map);
 				$("#yesLoc1").click(function(){
 					map.closePopup();
