@@ -5,6 +5,8 @@ var siteArray;
 
 var marker;
 
+var counter = 0;
+
 var collectedData = {
 	placeName: "",
 	placeNameState: "",
@@ -144,11 +146,59 @@ function distance(lat1, lon1, lat2, lon2, unit = 'K') {
 }
 
 function on() {
-	document.getElementById("overlay").style.display = "block";
+	//document.getElementById("overlay").style.display = "block";
+	$('#myModal').on('shown.bs.modal', function () {
+ 
+		var progress = setInterval(function() {
+		var $bar = $('.bar');
+	
+		if ($bar.width()==500) {
+		  
+			// complete
+		  
+			clearInterval(progress);
+			$('.progress').removeClass('active');
+			$('#myModal').modal('hide');
+			$bar.width(0);
+		
+		} 
+		else if ($bar.width()>500)
+		{
+			clearInterval(progress);
+			$bar.width(0);
+		}
+		else {
+		  
+			// perform processing logic here
+			$bar.width(0);
+			$bar.width(counter*5);
+		}
+		
+		$bar.text($bar.width()/5 + "%");
+		}, 800);
+	  
+	  
+	})
+	$('#myModal').modal('show');
+
 }
 
 function off() {
-	document.getElementById("overlay").style.display = "none";
+	//document.getElementById("overlay").style.display = "none";
+	$('#myModal').on('hide.bs.modal', function () {
+ 
+		var progress = setInterval(function() {
+		var $bar = $('.bar');
+		clearInterval(progress);
+		
+		$bar.width(0);
+		
+		$bar.text(0 + "%");
+		}, 800);
+	  
+	  
+	})
+	$('#myModal').modal('hide');
 }
 
 function printElement(elem) {
@@ -197,11 +247,13 @@ function ajaxSiteName () {
 				'cardinalDir' : collectedData.cardinalDir
         },
 		success: function(theResult){
+			counter += 10;
 			collectedData.suggSiteNames = JSON.parse(theResult);
 		}});
 }
 
 function ajaxSiteID () {
+
 	on();
 	return $.ajax({ 
 		type : 'post',
@@ -219,6 +271,7 @@ function ajaxSiteID () {
 			} else {
 				collectedData.siteID = "Needs revision.";
 			}
+			counter += 30;
 		}});
 }
 
@@ -229,22 +282,24 @@ function ajaxHUCInfo (e) {
 		url: "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/6/query?where=1%3D1&text=&objectIds=&time=&geometry=" + e.latlng.lng + "%2C" + e.latlng.lat + "&geometryType=esriGeometryPoint&inSR=4269&spatialRel=esriSpatialRelWithin&relationParam=&outFields=HUC12%2CNAME&returnGeometry=false&returnTrueCurves=false&maxAllowableOffset=&geometryPrecision=&outSR=&having=&returnIdsOnly=false&returnCountOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&gdbVersion=&historicMoment=&returnDistinctValues=false&resultOffset=&resultRecordCount=&queryByDistance=&returnExtentOnly=false&datumTransformation=&parameterValues=&rangeValues=&quantizationParameters=&f=pjson", 
 		dataType: 'json', 
 		success: function(result){
+			counter = 5;
 			collectedData.HUC = result.features[0].attributes.HUC12;
 			collectedData.HUCName = result.features[0].attributes.NAME;
 		}});
 }
 
 function ajaxContrDrainageArea (e) {
-	// on();
-	// return $.ajax({ 
-	// 	url: "https://streamstats.usgs.gov/streamstatsservices/watershed.geojson?rcode=NY&xlocation=" + e.latlng.lng + "&ylocation=" + e.latlng.lat + "&crs=4326&includeparameters=false&includeflowtypes=false&includefeatures=true&simplify=true", 
-	// 	dataType: 'json', 
-	// 	success: function(result1){ 
-	// 		if (result1.featurecollection[1] && result1.featurecollection[1].feature.features[0]) {
-	// 			collectedData.contrDrainageArea = result1.featurecollection[1].feature.features[0].properties.Shape_Area;
-	// 			collectedData.contrDrainageArea *= 10.764;
-	// 		}
-	// }});
+	on();
+	return $.ajax({ 
+		url: "https://streamstats.usgs.gov/streamstatsservices/watershed.geojson?rcode=NY&xlocation=" + e.latlng.lng + "&ylocation=" + e.latlng.lat + "&crs=4326&includeparameters=false&includeflowtypes=false&includefeatures=true&simplify=true", 
+		dataType: 'json', 
+		success: function(result1){ 
+			if (result1.featurecollection[1] && result1.featurecollection[1].feature.features[0]) {
+				collectedData.contrDrainageArea = result1.featurecollection[1].feature.features[0].properties.Shape_Area;
+				collectedData.contrDrainageArea *= 10.764;
+			}
+			counter += 30;
+	}});
 }
 
 function ajaxTimeZoneCode (e) {
@@ -254,19 +309,21 @@ function ajaxTimeZoneCode (e) {
 		dataType: 'json', 
 		success: function(result2){ 
 			collectedData.timeZoneCode = result2.abbreviation;
+			counter += 1;
 		}
 	});
 }
 
 function ajaxAltitude (e) {
- 	// on();
-	// return $.ajax({ 
-	// 	url: "https://nationalmap.gov/epqs/pqs.php?x=" + e.latlng.lng + "&y=" + e.latlng.lat + "&units=Feet&output=json", 
-	// 	dataType: 'json', 
-	// 	success: function(result3){ 
-	// 		collectedData.altitude = result3.USGS_Elevation_Point_Query_Service.Elevation_Query.Elevation;
-	// 	}
-	// });
+ 	on();
+	return $.ajax({ 
+		url: "https://nationalmap.gov/epqs/pqs.php?x=" + e.latlng.lng + "&y=" + e.latlng.lat + "&units=Feet&output=json", 
+		dataType: 'json', 
+		success: function(result3){ 
+			collectedData.altitude = result3.USGS_Elevation_Point_Query_Service.Elevation_Query.Elevation;
+			counter += 2;
+		}
+	});
 }
 
 function ajaxCountryCode (e) {
@@ -276,6 +333,7 @@ function ajaxCountryCode (e) {
 		dataType: 'json', 
 		success: function(result4){ 
 			collectedData.countryCode = result4.address.country_code;
+			counter += 1;
 		}
 	});
 }
@@ -286,6 +344,7 @@ function ajaxCountyStateFIPS (e) {
 		url: "https://geo.fcc.gov/api/census/block/find?latitude=" + e.latlng.lat + "&longitude=" + e.latlng.lng + "&showall=false&format=json", 
 		dataType: 'json', 
 		success: function(result5){ 
+			counter += 1;
 			collectedData.county = result5.County.name;
 			collectedData.state = result5.State.name;
 			collectedData.stateCode = result5.State.code;
@@ -302,6 +361,7 @@ function ajaxGNISNameReachCode (e) {
 		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&distance=2000&units=esriSRUnit_Meter&outFields=*&returnGeometry=false&f=pjson", 
 		dataType: 'json', 
 		success: function(result6){ 
+			counter += 5;
 			var theFeatures = result6.features;
 			for (var feature of theFeatures) {
 				if (feature.attributes.GNIS_NAME) {
@@ -315,11 +375,13 @@ function ajaxGNISNameReachCode (e) {
 }
 
 function ajaxNearbyPlace (e) {
+	counter += 15;
 	on();
 	return $.ajax({ 
 		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=2000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson", 
 		dataType: 'json', 
 		success: function(result6){
+			counter += 15;
 			console.log("THE LINK BELOW:");
 			console.log("https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=2000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson");
 			var theFeatures = result6.features;
@@ -764,8 +826,9 @@ function onMarkerClick(e) {
 
 	//make sure first tab is default
 	$('#markerModal a:first').tab('show');
-
+	
 	//show modal
+	//$('#myModal').modal('show');
 	$('#markerModal').modal('show');
 
 	//turn on popover click

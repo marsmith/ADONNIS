@@ -54,6 +54,8 @@ def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, fol
             if p == name:
                 poss.remove(p)
     
+    if poss == None:
+        return ["Found nothing"]
     return poss
 a = sys.argv[1]
 k = a.split(",")
