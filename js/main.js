@@ -4,6 +4,7 @@ var markerArray;
 var siteArray;
 
 var marker;
+var firstpolyline;
 
 var counter = 0;
 
@@ -191,8 +192,7 @@ function off() {
 		
 		$bar.text(0 + "%");
 		}, 800);
-	  
-	  
+
 	})
 	$('#myModal').modal('hide');
 	counter = 0;
@@ -228,9 +228,20 @@ function showFoundData() {
 	$('#siteData').modal('show');
 	var siteNamesString = "";
 	for (const siteName of collectedData.suggSiteNames.Results) {
-		siteNamesString += "<h5>- " + siteName + "</h5>";
+		siteNamesString += "<option>" + siteName + "</option>";
 	}
-	$('#siteDataForm').html('<form action=""><b>Suggested Site Names (that haven\'t been taken):</b><br>' + siteNamesString + '<b>Site ID:</b><br><h5>' + collectedData.siteID + '</h5><b>Altitude:</b><br><input type="text" name="altitude" value="' + collectedData.altitude + '"><br><b>Country Code:</b><br><input type="text" name="countryCode" value="' + collectedData.countryCode + '"><br><b>Timezone Code:</b><br><input type="text" name="timeZoneCode" value="' + collectedData.timeZoneCode + '"><br><b>contr Drainage Area:</b><br><input type="text" name="contrDrainageArea" value="' + collectedData.contrDrainageArea + '"><br><b>HUC:</b><br><input type="text" name="HUC" value="' + collectedData.HUC + '"><br><b>HUC Name:</b><br><input type="text" name="HUCName" value="' + collectedData.HUCName + '"><br><b>State FIPS:</b><br><input type="text" name="stateFIPS" value="' + collectedData.stateFIPS + '"><br><b>County FIPS:</b><br><input type="text" name="countyFIPS" value="' + collectedData.countyFIPS + '"><br><b>State:</b><br><input type="text" name="state" value="' + collectedData.state + '"><br><b>State Code:</b><br><input type="text" name="stateCode" value="' + collectedData.stateCode + '"><br><b>County:</b><br><input type="text" name="county" value="' + collectedData.county + '"><br><br><input type="submit" value="Submit"></form>');
+	$("#SuggestedNames").html(siteNamesString);
+	$("#SiteID").val(collectedData.siteID);
+	$("#Alt").val(collectedData.altitude);
+	$("#CC").val(collectedData.countryCode);
+	$("#TimeZone").val(collectedData.timeZoneCode);
+	$("#Drain").val(collectedData.contrDrainageArea);
+	$("#HUC").val(collectedData.HUC);
+	$("#HUCN").val(collectedData.HUCName);
+	$("#State").val(collectedData.state);
+	$("#County").val(collectedData.county);
+	$("#StateFPS").val(collectedData.stateFIPS);
+	$("#CountyFPS").val(collectedData.countyFIPS);
 }
 
 //ajax functions
@@ -381,7 +392,7 @@ function getSnappedPointThenRun (e) {
 				for (const point of feature.geometry.paths[0]) {
 					points.push(new L.LatLng(point[1], point[0]));
 				}
-				var firstpolyline = new L.Polyline(points, {
+				firstpolyline = new L.Polyline(points, {
 					color: 'red',
 					weight: 3,
 					opacity: 0.5,
@@ -619,6 +630,9 @@ $(document).ready(function () {
 		if (marker) { // check
 			map.removeLayer(marker); // remove
 		}
+		if (firstpolyline) { // check
+			map.removeLayer(firstpolyline); // remove
+		}
 		marker = new L.Marker(e.latlng, { draggable: true }).addTo(map); // set
 
 		var popup = L.popup({offset: L.point(0,-50)})
@@ -671,6 +685,9 @@ $(document).ready(function () {
 			map.closePopup();
 			if (marker) { // check
 				map.removeLayer(marker); // remove
+			}
+			if (firstpolyline) { // check
+				map.removeLayer(firstpolyline); // remove
 			}
 			marker = new L.Marker(e.latlng, { draggable: true }).addTo(map); // set
 			marker.on('dragend', function(ev) {

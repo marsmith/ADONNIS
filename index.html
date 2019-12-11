@@ -76,84 +76,82 @@
 					<h4 class="modal-title">Data</h4>
 				</div>
 				<div class="modal-body">
-					<form action="/action_page.php">
-						<div class="form-group">
-							<label for="SuggestedNames"> Suggested Site Names:</label>
-							<select class="form-control" id="SuggestedNames">
-								<option>1</option>
-								<option>2</option>
-								<option>3</option>
-								<option>4</option>
-							</select>
-						</div>
-						
-						<div class = "row">
-							<div class="col-xs-4">
-								<label for="SiteID"> Site ID:</label>
-								<input type="site" class="form-control" id="SiteID" name="SiteID">
+					<div id="printThis">
+						<form action="/action_page.php">
+							<div class="form-group">
+								<label for="SuggestedNames"> Suggested Site Names:</label>
+								<select class="form-control" id="SuggestedNames">
+								</select>
 							</div>
-						</div>
-						<br>
-						<div class = "row">
-							<div class="col-xs-4 form-group">
-								<label for="Alt"> Altitude:</label>
-								<input type="Alt" class="form-control" id="Alt" name="Alt">
+							
+							<div class = "row">
+								<div class="col-xs-6">
+									<label for="SiteID"> Site ID:</label>
+									<input type="site" class="form-control" id="SiteID" name="SiteID">
+								</div>
+							</div>
+							<br>
+							<div class = "row">
+								<div class="col-xs-6 form-group">
+									<label for="Alt"> Altitude:</label>
+									<input type="Alt" class="form-control" id="Alt" name="Alt">
+								</div>
+
+								<div class="col-xs-6 form-group">
+									<label for="CC"> Country Code:</label>
+									<input type="CC" class="form-control" id="CC" name="CC">
+								</div>
 							</div>
 
-							<div class="col-xs-4 form-group">
-								<label for="CC"> Country Code:</label>
-								<input type="CC" class="form-control" id="CC" name="CC">
-							</div>
-						</div>
+							<div class = "row">
+								<div class="col-xs-6 form-group">
+									<label for="TimeZone"> Timezone:</label>
+									<input type="TimeZone form" class="form-control" id="TimeZone" name="TimeZone Input">
+								</div>
 
-						<div class = "row">
-							<div class="col-xs-4 form-group">
-								<label for="TimeZone"> Timezone:</label>
-								<input type="TimeZone form" class="form-control" id="TimeZone" name="TimeZone Input">
+								<div class="col-xs-6 form-group">
+									<label for="Drain"> Drainage Area:</label>
+									<input type="Drainage form" class="form-control" id="Drain" name="Drainage">
+								</div>
 							</div>
+							
+							<div class = "row">
+								<div class="col-xs-6 form-group">
+									<label for="HUC"> HUC:</label>
+									<input type="HUC form" class="form-control" id="HUC" name="HUC input">
+								</div>
 
-							<div class="col-xs-4 form-group">
-								<label for="Drain"> Drainage Area:</label>
-								<input type="Drainage form" class="form-control" id="Drain" name="Drainage">
-							</div>
-						</div>
-						
-						<div class = "row">
-							<div class="col-xs-4 form-group">
-								<label for="HUC"> HUC:</label>
-								<input type="HUC form" class="form-control" id="HUC" name="HUC input">
-							</div>
-
-							<div class="col-xs-4 form-group">
-								<label for="HUCN"> HUC Name:</label>
-								<input type="HUCName form" class="form-control" id="HUCN" name="HUCName">
-							</div>
-						</div>
-
-						<div class = "row">
-							<div class="col-xs-4 form-group">
-								<label for="State"> State:</label>
-								<input type="State form" class="form-control" id="State" name="State Input">
+								<div class="col-xs-6 form-group">
+									<label for="HUCN"> HUC Name:</label>
+									<input type="HUCName form" class="form-control" id="HUCN" name="HUCName">
+								</div>
 							</div>
 
-							<div class="col-xs-4 form-group">
-								<label for="Country"> County:</label>
-								<input type="County Form" class="form-control" id="County" name="Country Input">
-							</div>
-						</div>
+							<div class = "row">
+								<div class="col-xs-6 form-group">
+									<label for="State"> State:</label>
+									<input type="State form" class="form-control" id="State" name="State Input">
+								</div>
 
-						<div class = "row">
-							<div class="col-xs-4 form-group">
-								<label for="StateFPS"> State FPS:</label>
-								<input type="StateFPS form" class="form-control" id="StateFPS" name="StateFPS Input">
+								<div class="col-xs-6 form-group">
+									<label for="County"> County:</label>
+									<input type="County Form" class="form-control" id="County" name="Country Input">
+								</div>
 							</div>
 
-							<div class="col-xs-4 form-group">
-								<label for="CountryFPS"> County FPS:</label>
-								<input type="CountyFPS Form" class="form-control" id="CountyFPS" name="CountryFPS Input">
+							<div class = "row">
+								<div class="col-xs-6 form-group">
+									<label for="StateFPS"> State FPS:</label>
+									<input type="StateFPS form" class="form-control" id="StateFPS" name="StateFPS Input">
+								</div>
+
+								<div class="col-xs-6 form-group">
+									<label for="CountyFPS"> County FPS:</label>
+									<input type="CountyFPS Form" class="form-control" id="CountyFPS" name="CountryFPS Input">
+								</div>
 							</div>
-						</div>
-					</form>
+						</form>
+					</div>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
