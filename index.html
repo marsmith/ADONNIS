@@ -76,81 +76,95 @@
 					<h4 class="modal-title">Data</h4>
 				</div>
 				<div class="modal-body">
-					<div id="printThis">
-						<form action="/action_page.php">
-							<div class="form-group">
-								<label for="SuggestedNames"> Suggested Site Names:</label>
-								<select class="form-control" id="SuggestedNames">
-								</select>
+					<form action="/action_page.php">
+						<div class="form-group">
+							<label for="SuggestedNames"> Suggested Site Names:</label>
+							<select class="form-control" id="SuggestedNames">
+							</select>
+						</div>
+						
+						<div class = "row">
+							<div class="col-xs-6">
+								<label for="SiteID"> Site ID:</label>
+								<input type="site" class="form-control" id="SiteID" name="SiteID">
 							</div>
-							
-							<div class = "row">
-								<div class="col-xs-6">
-									<label for="SiteID"> Site ID:</label>
-									<input type="site" class="form-control" id="SiteID" name="SiteID">
-								</div>
-							</div>
-							<br>
-							<div class = "row">
-								<div class="col-xs-6 form-group">
-									<label for="Alt"> Altitude:</label>
-									<input type="Alt" class="form-control" id="Alt" name="Alt">
-								</div>
-
-								<div class="col-xs-6 form-group">
-									<label for="CC"> Country Code:</label>
-									<input type="CC" class="form-control" id="CC" name="CC">
-								</div>
+						</div>
+						<br>
+						<div class = "row">
+							<div class="col-xs-6 form-group">
+								<label for="Alt"> Altitude:</label>
+								<input type="Alt" class="form-control" id="Alt" name="Alt">
 							</div>
 
-							<div class = "row">
-								<div class="col-xs-6 form-group">
-									<label for="TimeZone"> Timezone:</label>
-									<input type="TimeZone form" class="form-control" id="TimeZone" name="TimeZone Input">
-								</div>
-
-								<div class="col-xs-6 form-group">
-									<label for="Drain"> Drainage Area:</label>
-									<input type="Drainage form" class="form-control" id="Drain" name="Drainage">
-								</div>
+							<div class="col-xs-6 form-group">
+								<label for="CC"> Country Code:</label>
+								<input type="CC" class="form-control" id="CC" name="CC">
 							</div>
-							
-							<div class = "row">
-								<div class="col-xs-6 form-group">
-									<label for="HUC"> HUC:</label>
-									<input type="HUC form" class="form-control" id="HUC" name="HUC input">
-								</div>
+						</div>
 
-								<div class="col-xs-6 form-group">
-									<label for="HUCN"> HUC Name:</label>
-									<input type="HUCName form" class="form-control" id="HUCN" name="HUCName">
-								</div>
+						<div class = "row">
+							<div class="col-xs-6 form-group">
+								<label for="TimeZone"> Timezone:</label>
+								<input type="TimeZone form" class="form-control" id="TimeZone" name="TimeZone Input">
 							</div>
 
-							<div class = "row">
-								<div class="col-xs-6 form-group">
-									<label for="State"> State:</label>
-									<input type="State form" class="form-control" id="State" name="State Input">
-								</div>
-
-								<div class="col-xs-6 form-group">
-									<label for="County"> County:</label>
-									<input type="County Form" class="form-control" id="County" name="Country Input">
-								</div>
+							<div class="col-xs-6 form-group">
+								<label for="Drain"> Drainage Area:</label>
+								<input type="Drainage form" class="form-control" id="Drain" name="Drainage">
+							</div>
+						</div>
+						
+						<div class = "row">
+							<div class="col-xs-6 form-group">
+								<label for="HUC"> HUC:</label>
+								<input type="HUC form" class="form-control" id="HUC" name="HUC input">
 							</div>
 
-							<div class = "row">
-								<div class="col-xs-6 form-group">
-									<label for="StateFPS"> State FPS:</label>
-									<input type="StateFPS form" class="form-control" id="StateFPS" name="StateFPS Input">
-								</div>
-
-								<div class="col-xs-6 form-group">
-									<label for="CountyFPS"> County FPS:</label>
-									<input type="CountyFPS Form" class="form-control" id="CountyFPS" name="CountryFPS Input">
-								</div>
+							<div class="col-xs-6 form-group">
+								<label for="HUCN"> HUC Name:</label>
+								<input type="HUCName form" class="form-control" id="HUCN" name="HUCName">
 							</div>
-						</form>
+						</div>
+
+						<div class = "row">
+							<div class="col-xs-6 form-group">
+								<label for="State"> State:</label>
+								<input type="State form" class="form-control" id="State" name="State Input">
+							</div>
+
+							<div class="col-xs-6 form-group">
+								<label for="County"> County:</label>
+								<input type="County Form" class="form-control" id="County" name="Country Input">
+							</div>
+						</div>
+
+						<div class = "row">
+							<div class="col-xs-6 form-group">
+								<label for="StateFIPS"> State FIPS:</label>
+								<input type="StateFIPS form" class="form-control" id="StateFIPS" name="StateFIPS Input">
+							</div>
+
+							<div class="col-xs-6 form-group">
+								<label for="CountyFIPS"> County FIPS:</label>
+								<input type="CountyFIPS Form" class="form-control" id="CountyFIPS" name="CountryFIPS Input">
+							</div>
+						</div>
+					</form>
+					<div id="printSection">
+						<div id="printThis">
+							<h4>Site Name: <span id="siteNamePrint"></span></h4>
+							<h4>Site ID: <span id="siteIDPrint"></span></h4>
+							<h4>Altitude: <span id="altitudePrint"></span></h4>
+							<h4>Country Code: <span id="countryCodePrint"></span></h4>
+							<h4>Timezone: <span id="timezonePrint"></span></h4>
+							<h4>Drainage Area: <span id="drainageAreaPrint"></span></h4>
+							<h4>HUC: <span id="HUCPrint"></span></h4>
+							<h4>HUC Name: <span id="HUCNamePrint"></span></h4>
+							<h4>State: <span id="statePrint"></span></h4>
+							<h4>County: <span id="countyPrint"></span></h4>
+							<h4>State FIPS: <span id="stateFIPSPrint"></span></h4>
+							<h4>County FIPS: <span id="countyFIPSPrint"></span></h4>
+						</div>
 					</div>
 				</div>
 				<div class="modal-footer">
@@ -161,24 +175,6 @@
 			</div>
 		</div>
 
-	<!-- Modal -->
-	<!-- <div class="modal fade" id="siteData" role="dialog">
-		<div class="modal-dialog modal-md">
-			<div class="modal-content">
-			<div class="modal-header">
-				<button type="button" class="close" data-dismiss="modal">&times;</button>
-				<h4 class="modal-title">Data</h4>
-			</div>
-			<div class="modal-body">
-				<div id="printThis"><div id="siteDataForm"></div></div>
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-				<button id="btnPrint" type="button" class="btn btn-default">Print</button>
-			</div>
-			</div>
-		</div>
-	</div> -->
 	<div id="overlay" align="center" style="display: none;z-index: 1000000;">
 		<div id="text"><i class="fa fa-cog fa-spin" style="font-size:100px"></i></div>
 	</div>

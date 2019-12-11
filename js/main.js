@@ -240,8 +240,22 @@ function showFoundData() {
 	$("#HUCN").val(collectedData.HUCName);
 	$("#State").val(collectedData.state);
 	$("#County").val(collectedData.county);
-	$("#StateFPS").val(collectedData.stateFIPS);
-	$("#CountyFPS").val(collectedData.countyFIPS);
+	$("#StateFIPS").val(collectedData.stateFIPS);
+	$("#CountyFIPS").val(collectedData.countyFIPS);
+
+	//now insert data into print section
+
+	$("#siteIDPrint").text(collectedData.siteID);
+	$("#altitudePrint").text(collectedData.altitude);
+	$("#countryCodePrint").text(collectedData.countryCode);
+	$("#timezonePrint").text(collectedData.timeZoneCode);
+	$("#drainageAreaPrint").text(collectedData.contrDrainageArea);
+	$("#HUCPrint").text(collectedData.HUC);
+	$("#HUCNamePrint").text(collectedData.HUCName);
+	$("#statePrint").text(collectedData.state);
+	$("#countyPrint").text(collectedData.county);
+	$("#stateFIPSPrint").text(collectedData.stateFIPS);
+	$("#countyFIPSPrint").text(collectedData.countyFIPS);
 }
 
 //ajax functions
@@ -591,6 +605,8 @@ function ajaxNearbyPlace (e) {
 $(document).ready(function () {
 
 	document.getElementById("btnPrint").onclick = function () {
+		var chosenSiteName = $('#SuggestedNames').find(":selected").text();
+		$("#siteNamePrint").text(chosenSiteName);
 		printElement(document.getElementById("printThis"));
 	}
 
