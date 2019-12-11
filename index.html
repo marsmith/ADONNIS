@@ -16,7 +16,6 @@
 	crossorigin=""/>
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css">
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" />
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.2/css/bootstrap-select.css" />
 	<link rel="stylesheet" href="css/datepicker3.css" />
 	<link rel="stylesheet" href="css/style.css" />
 	<link rel="stylesheet" type="text/css" href="css/common.css">
@@ -62,7 +61,6 @@
 	<script src="js/bootstrap-datepicker.js"></script>
 	<script src="js/moment.min.js"></script>
 	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.2/js/bootstrap-select.js"></script>
 	<script src="js/main.js"></script>
 </head>
 
@@ -175,9 +173,6 @@
 			</div>
 		</div>
 
-	<div id="overlay" align="center" style="display: none;z-index: 1000000;">
-		<div id="text"><i class="fa fa-cog fa-spin" style="font-size:100px"></i></div>
-	</div>
 	<div id='topnav'>
 		<div class="navbar navbar-default navbar-fixed-top" role="navigation">
             <div class="navbar-header">
@@ -188,50 +183,6 @@
             </div>
 		</div>
 	</div>
-	<div id="legend" class="legend" style="display:none;">
-		<p>To query another date, use the datepicker below:</p>
-		<div style="margin:5px;" class="row">
-			<div class="btn-group pull-left">
-				<div class="input-group" style="width:150px;float:left;">
-					<input type="button" class="input-sm form-control datepicker"></input>
-					<span class="input-group-btn">
-					<button id="dateQueryButton" data-loading-text="Loading..." type="button" class="btn btn-sm btn-primary">Load Day</button>
-				  </span>
-				</div>
-				<!-- /input-group -->
-			</div>
-		</div>
-
-		<div style="margin:6px;">
-			<table>
-				<tr>
-					<td><img src="images/marker-blue.png" /></td>
-					<td>&nbsp;&nbsp;No condition reported</td>
-				</tr>
-				<tr>
-					<td><img src="images/marker-green.png" /></td>
-					<td>&nbsp;&nbsp;Good Condition</td>
-				</tr>
-				<tr>
-					<td><img src="images/marker-red.png" /></td>
-					<td>&nbsp;&nbsp;Advisory Condition</td>
-				</tr>
-				<tr>
-					<td><img src="images/marker-black.png" /></td>
-					<td>&nbsp;&nbsp;Site Closed</td>
-				</tr>
-				<td><img src="images/marker-gray.png" /></td>
-				<td>&nbsp;&nbsp;Off Season</td>
-				</tr>
-			</table>
-			<div style="width: 250px;">
-				<b>Note:</b> Sites are closed only in in NY. OH and PA do not close sites,
-					instead, advisories are posted when conditions are predicted to be above
-					the recreational threshold.</div>
-
-		</div>
-	</div>
-
 
 	<div id="map" style="cursor: crosshair;"></div>
 
@@ -285,14 +236,6 @@
 	</div>
 	<!-- END USGS Footer Template -->
 
-	<!-- <div class="progress">
-		<div class="progress-bar progress-bar-striped active" role="progressbar"
-		aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width:40%">
-		  40%
-		</div>
-	</div> -->
-
-
 	<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
 		<div class="modal-dialog">
 		  <div class="modal-content">
@@ -310,112 +253,6 @@
 		  </div><!-- /.modal-content -->
 		</div><!-- /.modal-dialog -->
 	  </div><!-- /.modal -->
-
-	<div id="markerModal" class="modal fade" tabindex="-1" role="dialog">
-		<div class="modal-dialog modal-lg">
-			<div class="modal-content">
-				<div class="modal-header">
-					<button class="close" type="button" data-dismiss="modal" aria-hidden="true" style="color:gray;">&times;</button>
-					<h4 class="modal-title"><span class="beachName"></span> Conditions</h4>
-				</div>
-				<div id="popupModal" class="modal-body">
-					<ul class="nav nav-tabs" id="tabs">
-						<li role="presentation" class="active"><a href="#tab1" data-toggle="tab"><i class="fa fa-caret-square-o-right"></i>&nbsp;&nbsp;Current Conditions</a></li>
-						<li role="presentation" id="recentCond"><a href="#tab2" data-toggle="tab"><i class="fa fa-calendar"></i>&nbsp;&nbsp;Recent Conditions</a></li>
-						<li role="presentation" id="3rdTab"></li>
-						<!--<div id="3rdTab"></div>-->
-					</ul>
-					<div class="tab-content">
-						<div class="tab-pane active" id="tab1">
-							</br>
-							<table class="table table-hover">
-								<tr>
-									<td><strong>Date: </strong></td>
-									<td><span id="conditionsDate"></span></td>
-								</tr>
-								<tr>
-									<td><strong>Beach Name: </strong></td>
-									<td><span class="beachName"></span></td>
-								</tr>
-								<tr>
-									<td><strong>Lake Temperature (&deg;F): </strong></td>
-									<td><span id="lakeTemp"></span></td>
-								</tr>
-								<tr>
-									<td><strong>Condition: </strong></td>
-									<td>
-										<div id="beachConditionBar" class="conditionsBar"><span id="beachCondition"></span></div>
-									</td>
-								</tr>
-							</table>
-							<div id="beachguard"></div>
-							<div id="gmap"></div>
-							<a style="display:inline-block;" id="directions" href="" target="_blank" class="btn btn-sm btn-default pull-right" type="button"><span><i class="fa fa-globe"></i></span>&nbsp;&nbsp;Directions</a></br>
-							</br>
-						</div>
-						<div class="tab-pane" id="tab2">
-							</br>
-							<div class="row">
-								<!-- <div id="timeFrameDropDownHide" class="col-sm-6">
-									<select id='chooseTimeFrame' class='selectpicker' data-width='fit' data-selected-text-format='count' title='<b><font color="darkred">Choose Time Frame</font></b>'>
-										<option value="7days">7 days</option>
-										<option value="season">Whole season</option>
-									</select>
-								</div> -->
-								<div class="col-sm-6" id="showPieChartContainer"><button id="showPieChart" type="button" class="btn btn-success">Adonnis's Accuracy</button></div>
-							</div>
-
-							<table id="recentConditionsTable" class="table table-condensed table-striped table-hover">
-							</table>
-							<div class="row">
-								<div id="piechart" class="center" style="display:none;"></div>
-							</div>
-							<div class="row">
-								<div id="piechart2" class="center" style="display:none;"></div>
-							</div>
-							<div class="row">
-								<div id="chartLegend" style="display:none;">
-									<table class="table table-condensed center-table">
-											<thead>
-												<tr>
-													<th>Color</th>
-													<th>Value</th>
-												</tr>
-											</thead>
-											<tr>
-												<td style="background-color:#C0392B;"></td>
-												<td>Correct Exceed</td>
-											</tr>
-											<tr>
-												<td style="background-color:#229954;"></td>
-												<td>Correct Non-Exceed</td>
-											</tr>
-											<tr>
-												<td style="background-color:#A9DFBF;"></td>
-												<td>False Exceed</td>
-											</tr>
-											<tr>
-												<td style="background-color:#E6B0AA;"></td>
-												<td>False Non-Exceed</td>
-											</tr>
-										</table>
-								</div>
-								<div id="infoText" class='well' style="display:none;margin:20px;"></div>
-							</div>
-						</div>
-						<div class="tab-pane" id="tab3">
-							</br>
-							<!--#include virtual="details/generalpicture.html" -->
-							<div id="beachDetails"></div>
-						</div>
-					</div>
-				</div>
-			</div>
-			<!-- /.modal-content -->
-		</div>
-		<!-- /.modal-dialog -->
-	</div>
-	<!-- /.modal -->
 
 	<div id="aboutModal" class="modal fade" tabindex="-1" role="dialog">
 		<div class="modal-dialog modal-lg">
