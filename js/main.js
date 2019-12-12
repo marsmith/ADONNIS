@@ -1,7 +1,8 @@
 var map;
 var marker;
 var firstpolyline;
-
+var printURL = "";
+var currStationName = "";
 var counter = 0;
 
 var collectedData = {
@@ -26,9 +27,9 @@ function toDegree(num) {
 
 function deg_to_dms (dd) {
 	var beg_sign = ""
-	// if (dd < 0){
-	//   beg_sign = "-";
-	// }
+	if (dd < 0){
+	  beg_sign = "0";
+	}
 	var absDd = Math.abs(dd);
 	var deg = absDd | 0;
 	var frac = absDd - deg;
@@ -36,7 +37,7 @@ function deg_to_dms (dd) {
 	var sec = frac * 3600 - min * 60;
 	// Round it to 2 decimal points.
 	sec = Math.round(sec * 100) / 100;
-	return [beg_sign + deg + ""+ min + "" + parseInt(sec), (sec%1).toFixed(2)];
+	return [beg_sign + deg + ""+ min + "" + parseInt(sec), ((sec%1).toFixed(2))*100];
   
    }
 
@@ -159,21 +160,10 @@ function distance(lat1, lon1, lat2, lon2, unit = 'K') {
 	}
 }
 
-function createPDFThenPrint() {
+function changeChosenSiteName() {
 	var chosenName = $('#SuggestedNames').find(":selected").text();
-	// $("#siteIDPrint").text(collectedData.siteID);
-	// $("#altitudePrint").text(collectedData.altitude);
-	// $("#countryCodePrint").text(collectedData.countryCode);
-	// $("#timezonePrint").text(collectedData.timeZoneCode);
-	// $("#drainageAreaPrint").text(collectedData.contrDrainageArea);
-	// $("#HUCPrint").text(collectedData.HUC);
-	// $("#HUCNamePrint").text(collectedData.HUCName);
-	// $("#statePrint").text(collectedData.state);
-	// $("#countyPrint").text(collectedData.county);
-	// $("#stateFIPSPrint").text(collectedData.stateFIPS);
-	// $("#countyFIPSPrint").text(collectedData.countyFIPS);
-	$('#theIframe').attr('src','siteForm/blankSiteForm.php?stationName=' + chosenName + '&siteID=' + collectedData.siteID + '&stateFIPS=' + collectedData.stateFIPS + '&country=' + collectedData.countryCode);
-	frames['frame'].print();
+	currStationName = chosenName;
+	$("#printThis").html('<iframe src="' + printURL + '&stationName=' + currStationName + '" style="display:none;" name="frame" id="theIframe"></iframe>');
 }
 
 function on() {
@@ -256,6 +246,13 @@ function showFoundData() {
 	$("#StateFIPS").val(collectedData.stateFIPS);
 	$("#CountyFIPS").val(collectedData.countyFIPS);
 
+
+	var latDMS = deg_to_dms(collectedData.coords.lat);
+	var lngDMS = deg_to_dms(collectedData.coords.lng);
+	printURL = 'siteForm/blankSiteForm.php?siteID=' + collectedData.siteID + '&stateFIPS=' + collectedData.stateFIPS + '&country=' + collectedData.countryCode + '&latDMS=' + latDMS[0] + '&latDecimal=' + latDMS[1] + '&lngDMS=' + lngDMS[0] + '&lngDecimal=' + lngDMS[1];
+	currStationName = $('#SuggestedNames').find(":selected").text();
+	$("#printThis").html('<iframe src="' + printURL + '&stationName=' + currStationName + '" style="display:none;" name="frame" id="theIframe"></iframe>');
+	console.log(printURL + '&stationName=' + currStationName);
 	//now insert data into print section
 
 	//$("#printThis").html('<iframe src="../siteForm/blankSiteForm.php?stationName=" style="display:none;" name="frame" id="theIframe"></iframe>')
@@ -382,7 +379,7 @@ function ajaxCountryCode (e) {
 		url: "https://nominatim.openstreetmap.org/reverse?format=json&lat=" + e.latlng.lat + "&lon=" +  e.latlng.lng + "&zoom=18&addressdetails=1", 
 		dataType: 'json', 
 		success: function(result4){ 
-			collectedData.countryCode = result4.address.country_code;
+			collectedData.countryCode = (result4.address.country_code).toUpperCase();
 			counter += 1;
 			console.log("Country code", counter);
 		},

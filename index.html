@@ -55,7 +55,7 @@
 					<form action="/action_page.php">
 						<div class="form-group">
 							<label for="SuggestedNames"> Suggested Site Names:</label>
-							<select class="form-control" id="SuggestedNames">
+							<select class="form-control" id="SuggestedNames" onchange="changeChosenSiteName()">
 							</select>
 						</div>
 						
@@ -126,24 +126,15 @@
 							</div>
 						</div>
 					</form>
-					<iframe src="" style="display:none;" name="frame" id="theIframe"></iframe>
-						<!-- <h4>Site Name: <span id="siteNamePrint"></span></h4>
-					<h4>Site ID: <span id="siteIDPrint"></span></h4>
-					<h4>Altitude: <span id="altitudePrint"></span></h4>
-					<h4>Country Code: <span id="countryCodePrint"></span></h4>
-					<h4>Timezone: <span id="timezonePrint"></span></h4>
-					<h4>Drainage Area: <span id="drainageAreaPrint"></span></h4>
-					<h4>HUC: <span id="HUCPrint"></span></h4>
-					<h4>HUC Name: <span id="HUCNamePrint"></span></h4>
-					<h4>State: <span id="statePrint"></span></h4>
-					<h4>County: <span id="countyPrint"></span></h4>
-					<h4>State FIPS: <span id="stateFIPSPrint"></span></h4>
-					<h4>County FIPS: <span id="countyFIPSPrint"></span></h4> -->
 
+
+					<div id="printThis">
+							
+					</div>
 				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-					<button onclick="createPDFThenPrint()" type="button" class="btn btn-default">Print</button>
+					<button onclick="frames['frame'].print()" type="button" class="btn btn-default">Print</button>
 				</div>
 				</div>
 			</div>
