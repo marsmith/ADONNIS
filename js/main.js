@@ -24,6 +24,22 @@ function toDegree(num) {
     return num * (180 / Math.PI);
 }
 
+function deg_to_dms (dd) {
+	var beg_sign = ""
+	// if (dd < 0){
+	//   beg_sign = "-";
+	// }
+	var absDd = Math.abs(dd);
+	var deg = absDd | 0;
+	var frac = absDd - deg;
+	var min = (frac * 60) | 0;
+	var sec = frac * 3600 - min * 60;
+	// Round it to 2 decimal points.
+	sec = Math.round(sec * 100) / 100;
+	return [beg_sign + deg + ""+ min + "" + parseInt(sec), (sec%1).toFixed(2)];
+  
+   }
+
 function getHorizontalBearing(fromLat, fromLon, toLat, toLon) {
     fromLat = toRadian(fromLat);
     fromLon = toRadian(fromLon);
@@ -143,6 +159,23 @@ function distance(lat1, lon1, lat2, lon2, unit = 'K') {
 	}
 }
 
+function createPDFThenPrint() {
+	var chosenName = $('#SuggestedNames').find(":selected").text();
+	// $("#siteIDPrint").text(collectedData.siteID);
+	// $("#altitudePrint").text(collectedData.altitude);
+	// $("#countryCodePrint").text(collectedData.countryCode);
+	// $("#timezonePrint").text(collectedData.timeZoneCode);
+	// $("#drainageAreaPrint").text(collectedData.contrDrainageArea);
+	// $("#HUCPrint").text(collectedData.HUC);
+	// $("#HUCNamePrint").text(collectedData.HUCName);
+	// $("#statePrint").text(collectedData.state);
+	// $("#countyPrint").text(collectedData.county);
+	// $("#stateFIPSPrint").text(collectedData.stateFIPS);
+	// $("#countyFIPSPrint").text(collectedData.countyFIPS);
+	$('#theIframe').attr('src','siteForm/blankSiteForm.php?stationName=' + chosenName + '&siteID=' + collectedData.siteID + '&stateFIPS=' + collectedData.stateFIPS + '&country=' + collectedData.countryCode);
+	frames['frame'].print();
+}
+
 function on() {
 	//document.getElementById("overlay").style.display = "block";
 	$('#myModal').on('shown.bs.modal', function () {
@@ -194,22 +227,6 @@ function off() {
 	counter = 0;
 }
 
-function printElement(elem) {
-    var domClone = elem.cloneNode(true);
-    
-    var $printSection = document.getElementById("printSection");
-    
-    if (!$printSection) {
-        var $printSection = document.createElement("div");
-        $printSection.id = "printSection";
-        document.body.appendChild($printSection);
-    }
-    
-    $printSection.innerHTML = "";
-    $printSection.appendChild(domClone);
-    window.print();
-}
-
 function callAjaxCalls(e) {
 	$.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7){
 		$.when(ajaxSiteName(), ajaxSiteID()).done(function(a8, a9){
@@ -241,17 +258,20 @@ function showFoundData() {
 
 	//now insert data into print section
 
-	$("#siteIDPrint").text(collectedData.siteID);
-	$("#altitudePrint").text(collectedData.altitude);
-	$("#countryCodePrint").text(collectedData.countryCode);
-	$("#timezonePrint").text(collectedData.timeZoneCode);
-	$("#drainageAreaPrint").text(collectedData.contrDrainageArea);
-	$("#HUCPrint").text(collectedData.HUC);
-	$("#HUCNamePrint").text(collectedData.HUCName);
-	$("#statePrint").text(collectedData.state);
-	$("#countyPrint").text(collectedData.county);
-	$("#stateFIPSPrint").text(collectedData.stateFIPS);
-	$("#countyFIPSPrint").text(collectedData.countyFIPS);
+	//$("#printThis").html('<iframe src="../siteForm/blankSiteForm.php?stationName=" style="display:none;" name="frame" id="theIframe"></iframe>')
+
+	// $("#siteIDPrint").text(collectedData.siteID);
+	// $("#altitudePrint").text(collectedData.altitude);
+	// $("#countryCodePrint").text(collectedData.countryCode);
+	// $("#timezonePrint").text(collectedData.timeZoneCode);
+	// $("#drainageAreaPrint").text(collectedData.contrDrainageArea);
+	// $("#HUCPrint").text(collectedData.HUC);
+	// $("#HUCNamePrint").text(collectedData.HUCName);
+	// $("#statePrint").text(collectedData.state);
+	// $("#countyPrint").text(collectedData.county);
+	// $("#stateFIPSPrint").text(collectedData.stateFIPS);
+	// $("#countyFIPSPrint").text(collectedData.countyFIPS);
+
 }
 
 //ajax functions
@@ -614,11 +634,11 @@ function ajaxNearbyPlace (e) {
 //main document ready function
 $(document).ready(function () {
 
-	document.getElementById("btnPrint").onclick = function () {
-		var chosenSiteName = $('#SuggestedNames').find(":selected").text();
-		$("#siteNamePrint").text(chosenSiteName);
-		printElement(document.getElementById("printThis"));
-	}
+	// document.getElementById("btnPrint").onclick = function () {
+	// 	var chosenSiteName = $('#SuggestedNames').find(":selected").text();
+	// 	$("#siteNamePrint").text(chosenSiteName);
+	// 	printElement(document.getElementById("printThis"));
+	// }
 
 	//initialize basemap
 	var worldImagery = L.tileLayer("https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}", {
