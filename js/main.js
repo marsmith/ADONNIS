@@ -365,7 +365,14 @@ function ajaxCountryCode (e) {
 			collectedData.countryCode = result4.address.country_code;
 			counter += 1;
 			console.log("Country code", counter);
-		}
+		},
+		error: function(XMLHttpRequest, textStatus, errorThrown) { 
+			if (confirm("Network error. Try again?")) {
+				counter = 0;
+				callAjaxCalls(e);
+			}
+		},
+		timeout: 10000 // sets timeout to 10 seconds
 	});
 }
 
