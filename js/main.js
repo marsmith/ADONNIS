@@ -37,7 +37,9 @@ function deg_to_dms (dd) {
 	var sec = frac * 3600 - min * 60;
 	// Round it to 2 decimal points.
 	sec = Math.round(sec * 100) / 100;
-	return [beg_sign + deg + ""+ min + "" + parseInt(sec), ((sec%1).toFixed(2))*100];
+	seconds = sec.toString();
+	seconds = seconds.split('.');
+	return [beg_sign + deg + ""+ min + "" + seconds[0], seconds[1]];
   
    }
 
@@ -249,7 +251,9 @@ function showFoundData() {
 
 	var latDMS = deg_to_dms(collectedData.coords.lat);
 	var lngDMS = deg_to_dms(collectedData.coords.lng);
-	printURL = 'siteForm/blankSiteForm.php?siteID=' + collectedData.siteID + '&stateFIPS=' + collectedData.stateFIPS + '&country=' + collectedData.countryCode + '&latDMS=' + latDMS[0] + '&latDecimal=' + latDMS[1] + '&lngDMS=' + lngDMS[0] + '&lngDecimal=' + lngDMS[1];
+	altDec = (collectedData.altitude).toString();
+	altDec = altDec.split(".")[1];
+	printURL = 'siteForm/blankSiteForm.php?siteID=' + collectedData.siteID + '&stateFIPS=' + collectedData.stateFIPS + '&country=' + collectedData.countryCode + '&latDMS=' + latDMS[0] + '&latDecimal=' + latDMS[1] + '&lngDMS=' + lngDMS[0] + '&lngDecimal=' + lngDMS[1] + '&altitude=' + parseInt(collectedData.altitude) + '&altitudeDecimal=' + altDec + '&HUCCode=' + collectedData.HUC ;
 	currStationName = $('#SuggestedNames').find(":selected").text();
 	$("#printThis").html('<iframe src="' + printURL + '&stationName=' + currStationName + '" style="display:none;" name="frame" id="theIframe"></iframe>');
 	console.log(printURL + '&stationName=' + currStationName);
