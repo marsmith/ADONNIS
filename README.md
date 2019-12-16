@@ -39,7 +39,8 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
   of when we encounter each object in the network (Site,Flow). If we encounter a real site, mark its index in the list
   If we encounter the start line (clicked by x,y), mark that index as well
   8. Determine the scenario of real sites around the clicked line.
-  	SCENARIO A: <>---***---<> Real Sites surrounding the start line (any distance away)
+  	
+	SCENARIO A: <>---***---<> Real Sites surrounding the start line (any distance away)
 	Perform a special version of pSNA where we only populate the network's "fake-sites" from the downstream site relative
 	to the start line and the upstream site realtive to the start line.
 	After this, go to step 6.
@@ -47,6 +48,7 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
 	SCENARIO B: <>---***--- Real Sites only before the start line
 	Run pSNA as usual but start one node up and do the calculation for the initial flowline manually
 	After this, got to step 6
+	
 	SCENARIO C: -----***---<> Real Sites only after the start line
 	Go to step 5
   
