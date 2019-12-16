@@ -11,6 +11,13 @@ $theVarsStr = "$placeName,$placeNameState,$distanceNumber,$GNIS_NAME,$mouthOrOut
 
 $command = escapeshellcmd("python3 ../backEnd/Namer.py \"$theVarsStr\"");
 $output = shell_exec($command);
-echo json_encode($output);
+if ($output)
+{
+    echo json_encode($output);
+} else {
+    $command = escapeshellcmd("conda activate ADDONIS & python ../backEnd/Namer.py \"$theVarsStr\"");
+    $output = shell_exec($command);
+    echo json_encode($output);
+}
 
 ?>
