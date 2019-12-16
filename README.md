@@ -20,14 +20,13 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
 
 ## How the Algorithm Works
   0. Import all data pertinent to MAX_BUFFER_SIZE allowed using GDAL (how big will our search area possibly get)
-	1. Draw a circle geometry around the x,y provided using GDAL
-	2. Isolate a network based on the lines in the circle and the line clicked with x,y
-	(even though there may be many lines in the circle, only those connected to the target
-	are selected)
-	* If the circle previous was too small, we will expand the circle until either reaching the recommended size
-	* or until we exceed max size.
-	3. If there are no existing sites on the network selected, goto step 9. If there is one, go to step 4,
-	if there are more than one, go to step 7
+  1. Draw a circle geometry around the x,y provided using GDAL
+  2. Isolate a network based on the lines in the circle and the line clicked with x,y (even though there may be many lines in
+  the circle, only those connected to the targetare selected)
+	  * If the circle previous was too small, we will expand the circle until either reaching the recommended size
+	  * or until we exceed max size.
+  3. If there are no existing sites on the network selected, goto step 9. If there is one, go to step 4,
+  if there are more than one, go to step 7
   
   ### Single Real Site
   4. Perform the iSNA algorithm to identify "fake-site" SiteID objects for all nodes from the click line to
@@ -37,13 +36,14 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
   
   ### Multiple Real Sites
   7. Do a "testFlight" runthrough of the network, starting from the base (or outlet,outflow,etc.). Keep track
-	of when we encounter each object in the network (Site,Flow). If we encounter a real site, mark its index in the list
-	If we encounter the start line (clicked by x,y), mark that index as well
-	8. Determine the scenario of real sites around the clicked line.
-	SCENARIO A: <>---***---<> Real Sites surrounding the start line (any distance away)
+  of when we encounter each object in the network (Site,Flow). If we encounter a real site, mark its index in the list
+  If we encounter the start line (clicked by x,y), mark that index as well
+  8. Determine the scenario of real sites around the clicked line.
+  	SCENARIO A: <>---***---<> Real Sites surrounding the start line (any distance away)
 	Perform a special version of pSNA where we only populate the network's "fake-sites" from the downstream site relative
 	to the start line and the upstream site realtive to the start line.
 	After this, go to step 6.
+	
 	SCENARIO B: <>---***--- Real Sites only before the start line
 	Run pSNA as usual but start one node up and do the calculation for the initial flowline manually
 	After this, got to step 6
@@ -52,8 +52,8 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
   
   ### No Real Sites
   9. Run the isolateNetwork algorithm again (steps 1-3), with an expanded search radius (increasing the clump factor)
-	If there are still no sites in range to base off of, then go to 10
-	10. Calculate a new first four digit number series, either in a gap that exists in the NY_Sitefile or create one after the
+  If there are still no sites in range to base off of, then go to 10
+  10. Calculate a new first four digit number series, either in a gap that exists in the NY_Sitefile or create one after the
   highest four digit number series. Then, concatenate this with 5000 to get the new number (mathematically, multiply the first
   four digits by 10,000 then add 5,000
   
