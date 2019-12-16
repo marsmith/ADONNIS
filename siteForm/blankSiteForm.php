@@ -38,7 +38,7 @@ span.cls_031{font-family:Arial,serif;font-size:12.1px;color:rgb(43,42,41);font-w
 div.cls_031{font-family:Arial,serif;font-size:12.1px;color:rgb(43,42,41);font-weight:normal;font-style:normal;text-decoration: none}
 span.cls_032{font-family:Arial,serif;font-size:6.7px;color:rgb(43,42,41);font-weight:normal;font-style:normal;text-decoration: none}
 div.cls_032{font-family:Arial,serif;font-size:6.7px;color:rgb(43,42,41);font-weight:normal;font-style:normal;text-decoration: none}
-span.cls_071{font-family:Courier New,serif;font-size:15.9px;color:rgb(0,0,0);font-weight:normal;font-style:normal;text-decoration: line-through}
+span.cls_071{font-family:Courier New,serif;font-size:15.9px;color:rgb(0,0,0);font-weight:normal;font-style:normal;}
 div.cls_071{font-family:Courier New,serif;font-size:15.9px;color:rgb(0,0,0);font-weight:normal;font-style:normal;text-decoration: none}
 span.cls_070{font-family:Courier New,serif;font-size:14.7px;color:rgb(0,0,0);font-weight:normal;font-style:normal;}
 div.cls_070{font-family:Courier New,serif;font-size:14.7px;color:rgb(0,0,0);font-weight:normal;font-style:normal;text-decoration: none}
@@ -162,9 +162,9 @@ div.cls_068{font-family:Arial,serif;font-size:7.4px;color:rgb(43,42,41);font-wei
 <div style="position:absolute;left:37.83px;top:201.87px" class="cls_009"><span class="cls_009">(C802)</span></div>
 <div style="position:absolute;left:75.16px;top:204.16px" class="cls_032"><span class="cls_032">Primary</span></div>
 <div style="position:absolute;left:109.18px;top:204.16px" class="cls_032"><span class="cls_032">Secondary</span></div>
-<div style="position:absolute;left:329.76px;top:211.81px" class="cls_071"><span class="cls_071"><?php echo $_GET["countyCode"]; ?></span></div>
+<div style="position:absolute;left:329.76px;top:215.81px" class="cls_071"><span class="cls_071"><?php echo $_GET["countyCode"]; ?></span></div>
 <div style="position:absolute;left:408.23px;top:222.08px" class="cls_009"><span class="cls_009">MCD Code</span></div>
-<div style="position:absolute;left:451.11px;top:217.34px" class="cls_070"><span class="cls_070">43786</span></div>
+<div style="position:absolute;left:451.11px;top:217.34px" class="cls_070"><span class="cls_070"></span></div>
 <div style="position:absolute;left:39.73px;top:226.07px" class="cls_009"><span class="cls_009">COUNTY or TOWN (C8)</span></div>
 <div style="position:absolute;left:281.42px;top:225.48px" class="cls_009"><span class="cls_009">County  code</span></div>
 <div style="position:absolute;left:198.50px;top:239.39px" class="cls_009"><span class="cls_009">LONGITUDE</span></div>
@@ -266,7 +266,7 @@ div.cls_068{font-family:Arial,serif;font-size:7.4px;color:rgb(43,42,41);font-wei
 <div style="position:absolute;left:464.49px;top:305.85px" class="cls_015"><span class="cls_015">NGVD29</span></div>
 <div style="position:absolute;left:518.84px;top:305.85px" class="cls_015"><span class="cls_015">NAVD88</span></div>
 <div style="position:absolute;left:38.00px;top:312.13px" class="cls_009"><span class="cls_009">ACCURACY</span></div>
-<div style="position:absolute;left:79.47px;top:307.04px" class="cls_046"><span class="cls_046">1.6</span></div>
+<div style="position:absolute;left:79.47px;top:307.04px" class="cls_046"><span class="cls_046"></span></div>
 <div style="position:absolute;left:120.88px;top:313.54px" class="cls_009"><span class="cls_009">METHOD</span></div>
 <div style="position:absolute;left:290.31px;top:306.23px" class="cls_041"><span class="cls_041">N</span></div>
 <div style="position:absolute;left:423.63px;top:312.18px" class="cls_009"><span class="cls_009">DATUM</span></div>
@@ -500,7 +500,10 @@ div.cls_068{font-family:Arial,serif;font-size:7.4px;color:rgb(43,42,41);font-wei
 <div style="position:absolute;left:351.42px;top:560.49px" class="cls_050"><span class="cls_050">✘</span></div>
 <div style="position:absolute;left:245.58px;top:569.71px" class="cls_009"><span class="cls_009">RECORD READY</span></div>
 <div style="position:absolute;left:38.55px;top:573.43px" class="cls_009"><span class="cls_009">INVENTORIED</span></div>
-<div style="position:absolute;left:327.83px;top:569.43px" class="cls_015"><span class="cls_015">Y  C   P   L</span></div>
+<div style="position:absolute;left:327.83px;top:569.43px" class="cls_015"><span class="cls_015">Y</span></div>
+<div style="position:absolute;left:347.83px;top:569.43px" class="cls_015"><span class="cls_015">C</span></div>
+<div style="position:absolute;left:370.83px;top:569.43px" class="cls_015"><span class="cls_015">P</span></div>
+<div style="position:absolute;left:392.83px;top:569.43px" class="cls_015"><span class="cls_015">L</span></div>
 <div style="position:absolute;left:245.58px;top:576.21px" class="cls_009"><span class="cls_009">FOR WEB (C32)</span></div>
 <div style="position:absolute;left:38.55px;top:579.93px" class="cls_009"><span class="cls_009">(C711)</span></div>
 <div style="position:absolute;left:93.27px;top:583.90px" class="cls_017"><span class="cls_017">month</span></div>

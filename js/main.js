@@ -40,7 +40,7 @@ function deg_to_dms (dd) {
 	seconds = sec.toString();
 	seconds = seconds.split('.');
 	return [beg_sign + deg + ""+ min + "" + seconds[0], seconds[1]];
-  
+
    }
 
 function getHorizontalBearing(fromLat, fromLon, toLat, toLon) {
@@ -171,31 +171,31 @@ function changeChosenSiteName() {
 function on() {
 	//document.getElementById("overlay").style.display = "block";
 	$('#myModal').on('shown.bs.modal', function () {
- 
+
 		var progress = setInterval(function() {
 		var $bar = $('.bar');
-	
+
 		if ($bar.width()>=500) {
-		  
+
 			// complete
 			showFoundData();
 			clearInterval(progress);
 			$('.progress').removeClass('active');
 			$('#myModal').modal('hide');
 			$bar.width(0);
-		
+
 		}
 		else {
-		  
+
 			// perform processing logic here
 			$bar.width(0);
 			$bar.width(counter*5);
 		}
-		
+
 		$bar.text(($bar.width()/5) + "%");
 		}, 800);
-	  
-	  
+
+
 	})
 	$('#myModal').modal('show');
 
@@ -204,13 +204,13 @@ function on() {
 function off() {
 	//document.getElementById("overlay").style.display = "none";
 	$('#myModal').on('hide.bs.modal', function () {
- 
+
 		var progress = setInterval(function() {
 		var $bar = $('.bar');
 		clearInterval(progress);
-		
+
 		$bar.width(0);
-		
+
 		$bar.text(0 + "%");
 		}, 800);
 
@@ -253,7 +253,9 @@ function showFoundData() {
 	var lngDMS = deg_to_dms(collectedData.coords.lng);
 	altDec = (collectedData.altitude).toString();
 	altDec = altDec.split(".")[1];
-	printURL = 'siteForm/blankSiteForm.php?siteID=' + collectedData.siteID + '&stateFIPS=' + collectedData.stateFIPS + '&country=' + collectedData.countryCode + '&latDMS=' + latDMS[0] + '&latDecimal=' + latDMS[1] + '&lngDMS=' + lngDMS[0] + '&lngDecimal=' + lngDMS[1] + '&altitude=' + parseInt(collectedData.altitude) + '&altitudeDecimal=' + altDec + '&HUCCode=' + collectedData.HUC ;
+	countyCode = collectedData.countyFIPS.toString();
+	countyCode = countyCode.slice(2);
+	printURL = 'siteForm/blankSiteForm.php?siteID=' + collectedData.siteID + '&stateFIPS=' + collectedData.stateFIPS + '&country=' + collectedData.countryCode + '&latDMS=' + latDMS[0] + '&latDecimal=' + latDMS[1] + '&lngDMS=' + lngDMS[0] + '&lngDecimal=' + lngDMS[1] + '&altitude=' + parseInt(collectedData.altitude) + '&altitudeDecimal=' + altDec + '&HUCCode=' + collectedData.HUC + '&countyCode=' + countyCode;
 	currStationName = $('#SuggestedNames').find(":selected").text();
 	$("#printThis").html('<iframe src="' + printURL + '&stationName=' + currStationName + '" style="display:none;" name="frame" id="theIframe"></iframe>');
 	console.log(printURL + '&stationName=' + currStationName);
@@ -279,11 +281,11 @@ function showFoundData() {
 
 function ajaxSiteName () {
 	on();
-	return $.ajax({ 
+	return $.ajax({
 		type : 'post',
-		url: "../php/siteName.php", 
-		dataType: 'json', 
-		data: 
+		url: "../php/siteName.php",
+		dataType: 'json',
+		data:
         {
 				'placeName' : collectedData.placeName,
 				'placeNameState' : collectedData.placeNameState,
@@ -302,11 +304,11 @@ function ajaxSiteName () {
 function ajaxSiteID () {
 
 	on();
-	return $.ajax({ 
+	return $.ajax({
 		type : 'post',
-		url: "../php/siteID.php", 
-		dataType: 'json', 
-		data: 
+		url: "../php/siteID.php",
+		dataType: 'json',
+		data:
         {
 				'lat' : collectedData.coords.lat,
 				'lng' : collectedData.coords.lng
@@ -326,9 +328,9 @@ function ajaxSiteID () {
 
 function ajaxHUCInfo (e) {
 	on();
-	return $.ajax({ 
-		url: "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/6/query?where=1%3D1&text=&objectIds=&time=&geometry=" + e.latlng.lng + "%2C" + e.latlng.lat + "&geometryType=esriGeometryPoint&inSR=4269&spatialRel=esriSpatialRelWithin&relationParam=&outFields=HUC12%2CNAME&returnGeometry=false&returnTrueCurves=false&maxAllowableOffset=&geometryPrecision=&outSR=&having=&returnIdsOnly=false&returnCountOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&gdbVersion=&historicMoment=&returnDistinctValues=false&resultOffset=&resultRecordCount=&queryByDistance=&returnExtentOnly=false&datumTransformation=&parameterValues=&rangeValues=&quantizationParameters=&f=pjson", 
-		dataType: 'json', 
+	return $.ajax({
+		url: "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/6/query?where=1%3D1&text=&objectIds=&time=&geometry=" + e.latlng.lng + "%2C" + e.latlng.lat + "&geometryType=esriGeometryPoint&inSR=4269&spatialRel=esriSpatialRelWithin&relationParam=&outFields=HUC12%2CNAME&returnGeometry=false&returnTrueCurves=false&maxAllowableOffset=&geometryPrecision=&outSR=&having=&returnIdsOnly=false&returnCountOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&gdbVersion=&historicMoment=&returnDistinctValues=false&resultOffset=&resultRecordCount=&queryByDistance=&returnExtentOnly=false&datumTransformation=&parameterValues=&rangeValues=&quantizationParameters=&f=pjson",
+		dataType: 'json',
 		success: function(result){
 			counter += 5;
 			console.log("HUC Info", counter);
@@ -339,10 +341,10 @@ function ajaxHUCInfo (e) {
 
 function ajaxContrDrainageArea (e) {
 	// on();
-	// return $.ajax({ 
-	// 	url: "https://streamstats.usgs.gov/streamstatsservices/watershed.geojson?rcode=NY&xlocation=" + e.latlng.lng + "&ylocation=" + e.latlng.lat + "&crs=4326&includeparameters=false&includeflowtypes=false&includefeatures=true&simplify=true", 
-	// 	dataType: 'json', 
-	// 	success: function(result1){ 
+	// return $.ajax({
+	// 	url: "https://streamstats.usgs.gov/streamstatsservices/watershed.geojson?rcode=NY&xlocation=" + e.latlng.lng + "&ylocation=" + e.latlng.lat + "&crs=4326&includeparameters=false&includeflowtypes=false&includefeatures=true&simplify=true",
+	// 	dataType: 'json',
+	// 	success: function(result1){
 	// 		if (result1.featurecollection[1] && result1.featurecollection[1].feature.features[0]) {
 	// 			collectedData.contrDrainageArea = result1.featurecollection[1].feature.features[0].properties.Shape_Area;
 	// 			collectedData.contrDrainageArea *= 10.764;
@@ -353,10 +355,10 @@ function ajaxContrDrainageArea (e) {
 
 function ajaxTimeZoneCode (e) {
 	on();
-	return $.ajax({ 
-		url: "https://api.timezonedb.com/v2.1/get-time-zone?key=FOG5KOCJ8U4T&format=json&by=position&lat=" + e.latlng.lat + "&lng=" + e.latlng.lng, 
-		dataType: 'json', 
-		success: function(result2){ 
+	return $.ajax({
+		url: "https://api.timezonedb.com/v2.1/get-time-zone?key=FOG5KOCJ8U4T&format=json&by=position&lat=" + e.latlng.lat + "&lng=" + e.latlng.lng,
+		dataType: 'json',
+		success: function(result2){
 			collectedData.timeZoneCode = result2.abbreviation;
 			counter += 1;
 			console.log("Time Zone", counter);
@@ -366,10 +368,10 @@ function ajaxTimeZoneCode (e) {
 
 function ajaxAltitude (e) {
  	on();
-	return $.ajax({ 
-		url: "https://nationalmap.gov/epqs/pqs.php?x=" + e.latlng.lng + "&y=" + e.latlng.lat + "&units=Feet&output=json", 
-		dataType: 'json', 
-		success: function(result3){ 
+	return $.ajax({
+		url: "https://nationalmap.gov/epqs/pqs.php?x=" + e.latlng.lng + "&y=" + e.latlng.lat + "&units=Feet&output=json",
+		dataType: 'json',
+		success: function(result3){
 			collectedData.altitude = result3.USGS_Elevation_Point_Query_Service.Elevation_Query.Elevation;
 			counter += 2;
 			console.log("Altitude", counter);
@@ -379,15 +381,15 @@ function ajaxAltitude (e) {
 
 function ajaxCountryCode (e) {
 	on();
-	return $.ajax({ 
-		url: "https://nominatim.openstreetmap.org/reverse?format=json&lat=" + e.latlng.lat + "&lon=" +  e.latlng.lng + "&zoom=18&addressdetails=1", 
-		dataType: 'json', 
-		success: function(result4){ 
+	return $.ajax({
+		url: "https://nominatim.openstreetmap.org/reverse?format=json&lat=" + e.latlng.lat + "&lon=" +  e.latlng.lng + "&zoom=18&addressdetails=1",
+		dataType: 'json',
+		success: function(result4){
 			collectedData.countryCode = (result4.address.country_code).toUpperCase();
 			counter += 1;
 			console.log("Country code", counter);
 		},
-		error: function(XMLHttpRequest, textStatus, errorThrown) { 
+		error: function(XMLHttpRequest, textStatus, errorThrown) {
 			if (confirm("Network error. Try again?")) {
 				counter = 0;
 				callAjaxCalls(e);
@@ -399,10 +401,10 @@ function ajaxCountryCode (e) {
 
 function ajaxCountyStateFIPS (e) {
 	on();
-	return $.ajax({ 
-		url: "https://geo.fcc.gov/api/census/block/find?latitude=" + e.latlng.lat + "&longitude=" + e.latlng.lng + "&showall=false&format=json", 
-		dataType: 'json', 
-		success: function(result5){ 
+	return $.ajax({
+		url: "https://geo.fcc.gov/api/census/block/find?latitude=" + e.latlng.lat + "&longitude=" + e.latlng.lng + "&showall=false&format=json",
+		dataType: 'json',
+		success: function(result5){
 			counter += 1;
 			console.log("County/State", counter);
 			collectedData.county = result5.County.name;
@@ -417,16 +419,16 @@ function ajaxCountyStateFIPS (e) {
 
 
 function getSnappedPointThenRun (e) {
-	$.ajax({ 
-		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=4000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson", 
-		dataType: 'json', 
+	$.ajax({
+		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=4000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson",
+		dataType: 'json',
 		success: function(result6){
 			var theFeatures = result6.features;
 			var smallestDistFeatureFeature = undefined;
 			var smallestDistFeature = Number.MAX_VALUE;
 			var smallestDistFeatureIndex = -1;
 			for (var feature of theFeatures) {
-				var points = [];				
+				var points = [];
 				for (const point of feature.geometry.paths[0]) {
 					points.push(new L.LatLng(point[1], point[0]));
 				}
@@ -469,7 +471,7 @@ function getSnappedPointThenRun (e) {
 			globSmallestDistIndex = smallestDistIndex;
 
 			//now find whether left or right of smallestDistIndex is closer
-			
+
 			var leftDist = Number.MAX_VALUE;
 			var rightDist = Number.MAX_VALUE;
 			//left
@@ -535,7 +537,7 @@ function getSnappedPointThenRun (e) {
 			.openOn(map);
 			$("#notCorr").click(function(){
 				map.closePopup();
-			}); 
+			});
 			$("#yesCorr").click(function(){
 				map.closePopup();
 				collectedData.coords = closestPoint.latlng;
@@ -566,10 +568,10 @@ function ajaxNearbyPlace (e) {
 		collectedData.mouthOrOutlet = "outlet";
 	}
 
-	return $.ajax({ 
-		url: "https://cartowfs.nationalmap.gov/arcgis/rest/services/geonames/MapServer/4/query?geometry=" + collectedData.coords.y +"," + collectedData.coords.x + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson", 
+	return $.ajax({
+		url: "https://cartowfs.nationalmap.gov/arcgis/rest/services/geonames/MapServer/4/query?geometry=" + collectedData.coords.y +"," + collectedData.coords.x + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson",
 		dataType: 'json',
-		success: function(result7){ 
+		success: function(result7){
 			counter += 20;
 			console.log("Nearby", counter);
 			//see if found any
@@ -591,12 +593,12 @@ function ajaxNearbyPlace (e) {
 
 				collectedData.placeName = closestFeature.attributes.gaz_name;
 				console.log("HEREEEEEEDFD!");
-				
+
 				var distMiles = closestDist;
 
 				collectedData.distanceNumber = distMiles;
 				collectedData.placeNameState = closestFeature.attributes.state_alpha;
-				
+
 				var n = getHorizontalBearing(closestCoords[0], closestCoords[1], collectedData.coords.y, collectedData.coords.x);
 				console.log("horizontal bearing: " + n);
 
@@ -621,7 +623,7 @@ function ajaxNearbyPlace (e) {
 				}
 			}
 		},
-		error: function(XMLHttpRequest, textStatus, errorThrown) { 
+		error: function(XMLHttpRequest, textStatus, errorThrown) {
 			if (confirm("Network error. Try again?")) {
 				counter = 0;
 				callAjaxCalls(e);
@@ -688,7 +690,7 @@ $(document).ready(function () {
 		$("#siteNamePrint").text("");
 
 		var latlng = map.mouseEventToLatLng(e.originalEvent);
-		
+
 		if (marker) { // check
 			map.removeLayer(marker); // remove
 		}
@@ -715,9 +717,9 @@ $(document).ready(function () {
 				$("#County").val("");
 				$("#StateFIPS").val("");
 				$("#CountyFIPS").val("");
-		
+
 				//now clear data in print section
-		
+
 				$("#siteIDPrint").text("");
 				$("#altitudePrint").text("");
 				$("#countryCodePrint").text("");
@@ -747,7 +749,7 @@ $(document).ready(function () {
 				});
 			});
 			getSnappedPointThenRun(e);
-		}); 
+		});
 		$("#noLoc").click(function(){
 			map.closePopup();
 		});
@@ -820,9 +822,9 @@ $(document).ready(function () {
 				$("#County").val("");
 				$("#StateFIPS").val("");
 				$("#CountyFIPS").val("");
-		
+
 				//now clear data in print section
-		
+
 				$("#siteIDPrint").text("");
 				$("#altitudePrint").text("");
 				$("#countryCodePrint").text("");
