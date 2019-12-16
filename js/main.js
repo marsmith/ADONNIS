@@ -40,7 +40,7 @@ function deg_to_dms (dd) {
 	seconds = sec.toString();
 	seconds = seconds.split('.');
 	return [beg_sign + deg + ""+ min + "" + seconds[0], seconds[1]];
-  
+
    }
 
 function getHorizontalBearing(fromLat, fromLon, toLat, toLon) {
@@ -183,7 +183,7 @@ function on() {
 			$('.progress').removeClass('active');
 			$('#myModal').modal('hide');
 			$bar.width(0);
-		
+
 		}
 		else {
 
