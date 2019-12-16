@@ -1,0 +1,176 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module Network</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>Network</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Cmpanozzo%5Cdocuments%5Cgithub%5Cadonnis%5Cbackend%5Cnetwork.py">c:\users\mpanozzo\documents\github\adonnis\backend\network.py</a></font></td></tr></table>
+    <p></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ee77aa">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Classes</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#ee77aa"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl>
+<dt><font face="helvetica, arial"><a href="builtins.html#object">builtins.object</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="Network.html#Network">Network</a>
+</font></dt></dl>
+</dd>
+</dl>
+ <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="Network">class <strong>Network</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt><a href="#Network">Network</a>(flows,&nbsp;sites,&nbsp;unitLen=1)<br>
+&nbsp;<br>
+Description<br>
+---------------------------------------------------------------------------<br>
+Represents&nbsp;a&nbsp;collection&nbsp;of&nbsp;flows&nbsp;connected&nbsp;at&nbsp;the&nbsp;ends&nbsp;by&nbsp;sites&nbsp;and&nbsp;the&nbsp;relationships&nbsp;between&nbsp;each.<br>
+Organized&nbsp;into&nbsp;two&nbsp;main&nbsp;tables&nbsp;a&nbsp;flow&nbsp;table&nbsp;and&nbsp;a&nbsp;site&nbsp;table&nbsp;(a&nbsp;table&nbsp;here&nbsp;is&nbsp;just&nbsp;a&nbsp;list).<br>
+Keeps&nbsp;track&nbsp;of&nbsp;its&nbsp;total&nbsp;size&nbsp;(length&nbsp;of&nbsp;all&nbsp;flows&nbsp;combined)<br>
+&nbsp;<br>
+Class&nbsp;Variables<br>
+---------------------------------------------------------------------------<br>
+totalSize&nbsp;[number]:&nbsp;Total&nbsp;length&nbsp;of&nbsp;the&nbsp;<a href="#Network">Network</a>&nbsp;(length&nbsp;of&nbsp;all&nbsp;Flows).&nbsp;Must&nbsp;be&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Recomputed&nbsp;to&nbsp;be&nbsp;acurate&nbsp;via&nbsp;<a href="#Network-recalculateTotalLength">recalculateTotalLength</a>()<br>
+flowTable&nbsp;[List(Of&nbsp;Flow)]:&nbsp;The&nbsp;flows&nbsp;(or&nbsp;connections)&nbsp;in&nbsp;the&nbsp;<a href="#Network">Network</a><br>
+siteTable&nbsp;[List(Of&nbsp;Site)]:&nbsp;The&nbsp;sites&nbsp;(or&nbsp;nodes)&nbsp;in&nbsp;the&nbsp;<a href="#Network">Network</a><br>
+unitLength&nbsp;[number]:&nbsp;(IN&nbsp;KM!)&nbsp;How&nbsp;much&nbsp;distance&nbsp;before&nbsp;incrementing&nbsp;what<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SiteID&nbsp;value&nbsp;portion&nbsp;should&nbsp;be&nbsp;assigned<br>
+&nbsp;<br>
+Usage<br>
+---------------------------------------------------------------------------<br>
+(Here&nbsp;is&nbsp;an&nbsp;example&nbsp;of&nbsp;how&nbsp;to&nbsp;run&nbsp;the&nbsp;entire&nbsp;thing&nbsp;with&nbsp;a&nbsp;<a href="#Network">Network</a>)<br>
+&gt;&gt;&gt;&nbsp;dictt&nbsp;=&nbsp;importJSON("Data/SmallNet001.json")<br>
+&gt;&gt;&gt;&nbsp;net&nbsp;=&nbsp;isolateNet(dictt,True)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>
+&gt;&gt;&gt;&nbsp;sinks&nbsp;=&nbsp;<a href="#Network-calculateSink">calculateSink</a>(net)<br>
+&gt;&gt;&gt;&nbsp;<a href="#Network-setupSiteSafety">setupSiteSafety</a>(net)<br>
+&gt;&gt;&gt;&nbsp;faucets&nbsp;=&nbsp;<a href="#Network-calculateFaucets">calculateFaucets</a>(net)<br>
+&gt;&gt;&gt;&nbsp;<a href="#Network-calculateUpstreamDistances">calculateUpstreamDistances</a>(net,faucets)<br>
+&gt;&gt;&gt;&nbsp;net.<a href="#Network-recalculateTotalLength">recalculateTotalLength</a>()<br>
+&gt;&gt;&gt;&nbsp;pSNA(net,SiteID(1001,9999,None),sinks[0])<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="Network-__init__"><strong>__init__</strong></a>(self, flows, sites, unitLen=1)</dt><dd><tt>Constructs&nbsp;a&nbsp;new&nbsp;<a href="#Network">Network</a>&nbsp;<a href="builtins.html#object">object</a><br>
+&nbsp;<br>
+flows&nbsp;[List(Of&nbsp;Flow)]:&nbsp;Flowtable&nbsp;to&nbsp;initialize&nbsp;with<br>
+sites&nbsp;[List&nbsp;(Of&nbsp;Site)]:&nbsp;Sitetable&nbsp;to&nbsp;initialize&nbsp;with<br>
+unitLen&nbsp;[number]:&nbsp;How&nbsp;many&nbsp;(KM)&nbsp;before&nbsp;decrementing/incrementing&nbsp;the&nbsp;value&nbsp;portion&nbsp;of&nbsp;a&nbsp;SiteID</tt></dd></dl>
+
+<dl><dt><a name="Network-calcStraihler"><strong>calcStraihler</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="Network-calculateFaucets"><strong>calculateFaucets</strong></a>(self)</dt><dd><tt>Calculate&nbsp;the&nbsp;faucets&nbsp;for&nbsp;a&nbsp;given&nbsp;network.&nbsp;The&nbsp;'faucets'&nbsp;are&nbsp;the&nbsp;sources&nbsp;of<br>
+the&nbsp;water&nbsp;network.&nbsp;(If&nbsp;you&nbsp;think&nbsp;of&nbsp;the&nbsp;network&nbsp;as&nbsp;a&nbsp;tree,&nbsp;these&nbsp;would&nbsp;be&nbsp;the&nbsp;outermost<br>
+leaf&nbsp;nodes)<br>
+&nbsp;<br>
+net&nbsp;[<a href="#Network">Network</a>]:&nbsp;<a href="#Network">Network</a>&nbsp;to&nbsp;perform&nbsp;analysis&nbsp;on.<br>
+&nbsp;<br>
+Returns&nbsp;List(Of&nbsp;Site):&nbsp;List&nbsp;of&nbsp;sites&nbsp;at&nbsp;the&nbsp;upstream-most&nbsp;areas&nbsp;of&nbsp;a&nbsp;network&nbsp;(faucets).</tt></dd></dl>
+
+<dl><dt><a name="Network-calculateSink"><strong>calculateSink</strong></a>(self)</dt><dd><tt>Calculate&nbsp;the&nbsp;sink&nbsp;for&nbsp;a&nbsp;given&nbsp;network.&nbsp;The&nbsp;sink&nbsp;is&nbsp;the&nbsp;most&nbsp;downstream<br>
+Site&nbsp;of&nbsp;the&nbsp;entire&nbsp;<a href="#Network">Network</a>.&nbsp;(If&nbsp;you&nbsp;think&nbsp;of&nbsp;the&nbsp;<a href="#Network">Network</a>&nbsp;like&nbsp;a&nbsp;tree,&nbsp;it&nbsp;would<br>
+be&nbsp;the&nbsp;root!)<br>
+&nbsp;<br>
+net&nbsp;[<a href="#Network">Network</a>]:&nbsp;<a href="#Network">Network</a>&nbsp;to&nbsp;perform&nbsp;analysis&nbsp;on<br>
+&nbsp;<br>
+Returns&nbsp;[Site]:&nbsp;The&nbsp;sink&nbsp;site&nbsp;of&nbsp;a&nbsp;network<br>
+Raises&nbsp;RuntimeError&nbsp;if&nbsp;the&nbsp;graph&nbsp;has&nbsp;no&nbsp;sink&nbsp;(is&nbsp;invalid)!</tt></dd></dl>
+
+<dl><dt><a name="Network-calculateUpstreamDistances"><strong>calculateUpstreamDistances</strong></a>(self)</dt><dd><tt>Recalculates&nbsp;the&nbsp;upstream&nbsp;distances&nbsp;for&nbsp;each&nbsp;Site&nbsp;in&nbsp;a&nbsp;<a href="#Network">Network</a>&nbsp;starting&nbsp;from&nbsp;each&nbsp;faucet&nbsp;<br>
+(furthest&nbsp;sites&nbsp;from&nbsp;the&nbsp;sink,&nbsp;dendrites)<br>
+&nbsp;<br>
+&nbsp;<br>
+net&nbsp;[<a href="#Network">Network</a>]:&nbsp;<a href="#Network">Network</a>&nbsp;to&nbsp;perform&nbsp;operations&nbsp;on.<br>
+faucets&nbsp;[List(Of&nbsp;Site)]:&nbsp;A&nbsp;premade&nbsp;list&nbsp;of&nbsp;faucets&nbsp;used&nbsp;to&nbsp;complete&nbsp;method<br>
+&nbsp;<br>
+Returns&nbsp;[None]<br>
+Raises&nbsp;RuntimeError&nbsp;if&nbsp;there&nbsp;is&nbsp;a&nbsp;multiple&nbsp;sink&nbsp;situation</tt></dd></dl>
+
+<dl><dt><a name="Network-findSharedConfluence"><strong>findSharedConfluence</strong></a>(self, site1, site2)</dt><dd><tt>Will&nbsp;navigate&nbsp;through&nbsp;the&nbsp;network&nbsp;to&nbsp;find&nbsp;the&nbsp;confluence<br>
+of&nbsp;two&nbsp;sites&nbsp;(nodes).&nbsp;Note:&nbsp;This&nbsp;will&nbsp;not&nbsp;work&nbsp;if&nbsp;there&nbsp;are&nbsp;loops&nbsp;potentially</tt></dd></dl>
+
+<dl><dt><a name="Network-find_flow"><strong>find_flow</strong></a>(self, id_number)</dt></dl>
+
+<dl><dt><a name="Network-getRealSites"><strong>getRealSites</strong></a>(self)</dt><dd><tt>Determines&nbsp;a&nbsp;list&nbsp;of&nbsp;all&nbsp;the&nbsp;real&nbsp;sites&nbsp;in&nbsp;this&nbsp;network<br>
+&nbsp;<br>
+net&nbsp;[<a href="#Network">Network</a>]:&nbsp;<a href="#Network">Network</a>&nbsp;to&nbsp;perform&nbsp;analysis&nbsp;on<br>
+&nbsp;<br>
+Returns&nbsp;List[Of&nbsp;Site]&nbsp;sites&nbsp;in&nbsp;the&nbsp;sitetable&nbsp;(byref)&nbsp;which<br>
+are&nbsp;real-world&nbsp;data&nbsp;collection&nbsp;sites&nbsp;(these&nbsp;probably&nbsp;also&nbsp;have&nbsp;already&nbsp;been&nbsp;assigned&nbsp;a&nbsp;real&nbsp;ID)</tt></dd></dl>
+
+<dl><dt><a name="Network-navigateFurthestUpstream"><strong>navigateFurthestUpstream</strong></a>(self, site)</dt><dd><tt>Will&nbsp;navigate&nbsp;through&nbsp;the&nbsp;network&nbsp;to&nbsp;find&nbsp;the&nbsp;node&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;a&nbsp;branch<br>
+by&nbsp;using&nbsp;&gt;&nbsp;operations.<br>
+&nbsp;<br>
+net&nbsp;[<a href="#Network">Network</a>]:&nbsp;<a href="#Network">Network</a>&nbsp;to&nbsp;perform&nbsp;analysis&nbsp;on.<br>
+site&nbsp;[Site]:&nbsp;Site&nbsp;to&nbsp;start&nbsp;operation&nbsp;from.<br>
+&nbsp;<br>
+Returns&nbsp;[Site]:&nbsp;Furthest&nbsp;upstream&nbsp;site.</tt></dd></dl>
+
+<dl><dt><a name="Network-navigateToNearestConfluence"><strong>navigateToNearestConfluence</strong></a>(self, site)</dt><dd><tt>Will&nbsp;navigate&nbsp;to&nbsp;the&nbsp;nearest&nbsp;confluence.&nbsp;Returns&nbsp;the&nbsp;last&nbsp;flow&nbsp;which&nbsp;allowed&nbsp;reaching&nbsp;the<br>
+confluence.&nbsp;<br>
+&nbsp;<br>
+net&nbsp;[<a href="#Network">Network</a>]:&nbsp;<a href="#Network">Network</a>&nbsp;to&nbsp;perform&nbsp;analysis&nbsp;on<br>
+site&nbsp;[Site]:&nbsp;Site&nbsp;to&nbsp;start&nbsp;operation&nbsp;from.<br>
+&nbsp;<br>
+Returns&nbsp;[Site]:&nbsp;Nearest&nbsp;confluence&nbsp;to&nbsp;argument&nbsp;'site'<br>
+Raises&nbsp;RuntimeWarning&nbsp;if&nbsp;'site'&nbsp;is&nbsp;not&nbsp;in&nbsp;sitetable</tt></dd></dl>
+
+<dl><dt><a name="Network-positionalEqualityList"><strong>positionalEqualityList</strong></a>(self)</dt><dd><tt>Determines&nbsp;all&nbsp;sites&nbsp;with&nbsp;positional&nbsp;equality<br>
+Returns&nbsp;[List(Of&nbsp;Site)]:&nbsp;List&nbsp;of&nbsp;sites&nbsp;with&nbsp;positional&nbsp;equality</tt></dd></dl>
+
+<dl><dt><a name="Network-recalculateTotalLength"><strong>recalculateTotalLength</strong></a>(self)</dt><dd><tt>Recalculates&nbsp;the&nbsp;<a href="#Network">Network</a>'s&nbsp;totalSize<br>
+Returns&nbsp;[None]</tt></dd></dl>
+
+<dl><dt><a name="Network-removeInvolvedFlows"><strong>removeInvolvedFlows</strong></a>(self, site)</dt><dd><tt>Removes&nbsp;any&nbsp;flows&nbsp;from&nbsp;the&nbsp;flow&nbsp;table&nbsp;which&nbsp;have&nbsp;'site'&nbsp;as<br>
+one&nbsp;of&nbsp;the&nbsp;endpoints<br>
+&nbsp;<br>
+site&nbsp;[Site]:&nbsp;Site&nbsp;that&nbsp;if&nbsp;appearing&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;flow&nbsp;in&nbsp;the&nbsp;flow&nbsp;table,&nbsp;means&nbsp;the&nbsp;flow&nbsp;should&nbsp;be&nbsp;purged<br>
+&nbsp;<br>
+Returns&nbsp;[None]</tt></dd></dl>
+
+<dl><dt><a name="Network-setupSiteSafety"><strong>setupSiteSafety</strong></a>(self)</dt><dd><tt>Will&nbsp;calculate&nbsp;the&nbsp;pending&nbsp;upstream&nbsp;number&nbsp;for&nbsp;every&nbsp;site&nbsp;in&nbsp;the&nbsp;sitetable<br>
+&nbsp;<br>
+net&nbsp;[<a href="#Network">Network</a>]:&nbsp;The&nbsp;network&nbsp;to&nbsp;lookup&nbsp;sites&nbsp;in&nbsp;site-table.<br>
+&nbsp;<br>
+Returns&nbsp;[None]<br>
+&nbsp;<br>
+Notes:&nbsp;Do&nbsp;NOT&nbsp;call&nbsp;this&nbsp;method&nbsp;outside&nbsp;of&nbsp;preconfigured&nbsp;use.&nbsp;It&nbsp;will&nbsp;mess&nbsp;up&nbsp;the<br>
+algorithm.</tt></dd></dl>
+
+<dl><dt><a name="Network-subnetTrace"><strong>subnetTrace</strong></a>(self, startSite)</dt><dd><tt>Will&nbsp;navigate&nbsp;through&nbsp;network&nbsp;from&nbsp;startSite&nbsp;and<br>
+generate&nbsp;a&nbsp;cloned&nbsp;<a href="#Network">Network</a>&nbsp;from&nbsp;the&nbsp;resulting&nbsp;recursion<br>
+&nbsp;<br>
+startSite&nbsp;[Site]:&nbsp;Site&nbsp;in&nbsp;<a href="#Network">Network</a>&nbsp;to&nbsp;start&nbsp;from<br>
+&nbsp;<br>
+Returns&nbsp;[<a href="#Network">Network</a>]:&nbsp;Deep&nbsp;Copy&nbsp;of&nbsp;<a href="#Network">Network</a>&nbsp;based&nbsp;on&nbsp;recursive&nbsp;paths</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#55aa55">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><strong>DOWNSTREAM_CON</strong> = 1<br>
+<strong>UPSTREAM_CON</strong> = 2</td></tr></table>
+</body></html>

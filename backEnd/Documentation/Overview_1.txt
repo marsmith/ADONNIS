@@ -51,26 +51,4 @@ NO_REAL_SITES (in range) -------------------------------------------------------
     four digit number series. Then, concatenate this with 5000 to get the new number (mathematically, multiply the first four digits by 10,000 then add 5,000)
 
 
-
-[Additional Resources]
-
-What is a "fake-site"
-    Theory_02_Networks
-
-What is "Interpolating the SiteID" mean?
-    Theory_01_Interpolation
-
-What is a "Network?
-    Theory_02_Networks
-
-What is pSNA?
-    Theory_03_pSNA
-
-What is iSNA?
-    Theory_04_iSNA
-
-How do we determine the recommended search circle size?
-    Theory_05_GDAL_Related
-
-How does interpolating between two real sites work?
-    Theory_02_Networks [Interpolating Across Multiple Reals]
+For pydoc web page, see "doc.html"

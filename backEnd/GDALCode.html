@@ -1,0 +1,109 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module GDALCode</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>GDALCode</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Cmpanozzo%5Cdocuments%5Cgithub%5Cadonnis%5Cbackend%5Cgdalcode.py">c:\users\mpanozzo\documents\github\adonnis\backend\gdalcode.py</a></font></td></tr></table>
+    <p></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="Dijkstra.html">Dijkstra</a><br>
+<a href="Visualizer.html">Visualizer</a><br>
+<a href="copy.html">copy</a><br>
+<a href="csv.html">csv</a><br>
+<a href="osgeo.gdal.html">osgeo.gdal</a><br>
+</td><td width="25%" valign=top><a href="osgeo.gdal_array.html">osgeo.gdal_array</a><br>
+<a href="osgeo.gdalconst.html">osgeo.gdalconst</a><br>
+<a href="json.html">json</a><br>
+<a href="multiprocessing.html">multiprocessing</a><br>
+<a href="multiprocessing.html">multiprocessing</a><br>
+</td><td width="25%" valign=top><a href="numpy.html">numpy</a><br>
+<a href="osgeo.ogr.html">osgeo.ogr</a><br>
+<a href="os.html">os</a><br>
+<a href="osgeo.osr.html">osgeo.osr</a><br>
+<a href="sys.html">sys</a><br>
+</td><td width="25%" valign=top><a href="test.html">test</a><br>
+<a href="threading.html">threading</a><br>
+<a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-determineNewSiteID"><strong>determineNewSiteID</strong></a>(x, y, dataFolder, siteLayerName, lineLayerName, cf=2, VIS=False, isTest=False)</dt><dd><tt>Attempts&nbsp;to&nbsp;calculate&nbsp;a&nbsp;new&nbsp;siteID&nbsp;with&nbsp;the&nbsp;given&nbsp;data&nbsp;information.<br>
+&nbsp;<br>
+Raises&nbsp;Exception&nbsp;if&nbsp;any&nbsp;step&nbsp;along&nbsp;the&nbsp;way&nbsp;fails<br>
+&nbsp;<br>
+longg&nbsp;[Number]:&nbsp;Longitude&nbsp;in&nbsp;decimal&nbsp;degree&nbsp;(float)&nbsp;notation<br>
+latt&nbsp;[Number]:&nbsp;Latitude&nbsp;in&nbsp;decimal&nbsp;degree&nbsp;(float)&nbsp;notation<br>
+folderPath&nbsp;[String]:&nbsp;Path&nbsp;where&nbsp;the&nbsp;shapefile&nbsp;folders&nbsp;are<br>
+siteLayerName&nbsp;[String]:&nbsp;Folder&nbsp;name&nbsp;where&nbsp;the&nbsp;site&nbsp;shapefile&nbsp;is.&nbsp;(1)<br>
+lineLayerName&nbsp;[String]:&nbsp;Folder&nbsp;name&nbsp;where&nbsp;the&nbsp;line&nbsp;shapefile&nbsp;is.&nbsp;(2)<br>
+cf&nbsp;[Number]:&nbsp;Clump&nbsp;Factor&nbsp;for&nbsp;optimal&nbsp;radius&nbsp;calculation&nbsp;(Default&nbsp;2)<br>
+VIS&nbsp;[Bool]:&nbsp;Should&nbsp;we&nbsp;launch&nbsp;the&nbsp;visualizer&nbsp;(Default&nbsp;False)<br>
+isTest&nbsp;[Bool]:&nbsp;Are&nbsp;we&nbsp;operating&nbsp;in&nbsp;test&nbsp;mode?&nbsp;(Default&nbsp;True)<br>
+&nbsp;<br>
+Returns&nbsp;[SiteID]:&nbsp;The&nbsp;SiteID&nbsp;object&nbsp;to&nbsp;be&nbsp;calculated&nbsp;at&nbsp;the&nbsp;specified&nbsp;longg&nbsp;latt.&nbsp;(3)<br>
+&nbsp;<br>
+*(1)&nbsp;The&nbsp;site&nbsp;shapefile&nbsp;must&nbsp;be&nbsp;the&nbsp;same&nbsp;name&nbsp;as&nbsp;the&nbsp;folder&nbsp;it&nbsp;is&nbsp;in<br>
+*(2)&nbsp;The&nbsp;line&nbsp;shapefile&nbsp;must&nbsp;be&nbsp;the&nbsp;sname&nbsp;name&nbsp;as&nbsp;the&nbsp;folder&nbsp;it&nbsp;is&nbsp;in<br>
+*(3)&nbsp;The&nbsp;longg&nbsp;and&nbsp;latt&nbsp;MUST&nbsp;be&nbsp;snapped&nbsp;on&nbsp;or&nbsp;within&nbsp;1&nbsp;meter&nbsp;of&nbsp;the&nbsp;lines.</tt></dd></dl>
+ <dl><dt><a name="-determineOptimalSearchRadius"><strong>determineOptimalSearchRadius</strong></a>(stateArea=141299400000, numberOfSites=None, clumpFactor=1)</dt><dd><tt>Gives&nbsp;an&nbsp;optimal&nbsp;radius&nbsp;for&nbsp;searching&nbsp;based&nbsp;on&nbsp;average&nbsp;sites&nbsp;per&nbsp;square&nbsp;meter&nbsp;in&nbsp;the&nbsp;state<br>
+clumpFactor&nbsp;[Number]:&nbsp;How&nbsp;clumpy&nbsp;are&nbsp;sites.&nbsp;1&nbsp;+;&nbsp;1&nbsp;being&nbsp;sites&nbsp;are&nbsp;evenly&nbsp;distributed,&nbsp;while&nbsp;higher&nbsp;numbers&nbsp;mean&nbsp;sites&nbsp;are&nbsp;less<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;evenly&nbsp;distributed</tt></dd></dl>
+ <dl><dt><a name="-getFirstFourDigitFraming"><strong>getFirstFourDigitFraming</strong></a>(folderPath, siteLayerName)</dt><dd><tt>Finds&nbsp;the&nbsp;first&nbsp;four&nbsp;digit&nbsp;series&nbsp;of&nbsp;ID's&nbsp;that&nbsp;are&nbsp;avaliable&nbsp;and&nbsp;have&nbsp;no&nbsp;entries<br>
+folderPath&nbsp;[String]:&nbsp;Folder&nbsp;path&nbsp;of&nbsp;shapefile&nbsp;data&nbsp;(not&nbsp;including&nbsp;shapefile&nbsp;folder)<br>
+siteLayerName&nbsp;[String]:&nbsp;Name&nbsp;of&nbsp;Shapefile&nbsp;Folder/Shapefile</tt></dd></dl>
+ <dl><dt><a name="-getFirstFourDigitFraming_Existing"><strong>getFirstFourDigitFraming_Existing</strong></a>(interSites)</dt></dl>
+ <dl><dt><a name="-isolateNetwork"><strong>isolateNetwork</strong></a>(folderPath, siteLayerName, lineLayerName, x, y, minDist=5000, maxDist=None, clFactor=2)</dt><dd><tt>Will&nbsp;attempt&nbsp;to&nbsp;isolate&nbsp;a&nbsp;Network&nbsp;from&nbsp;the&nbsp;geospatial&nbsp;data&nbsp;provided<br>
+Raises&nbsp;Exception&nbsp;if&nbsp;there&nbsp;is&nbsp;a&nbsp;failure&nbsp;in&nbsp;parsing&nbsp;or&nbsp;invalid&nbsp;data<br>
+**&nbsp;This&nbsp;is&nbsp;meant&nbsp;to&nbsp;be&nbsp;in&nbsp;a&nbsp;series&nbsp;of&nbsp;methods&nbsp;**<br>
+&nbsp;<br>
+folderPath&nbsp;[String]:&nbsp;Path&nbsp;where&nbsp;the&nbsp;shapefile&nbsp;folders&nbsp;are<br>
+siteLayerName&nbsp;[String]:&nbsp;Folder&nbsp;name&nbsp;where&nbsp;the&nbsp;site&nbsp;shapefile&nbsp;is.&nbsp;<br>
+lineLayerName&nbsp;[String]:&nbsp;Folder&nbsp;name&nbsp;where&nbsp;the&nbsp;line&nbsp;shapefile&nbsp;is.&nbsp;<br>
+x&nbsp;[Number]:&nbsp;Longitude&nbsp;in&nbsp;decimal&nbsp;degree&nbsp;(float)&nbsp;notation<br>
+y&nbsp;[Number]:&nbsp;Latitude&nbsp;in&nbsp;decimal&nbsp;degree&nbsp;(float)&nbsp;notation<br>
+minDist&nbsp;[Number]:&nbsp;Minimum&nbsp;search&nbsp;buffer&nbsp;size&nbsp;(Default&nbsp;UC_BUFFER_MIN)<br>
+maxDist&nbsp;[Number]:&nbsp;Maximum&nbsp;search&nbsp;buffer&nbsp;size&nbsp;(Default&nbsp;UC_BUFFER_MAX)<br>
+clFactor&nbsp;[Number]:&nbsp;Clump&nbsp;Factor&nbsp;for&nbsp;optimal&nbsp;radius&nbsp;calculation&nbsp;(Default&nbsp;2)<br>
+&nbsp;<br>
+Returns&nbsp;[[Network,Point&nbsp;Geometry,Vector&nbsp;Layer&nbsp;Entry&nbsp;(Line),<br>
+Flow,Vector&nbsp;Layer(Sites),List(Of&nbsp;Vector&nbsp;Layer&nbsp;Entry(Site)),Number]]<br>
+0&nbsp;-&nbsp;Network&nbsp;Isolated<br>
+1&nbsp;-&nbsp;Projected&nbsp;Input&nbsp;Point<br>
+2&nbsp;-&nbsp;Starting&nbsp;Line&nbsp;(User&nbsp;Clicked&nbsp;Line)<br>
+3&nbsp;-&nbsp;Starting&nbsp;Flow&nbsp;(User&nbsp;Clicked&nbsp;Flow)<br>
+4&nbsp;-&nbsp;Site&nbsp;Layer<br>
+5&nbsp;-&nbsp;List&nbsp;of&nbsp;Site&nbsp;Entries&nbsp;in&nbsp;Site&nbsp;Layer&nbsp;inside&nbsp;the&nbsp;bubble<br>
+6&nbsp;-&nbsp;Number&nbsp;of&nbsp;Entries&nbsp;in&nbsp;the&nbsp;Site&nbsp;Layer</tt></dd></dl>
+</td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#55aa55">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><strong>DOWNSTREAM_CON</strong> = 1<br>
+<strong>INITIAL_UCLICK_SWEEP</strong> = 1<br>
+<strong>MAX_CLUMP_FACTOR</strong> = 10<br>
+<strong>NY_STATE_AREA</strong> = 141299400000<br>
+<strong>UC_BUFFER_MAX</strong> = 30000<br>
+<strong>UC_BUFFER_MIN</strong> = 5000<br>
+<strong>UPSTREAM_CON</strong> = 2<br>
+<strong>USER_CLICK_X</strong> = -1.0<br>
+<strong>USER_CLICK_Y</strong> = -1.0<br>
+<strong>degree_sign</strong> = '°'</td></tr></table>
+</body></html>

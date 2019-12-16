@@ -1,0 +1,79 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module Timesaver</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>Timesaver</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Cmpanozzo%5Cdocuments%5Cgithub%5Cadonnis%5Cbackend%5Ctimesaver.py">c:\users\mpanozzo\documents\github\adonnis\backend\timesaver.py</a></font></td></tr></table>
+    <p></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="Dijkstra.html">Dijkstra</a><br>
+<a href="Visualizer.html">Visualizer</a><br>
+<a href="copy.html">copy</a><br>
+<a href="csv.html">csv</a><br>
+<a href="osgeo.gdal.html">osgeo.gdal</a><br>
+</td><td width="25%" valign=top><a href="osgeo.gdal_array.html">osgeo.gdal_array</a><br>
+<a href="osgeo.gdalconst.html">osgeo.gdalconst</a><br>
+<a href="json.html">json</a><br>
+<a href="multiprocessing.html">multiprocessing</a><br>
+<a href="multiprocessing.html">multiprocessing</a><br>
+</td><td width="25%" valign=top><a href="numpy.html">numpy</a><br>
+<a href="osgeo.ogr.html">osgeo.ogr</a><br>
+<a href="os.html">os</a><br>
+<a href="osgeo.osr.html">osgeo.osr</a><br>
+<a href="sys.html">sys</a><br>
+</td><td width="25%" valign=top><a href="test.html">test</a><br>
+<a href="threading.html">threading</a><br>
+<a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-determineNewSiteID_Timely"><strong>determineNewSiteID_Timely</strong></a>(longg, latt, folderPath, siteLayerName, lineLayerName, numSecAllowed=30)</dt><dd><tt>Attempts&nbsp;to&nbsp;calculate&nbsp;a&nbsp;new&nbsp;siteID&nbsp;with&nbsp;the&nbsp;given&nbsp;data&nbsp;information&nbsp;in&nbsp;a&nbsp;certain&nbsp;number&nbsp;of&nbsp;seconds<br>
+Raises&nbsp;RuntimeError&nbsp;if&nbsp;the&nbsp;process&nbsp;goes&nbsp;over&nbsp;the&nbsp;specified&nbsp;time&nbsp;limit<br>
+longg&nbsp;[Number]:&nbsp;Longitude&nbsp;in&nbsp;decimal&nbsp;degree&nbsp;(float)&nbsp;notation<br>
+latt&nbsp;[Number]:&nbsp;Latitude&nbsp;in&nbsp;decimal&nbsp;degree&nbsp;(float)&nbsp;notation<br>
+folderPath&nbsp;[String]:&nbsp;Path&nbsp;where&nbsp;the&nbsp;shapefile&nbsp;folders&nbsp;are<br>
+siteLayerName&nbsp;[String]:&nbsp;Folder&nbsp;name&nbsp;where&nbsp;the&nbsp;site&nbsp;shapefile&nbsp;is.&nbsp;(1)<br>
+lineLayerName&nbsp;[String]:&nbsp;Folder&nbsp;name&nbsp;where&nbsp;the&nbsp;line&nbsp;shapefile&nbsp;is.&nbsp;(2)<br>
+numSecAllowed&nbsp;[Number]:&nbsp;Number&nbsp;of&nbsp;seconds&nbsp;to&nbsp;complete&nbsp;the&nbsp;siteID&nbsp;finding&nbsp;process&nbsp;(3)<br>
+&nbsp;<br>
+Returns&nbsp;[SiteID]:&nbsp;The&nbsp;SiteID&nbsp;object&nbsp;to&nbsp;be&nbsp;calculated&nbsp;at&nbsp;the&nbsp;specified&nbsp;longg&nbsp;latt.&nbsp;(4)<br>
+&nbsp;<br>
+*(1)&nbsp;The&nbsp;site&nbsp;shapefile&nbsp;must&nbsp;be&nbsp;the&nbsp;same&nbsp;name&nbsp;as&nbsp;the&nbsp;folder&nbsp;it&nbsp;is&nbsp;in<br>
+*(2)&nbsp;The&nbsp;line&nbsp;shapefile&nbsp;must&nbsp;be&nbsp;the&nbsp;sname&nbsp;name&nbsp;as&nbsp;the&nbsp;folder&nbsp;it&nbsp;is&nbsp;in<br>
+*(3)&nbsp;If&nbsp;the&nbsp;process&nbsp;completes&nbsp;under&nbsp;the&nbsp;time&nbsp;limit,&nbsp;the&nbsp;method&nbsp;will&nbsp;not&nbsp;wait&nbsp;the&nbsp;full&nbsp;time&nbsp;period<br>
+&nbsp;&nbsp;&nbsp;&nbsp;i.e.&nbsp;if&nbsp;we&nbsp;complete&nbsp;in&nbsp;5&nbsp;sec&nbsp;but&nbsp;allow&nbsp;for&nbsp;30,&nbsp;we&nbsp;will&nbsp;exit&nbsp;out&nbsp;of&nbsp;the&nbsp;method&nbsp;in&nbsp;5&nbsp;sec,&nbsp;not&nbsp;30<br>
+*(4)&nbsp;The&nbsp;longg&nbsp;and&nbsp;latt&nbsp;MUST&nbsp;be&nbsp;snapped&nbsp;on&nbsp;or&nbsp;within&nbsp;1&nbsp;meter&nbsp;of&nbsp;the&nbsp;lines.</tt></dd></dl>
+ <dl><dt><a name="-recoverReturn"><strong>recoverReturn</strong></a>(longg, latt, folderPath, siteLayerName, lineLayerName, returnDict)</dt></dl>
+</td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#55aa55">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><strong>DOWNSTREAM_CON</strong> = 1<br>
+<strong>INITIAL_UCLICK_SWEEP</strong> = 1<br>
+<strong>MAX_CLUMP_FACTOR</strong> = 10<br>
+<strong>NY_STATE_AREA</strong> = 141299400000<br>
+<strong>UC_BUFFER_MAX</strong> = 30000<br>
+<strong>UC_BUFFER_MIN</strong> = 5000<br>
+<strong>UPSTREAM_CON</strong> = 2<br>
+<strong>USER_CLICK_X</strong> = -1.0<br>
+<strong>USER_CLICK_Y</strong> = -1.0<br>
+<strong>degree_sign</strong> = '°'</td></tr></table>
+</body></html>
