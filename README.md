@@ -1,4 +1,5 @@
 # ADONNIS
+<img src="/images/logoRob.png" width="200"/>
 
 ## Back end info
 
@@ -15,5 +16,5 @@ Both the shapefiles must be pre-projected to NAD 1983 UTM 18N (projected coordin
 
 
 ## Details
-For more information, see the Documentation Folder
+For more information, see the Documentation Folder in back-end
 
