@@ -8,6 +8,10 @@ from osgeo import gdal_array
 from osgeo import gdalconst
 import sys
 import json
+import os
+
+os.environ['GDAL_DATA'] = 'C:/Users/marsmith/miniconda/envs/adonnis/Library/share/gdal'
+os.environ['PROJ_LIB'] = 'C:/Users/marsmith/miniconda/envs/adonnis/Library/share/proj'
 
 def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, folderPath, siteLayerName):
     beg = []

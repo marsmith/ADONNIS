@@ -569,9 +569,10 @@ function ajaxNearbyPlace (e) {
 	}
 
 	return $.ajax({
-		url: "https://cartowfs.nationalmap.gov/arcgis/rest/services/geonames/MapServer/4/query?geometry=" + collectedData.coords.y +"," + collectedData.coords.x + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson",
+		url: "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/18/query?geometry=" + collectedData.coords.y +"," + collectedData.coords.x + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson",
 		dataType: 'json',
 		success: function(result7){
+			console.log('RESULT',result7)
 			counter += 20;
 			console.log("Nearby", counter);
 			//see if found any
@@ -592,7 +593,7 @@ function ajaxNearbyPlace (e) {
 				}
 
 				collectedData.placeName = closestFeature.attributes.gaz_name;
-				console.log("HEREEEEEEDFD!");
+				console.log("FOUND CLOSEST POPULATED PLACE:", collectedData.placeName);
 
 				var distMiles = closestDist;
 

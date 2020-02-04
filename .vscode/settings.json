@@ -1,3 +1,14 @@
 {
-    "python.pythonPath": "C:\\Users\\mpanozzo\\AppData\\Local\\Continuum\\miniconda3\\envs\\ADDONIS\\python.exe"
+    "python.pythonPath": "C:\\Users\\marsmith\\miniconda\\envs\\adonnis\\python.exe",
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./backEnd",
+        "-p",
+        "test*.py"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.unittestEnabled": true,
+    "phpserver.phpPath": "C:\\Temp\\php\\php.exe",
 }

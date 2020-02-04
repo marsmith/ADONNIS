@@ -22,11 +22,12 @@ UC_BUFFER_MIN = 5000 # 5 km (What is the minimum size circle to draw)
 UC_BUFFER_MAX = 30000 # 30 km (What is the maximum size circle to draw)
 NY_STATE_AREA = 141299400000 # m^2 (Aprox. Area of the state)
 MAX_CLUMP_FACTOR = 10 # Maximum clump factor allowed 
-INITIAL_UCLICK_SWEEP = 1 # 1m (How many meters away from the line can our USER_CLICK be)
+INITIAL_UCLICK_SWEEP = 5 # 1m (How many meters away from the line can our USER_CLICK be)
 USER_CLICK_X = -1.0
 USER_CLICK_Y = -1.0
 
-
+os.environ['GDAL_DATA'] = 'C:/Users/marsmith/miniconda/envs/adonnis/Library/share/gdal'
+os.environ['PROJ_LIB'] = 'C:/Users/marsmith/miniconda/envs/adonnis/Library/share/proj'
 
 def determineOptimalSearchRadius(stateArea = NY_STATE_AREA,numberOfSites=None,clumpFactor=1):
     '''
@@ -755,9 +756,11 @@ if __name__ == "__main__":
     # Set a time limit on execution of this module to 30 seconds
     multiprocessing.set_start_method('spawn', True)
 
-    folderPath = "../data/"
+    BASE_DIR = os.path.join( os.path.dirname(os.path.dirname( __file__ )))
+    folderPath = BASE_DIR + '/data/'
     arguments = sys.argv[1]
     a = arguments.split(",")
+    # a = ["-74.0136461","44.2623416"]
     siteLayerName = "ProjectedSites"
     lineLayerName = "NHDFlowline_Project_SplitLin3"
     newSite = determineNewSiteID_Timely(float(a[0]),float(a[1]),folderPath,siteLayerName,lineLayerName,60)
