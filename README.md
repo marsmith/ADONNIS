@@ -6,6 +6,30 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
 
 ## Back end info
 
+  ### Software Installation
+  
+  #### Required Packages
+  - Python 3.6
+  - Numpy
+  - GDAL 2.4.4
+  
+  
+  #### Recomended Setup
+  
+  Install MiniConda3. This will aid in the installation of required packages. Open the miniconda terminal named "Anaconda Prompt (miniconda 3) from the start menu. Next, create a new python environment with ```conda create -n adonnis numpy```. Now, activate the new environment with ```conda activate adonnis```. Attempt to install gdal 2.4.4 using ```conda install -c conda-forge gdal=2.4.4```. If you are met with a server error, one of two issues are likely occuring. 
+
+  - Issue 1: There is a certification error. Either contact the IT manager for assistance or as a unrecommended fix, type: ```conda config --set ssl_verify false```. This solution is unsafe but will likely fix a cerification error. After either changing the certificate or changing the ```ssl_verify``` settings, ensure that you restart your anaconda prompt and reactivate your environment with ```conda activate adonnis```.
+
+  -Issue 2: A package is not correctly downloading. The package ```m2w64-gettext``` has been known to be problematic. To work around this, manually install the package from the ```msys2``` source using ```conda install -c msys2 m2w64-gettext```. Once gettext is installed, you may attempt to install gdal 2.4.4 again with ```conda install -c conda-forge gdal=2.4.4```.
+  
+  
+  Next get a local copy of the git repository.
+  Clone the git repository in C:\NYBackup\GitHub\ using ```git clone https://github.com/marsmith/ADONNIS.git```.
+  Ensure that the final folder structure matches: ```C:\NYBackup\GitHub\ADONNIS```. Note that this specific folder structure is a temporary requirement.
+
+  Next, we need to copy data into the program directory. The root data folder is stored here: ```X:\marsmith\GDAL_DATA_PR```. Copy this folder into ```\adonnis\backend```. Rename ```GDAL_DATA_PR``` to ```data```. 
+  
+
   ### Prerequisites
 
   - data folder containing a NHDFlowline shapefile
