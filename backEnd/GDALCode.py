@@ -13,6 +13,7 @@ import time
 import threading
 import multiprocessing
 from Timesaver import *
+from GDALData import *
 from Precompiler import *
 from net_tracer import net_tracer
 
@@ -26,8 +27,8 @@ INITIAL_UCLICK_SWEEP = 5 # 1m (How many meters away from the line can our USER_C
 USER_CLICK_X = -1.0
 USER_CLICK_Y = -1.0
 
-os.environ['GDAL_DATA'] = 'C:/Users/marsmith/miniconda/envs/adonnis/Library/share/gdal'
-os.environ['PROJ_LIB'] = 'C:/Users/marsmith/miniconda/envs/adonnis/Library/share/proj'
+#os.environ['GDAL_DATA'] = 'C:/Users/marsmith/miniconda/envs/adonnis/Library/share/gdal'
+#os.environ['PROJ_LIB'] = 'C:/Users/marsmith/miniconda/envs/adonnis/Library/share/proj'
 
 def determineOptimalSearchRadius(stateArea = NY_STATE_AREA,numberOfSites=None,clumpFactor=1):
     '''
@@ -39,44 +40,41 @@ def determineOptimalSearchRadius(stateArea = NY_STATE_AREA,numberOfSites=None,cl
     r = numpy.sqrt((1 / rat) / numpy.pi) * clumpFactor
     return r
 
-def getFirstFourDigitFraming(folderPath,siteLayerName):
+def getFirstFourDigitFraming(gdalData):
     '''
     Finds the first four digit series of ID's that are avaliable and have no entries
     folderPath [String]: Folder path of shapefile data (not including shapefile folder)
     siteLayerName [String]: Name of Shapefile Folder/Shapefile
     '''
-    path_sites = str(folderPath) + "/" + str(siteLayerName) + "/" + str(siteLayerName) + ".shp"
-    sitesDataSource = ogr.Open(path_sites)
-    sl = sitesDataSource.GetLayer()
-    siteNumber_index = sl.GetLayerDefn().GetFieldIndex("site_no")
+    siteLayer = gdalData.siteLayer
+    siteNumber_index = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
     ffDict = {} # Stores the first four 
-    for site in sl:
+    for site in siteLayer:
         ff = site.GetFieldAsString(siteNumber_index)[0:4]
         if ff in ffDict.keys():
             continue 
         else:
             ffDict[ff] = "4dseries"
     return list(ffDict.keys())
-def getFirstFourDigitFraming_Existing(interSites):
+def getFirstFourDigitFraming_Existing(gdalData, interSites):
+    siteLayer = gdalData.siteLayer
     ffDict = {}
     for sentry in interSites:
         siteGe = sentry[0]
-        siteNumber_index = sl.GetLayerDefn().GetFieldIndex("site_no")
+        siteNumber_index = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
         ff = siteGe.GetFieldAsString(siteNumber_index)[0:4]
         if ff in ffDict.keys():
             continue
         else:
             ffDict[ff] = "4dseries"
     return list(ffDict.keys())
-def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFER_MIN,maxDist= None,clFactor=2):
+def isolateNetwork(gdalData,x,y,minDist = UC_BUFFER_MIN,maxDist= None,clFactor=2):
     '''
     Will attempt to isolate a Network from the geospatial data provided
     Raises Exception if there is a failure in parsing or invalid data
     ** This is meant to be in a series of methods **
 
-    folderPath [String]: Path where the shapefile folders are
-    siteLayerName [String]: Folder name where the site shapefile is. 
-    lineLayerName [String]: Folder name where the line shapefile is. 
+    gdalData [GDALData]: gdal data instance to use
     x [Number]: Longitude in decimal degree (float) notation
     y [Number]: Latitude in decimal degree (float) notation
     minDist [Number]: Minimum search buffer size (Default UC_BUFFER_MIN)
@@ -98,10 +96,6 @@ def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFE
     global USER_CLICK_Y
     starterFlow = None
      
-    # Load Lines
-    path = str(folderPath) + "/" + str(lineLayerName) + "/" + str(lineLayerName) + ".shp"
-    
-    path_sites = str(folderPath) + "/" + str(siteLayerName) + "/" + str(siteLayerName) + ".shp"
     # Buffer around userClick
     
     oRef = osr.SpatialReference()
@@ -120,22 +114,20 @@ def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFE
     inputPointProj.SetPoint_2D(0,p_lng,p_lat)
     r_ctran = osr.CoordinateTransformation(targRef,oRef)
     # Load Sites
-    sitesDataSource = ogr.Open(path_sites)
-    sl = sitesDataSource.GetLayer()
-    ctran = osr.CoordinateTransformation(sl.GetSpatialRef(),targRef)
+    siteLayer = gdalData.siteLayer
+    ctran = osr.CoordinateTransformation(siteLayer.GetSpatialRef(),targRef)
 
     dist = minDist
     interSites = []
-    numSites = len(sl)
+    numSites = len(siteLayer)
 
     if maxDist is None:
         # If max distance is not provided, then we can use the 
         # optimal solution
         maxDist = determineOptimalSearchRadius(numberOfSites=numSites,clumpFactor=clFactor)
 
-    dataSource = ogr.Open(path)
     shpdriver = ogr.GetDriverByName('ESRI Shapefile')
-    linesLayer = dataSource.GetLayer() 
+    linesLayer = gdalData.lineLayer
     gg = inputPointProj.Buffer(UC_BUFFER_MAX)
     linesLayer.SetSpatialFilter(gg)
     i = 0
@@ -194,12 +186,13 @@ def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFE
                 
         i += 1 # Increment line counter
     '''
-
+    #increase the distance until we either max out on distance OR
+    #until we find (in this case), 2 preexisting sites 
     while len(interSites) < clFactor and dist < maxDist:
         geomBuffer = inputPointProj.Buffer(dist) # Buffer around the geometry  
             
         # Intersect of BUFFER and SITES        
-        for site in sl:
+        for site in siteLayer:
             # Grab information on the first four digits of the site          
 
             ingeom_site = site.GetGeometryRef()
@@ -207,14 +200,14 @@ def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFE
                 # This site is inside the buffer!
                 interSites.append((site,ingeom_site.Buffer(1)))
 
-        sl.ResetReading()
+        siteLayer.ResetReading()
         if len(interSites) < clFactor:
             dist += 1000 # Expand by 2km           
 
     linesLayer.SetSpatialFilter(geomBuffer)    
     # Get certain info about site attributes
-    siteNumber_index = sl.GetLayerDefn().GetFieldIndex("site_no")
-    stationName_index = sl.GetLayerDefn().GetFieldIndex("station_nm")    
+    siteNumber_index = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
+    stationName_index = siteLayer.GetLayerDefn().GetFieldIndex("station_nm")    
     siteCounter = 0
     interLines = []
     # Intersect of BUFFER and LINES
@@ -258,8 +251,8 @@ def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFE
             if fCode == 42807 or fCode == 33600:
                 continue # Skip this line, ignore it completely
             
-            _npt = e.GetGeometryRef().GetPointCount()
-            upPt = ogr.Geometry(ogr.wkbPoint)
+            _npt = e.GetGeometryRef().GetPointCount()#number of points
+            upPt = ogr.Geometry(ogr.wkbPoint)#up stream point - wkb point is the code for point based geometry
             p_ = e.GetGeometryRef().GetPoint(0)
             upPt.AddPoint(p_[0],p_[1])
             
@@ -274,7 +267,7 @@ def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFE
             downSite = None
             
             # Check if any real sites exist at the endpoint
-            for s in interSites:
+            for s in interSites: #for all sites (up to 2) in the search area ...
                 s_geom = s[1]
                 
                 if s_geom.Intersects(upPt):
@@ -402,11 +395,11 @@ def isolateNetwork(folderPath,siteLayerName,lineLayerName,x,y,minDist = UC_BUFFE
     netti = Network(flowList,list(sitesStore.values()))
     starterFlow = removeUseless(netti,True,starterFlow) # Pass in starterFlow so we can re-assign it
     
-    return [netti,inputPointProj,startingLine,starterFlow,sl,interSites,len(sl)]
+    return [netti,inputPointProj,startingLine,starterFlow,siteLayer,interSites,len(siteLayer)]
     
-    
+    #dataFolder,siteLayerName
 
-def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False,isTest=False):
+def determineNewSiteID(x,y,gdalData,cf=2,VIS=False,isTest=False):
     '''
     Attempts to calculate a new siteID with the given data information.
 
@@ -414,9 +407,7 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
 
     longg [Number]: Longitude in decimal degree (float) notation
     latt [Number]: Latitude in decimal degree (float) notation
-    folderPath [String]: Path where the shapefile folders are
-    siteLayerName [String]: Folder name where the site shapefile is. (1)
-    lineLayerName [String]: Folder name where the line shapefile is. (2)
+    gdalData [GDALData]: data object to use
     cf [Number]: Clump Factor for optimal radius calculation (Default 2)
     VIS [Bool]: Should we launch the visualizer (Default False)
     isTest [Bool]: Are we operating in test mode? (Default True)
@@ -428,25 +419,23 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
     *(3) The longg and latt MUST be snapped on or within 1 meter of the lines.
 
     '''
-    [net,ucPoint,startingLine,startFlow,siteLayer,interSites,numSites] = isolateNetwork(dataFolder,siteLayerName,lineLayerName,x,y,UC_BUFFER_MIN,None,cf)
+    [net,ucPoint,startingLine,startFlow,siteLayer,interSites,numSites] = isolateNetwork(gdalData,x,y,UC_BUFFER_MIN,None,cf)
     net.calculateUpstreamDistances()    
     net.calcStraihler()    
     reals = net.getRealSites()
 
-    def return_site(newSite, folderPath, siteLayerName):
+    def return_site(newSite, gdalData):
         if newSite.extension:
             extension_flag = True
-            path_sites = str(dataFolder) + "/" + str(siteLayerName) + "/" + str(siteLayerName) + ".shp"
-            sitesDataSource = ogr.Open(path_sites)
-            sl = sitesDataSource.GetLayer()
-            siteNumber_index = sl.GetLayerDefn().GetFieldIndex("site_no")
+            siteLayer = gdalData.siteLayer
+            siteNumber_index = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
             oRef = osr.SpatialReference()
             oRef.ImportFromEPSG(4326)
             # Reproject
             targRef = osr.SpatialReference()
             targRef.ImportFromEPSG(26918)
             cTran = osr.CoordinateTransformation(targRef,oRef)
-            for site in sl:
+            for site in siteLayer:
                 siteID = site.GetFieldAsString(siteNumber_index)
                 siteID = SiteID(siteID)
                 if siteID.value == newSite.value:
@@ -462,9 +451,9 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
                 return newSite     
         else:
             return newSite
-    def find_with_no_sites(dataFolder, siteLayerName,minStartFour=None):
+    def find_with_no_sites(gdalData,minStartFour=None):
         # We have no reference to base off of, select a new first four digit series and select the middle
-            digitBasis = getFirstFourDigitFraming(dataFolder,siteLayerName)
+            digitBasis = getFirstFourDigitFraming(gdalData)
             digitBasis.sort()
             # Find a gap in the numbers
             before = None
@@ -488,7 +477,7 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
             newHighest = (int(before) + 1) * 10000 + 5000
             newHighest = "%08d" %(newHighest)
             newSiteID = SiteID(newHighest)
-            return return_site(newSiteID, dataFolder, siteLayerName)
+            return return_site(newSiteID, gdalData)
 
     def interpolateLine(isTesting = isTest):
 
@@ -531,7 +520,7 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
         
         YAY = downstreamID - lengthP
         
-        return return_site(YAY, dataFolder, siteLayerName)
+        return return_site(YAY, gdalData)
 
     # -------- DIFFERENT REAL SITE CASES -------------------------
     #------------------------------------------------------------
@@ -567,7 +556,7 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
                     Visualizer.visualize(net, USER_CLICK_X, USER_CLICK_Y, newSite)
             
             newSite = interpolateLine() 
-            return return_site(newSite, dataFolder, siteLayerName)      
+            return return_site(newSite, gdalData)      
         
         else:
             # We must conform to the SiteTheory Standard for multiple sites
@@ -604,7 +593,7 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
                     newSite = interpolateLine()
                     Visualizer.visualize(net, USER_CLICK_X, USER_CLICK_Y, newSite)           
                 newSite = interpolateLine()
-                return return_site(newSite, dataFolder, siteLayerName)
+                return return_site(newSite, gdalData)
 
             elif (uIndex > -1 and fIndex > -1) and lIndex == -1:
                 # Scenario ---- (target flow) ---...---<>
@@ -619,7 +608,7 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
                     newSite = interpolateLine()
                     Visualizer.visualize(net, USER_CLICK_X, USER_CLICK_Y, newSite)
                 newSite = interpolateLine()
-                return return_site(newSite, dataFolder, siteLayerName)
+                return return_site(newSite, gdalData)
             elif str(orderedList[lIndex].assignedID)[0:4] != str(orderedList[uIndex].assignedID)[0:4]:
                 # We have two different series on the same line. Just use the downstream ID and work from
                 # there only
@@ -657,7 +646,7 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
                         newSite = interpolateLine()
                         Visualizer.visualize(net, USER_CLICK_X, USER_CLICK_Y, newSite)
                     newSite = interpolateLine()
-                    return return_site(newSite, dataFolder, siteLayerName)
+                    return return_site(newSite, gdalData)
                     
                 else:
                     # We have a valid UL, now compute the ID from the bottom ID, and theoretically everything
@@ -714,7 +703,7 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
                         if VIS:
                             Visualizer.visualize(net, USER_CLICK_X, USER_CLICK_Y, YAY)
                         
-                        return return_site(YAY, dataFolder, siteLayerName)
+                        return return_site(YAY, gdalData)
     if len(reals) < 1:
         # We need to base our siteID off of the length of the networks which the other
         # next numbered sites sharing the first four numbers are on.      
@@ -727,26 +716,26 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
         reals = []
         if r <= UC_BUFFER_MAX:
             # Radius recommended does not exceed upper bounds! Execute again
-            [net,ucPoint,startingLine,startFlow,siteLayer,interSites, length] = isolateNetwork(dataFolder,siteLayerName,lineLayerName,x,y,prev,r)    
+            [net,ucPoint,startingLine,startFlow,siteLayer,interSites, length] = isolateNetwork(gdalData,x,y,prev,r)    
             net.calculateUpstreamDistances()    
             net.calcStraihler()    
             reals = net.getRealSites()
 
         if len(reals) == 0:
             if len(interSites) < 1:
-                id = find_with_no_sites(dataFolder,siteLayerName)
+                id = find_with_no_sites(gdalData)
                 if VIS:
                     Visualizer.visualize(net, USER_CLICK_X, USER_CLICK_Y, id)
-                return return_site(id, dataFolder, siteLayerName)
+                return return_site(id, gdalData)
             else:
                 # Try and guess based off of the next highest in that local area
-                ff = getFirstFourDigitFraming_Existing(interSites)
+                ff = getFirstFourDigitFraming_Existing(gdalData, interSites)
                 ff.sort(reverse=True)
                 assert(len(ff) > 0)
-                id = find_with_no_sites(dataFolder,siteLayerName,ff[0])
+                id = find_with_no_sites(gdalData,ff[0])
                 if VIS:
                     Visualizer.visualize(net, USER_CLICK_X, USER_CLICK_Y, id)
-                return return_site(id, dataFolder, siteLayerName)
+                return return_site(id, gdalData)
         else:
             return foundSomething()
     else:
@@ -754,19 +743,22 @@ def determineNewSiteID(x,y,dataFolder,siteLayerName,lineLayerName,cf=2,VIS=False
     
 if __name__ == "__main__":
     # Set a time limit on execution of this module to 30 seconds
-    multiprocessing.set_start_method('spawn', True)
-
+    #multiprocessing.set_start_method('spawn', True)
+    print("started")
     BASE_DIR = os.path.join( os.path.dirname(os.path.dirname( __file__ )))
-    folderPath = BASE_DIR + '/data/'
-    arguments = sys.argv[1]
-    a = arguments.split(",")
-    # a = ["-74.0136461","44.2623416"]
-    siteLayerName = "ProjectedSites"
-    lineLayerName = "NHDFlowline_Project_SplitLin3"
-    newSite = determineNewSiteID_Timely(float(a[0]),float(a[1]),folderPath,siteLayerName,lineLayerName,60)
+    #folderPath = BASE_DIR + '/data/'
+    #arguments = sys.argv[1]
+    #a = arguments.split(",")
+    x = -74.3254918    #Long Lake
+    y =  44.0765791
+    a = [x,y]
+    gdalData = GDALData()
+    gdalData.loadFromData()
+    #newSite = determineNewSiteID_Timely(float(a[0]),float(a[1]),gdalData,60)
+    newSite = determineNewSiteID(float(a[0]),float(a[1]),gdalData,60)
     res = {'Results': str(newSite)}
     results = json.dumps(res)
-    print(results)
+    print("results = " + results)
     
     '''
 

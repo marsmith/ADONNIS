@@ -4,14 +4,14 @@
 from GDALCode import *
 import multiprocessing as mp
 
-def recoverReturn(longg,latt,folderPath,siteLayerName,lineLayerName,returnDict):
+def recoverReturn(longg,latt,gdalData,returnDict):
     try:
-        returnDict["data"] = determineNewSiteID(longg,latt,folderPath,siteLayerName,lineLayerName)
+        returnDict["data"] = determineNewSiteID(longg,latt,gdalData)
     except Exception as e:
         returnDict["exception"] = e
 
 
-def determineNewSiteID_Timely(longg,latt,folderPath,siteLayerName,lineLayerName,numSecAllowed=30):
+def determineNewSiteID_Timely(longg,latt,gdalData,numSecAllowed=30):
     '''
     Attempts to calculate a new siteID with the given data information in a certain number of seconds
     Raises RuntimeError if the process goes over the specified time limit
@@ -34,7 +34,7 @@ def determineNewSiteID_Timely(longg,latt,folderPath,siteLayerName,lineLayerName,
     
     man = mp.Manager()
     rD = man.dict()
-    x = mp.Process(target=recoverReturn,args=(longg,latt,folderPath,siteLayerName,lineLayerName,rD),daemon=True)
+    x = mp.Process(target=recoverReturn,args=(longg,latt,gdalData,rD),daemon=True)
     
     timeSlept = 0
     x.start()
