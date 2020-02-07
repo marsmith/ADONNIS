@@ -10,7 +10,7 @@ import sys
 import json
 import os
 
-def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, folderPath, siteLayerName):
+def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, gdalData):
     beg = []
     if mouthOrOutlet != "":
         beg.append("Near " + mouthOrOutlet + " of " + GNIS_Name)
@@ -45,9 +45,7 @@ def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, fol
 
     poss = sorted(possibilities, key = len)
 
-    path_sites = str(folderPath) + "/" + str(siteLayerName) + "/" + str(siteLayerName) + ".shp"
-    sitesDataSource = ogr.Open(path_sites)
-    sl = sitesDataSource.GetLayer()
+    sl = gdalData.siteLayer
     siteName_index = sl.GetLayerDefn().GetFieldIndex("station_nm")
     for s in sl:
         name = s.GetFieldAsString(siteName_index)
@@ -60,7 +58,10 @@ def Namer(placeName, State, distance, GNIS_Name, mouthOrOutlet, cardinalDir, fol
     return poss
 a = sys.argv[1]
 k = a.split(",")
-pos = Namer(k[0], k[1], float(k[2]), k[3], k[4], k[5], "../data/", "ProjectedSites")
+#Probably shouldn't be creating this again. This code is not hooked into the rest of backend though so the reference would have to be passed in
+gdalData = GDALData()
+gdalData.loadFromData()
+pos = Namer(k[0], k[1], float(k[2]), k[3], k[4], k[5], gdalData)
 
 res = {'Results':pos}
 results = json.dumps(res)
