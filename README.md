@@ -20,8 +20,13 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
 
   - Issue 1: There is a certification error. Either contact the IT manager for assistance or as a unrecommended fix, type: ```conda config --set ssl_verify false```. This solution is unsafe but will likely fix a cerification error. After either changing the certificate or changing the ```ssl_verify``` settings, ensure that you restart your anaconda prompt and reactivate your environment with ```conda activate adonnis```.
 
-  -Issue 2: A package is not correctly downloading. The package ```m2w64-gettext``` has been known to be problematic. To work around this, manually install the package from the ```msys2``` source using ```conda install -c msys2 m2w64-gettext```. Once gettext is installed, you may attempt to install gdal 2.4.4 again with ```conda install -c conda-forge gdal=2.4.4```.
+  - Issue 2: A package is not correctly downloading. The package ```m2w64-gettext``` has been known to be problematic. To work around this, manually install the package from the ```msys2``` source using ```conda install -c msys2 m2w64-gettext```. Once gettext is installed, you may attempt to install gdal 2.4.4 again with ```conda install -c conda-forge gdal=2.4.4```.
   
+  #### Setting up VS Code
+  
+  We used visual studio code for development of this project. Although this is not required it is recommended. Once VS code is installed, go to ```File->Open Folder..``` and open the ADONNIS folder. Ensure that the python, PHP Server, and Test Explorer UI extensions are installed. 
+  One important note is that the VS Code terminal will not recognize anaconda commands initially. This can cause issues debugging as well as managing conda environments. To fix this, follow the steps in the following tutorial:
+  https://www.datacamp.com/community/tutorials/installing-anaconda-windows
   
   Next get a local copy of the git repository.
   Clone the git repository in C:\NYBackup\GitHub\ using ```git clone https://github.com/marsmith/ADONNIS.git```.
