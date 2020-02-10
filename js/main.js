@@ -416,7 +416,43 @@ function ajaxCountyStateFIPS (e) {
 		}
 	});
 }
+//getLayerId
+function ajaxSiteLocs (map, group) {
+	//on();
 
+	var bounds = map.getBounds();
+	var nwBound = bounds.getNorthWest();
+	var seBound = bounds.getSouthEast();
+	
+	//https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=-77.459070&nw_latitude_va=42.970432&se_longitude_va=-77.559070&se_latitude_va=42.870432&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box
+	//https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=-77.459070&nw_latitude_va=42.970432&se_longitude_va=-77.316980&se_latitude_va=41.572236&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box
+	$.ajax({
+		url: "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + nwBound.lng + "&nw_latitude_va=" + nwBound.lat + "&se_longitude_va=" + seBound.lng + "&se_latitude_va=" + seBound.lat + 
+		"&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box",
+		dataType: 'xml',
+		success: function(xml){
+			group.clearLayers();
+			var myRenderer = L.canvas({ padding: 0.5 });
+			myRenderer.addTo(group);
+			$(xml).find('site').each(function(){
+				var type = $(this).find("site_tp_cd").text();
+				var streamCode = "ST";
+				if(type.localeCompare(streamCode) == 0) {
+					var lat = $(this).find("dec_lat_va").text();
+					var lng = $(this).find("dec_long_va").text();
+					var name = $(this).find("station_nm").text();
+					var siteID = $(this).find("site_no").text();
+
+					var tooltip = name.length > 0 ? name + "\nID: " + siteID : siteID;
+				
+					//L.circleMarker(L.latLng(lat, lng), {renderer: myRenderer}).addTo(group);
+
+					L.marker(L.latLng(lat, lng), {title: tooltip}).addTo(group);
+				}
+			});
+		}
+	});
+}
 
 function getSnappedPointThenRun (e) {
 	$.ajax({
@@ -659,6 +695,17 @@ $(document).ready(function () {
 		layers: [worldImagery, worldBoundAndPlacesRef],
 		attributionControl: false,
 		zoomControl: false
+	});
+
+	var siteLocGroup = L.layerGroup();
+	siteLocGroup.addTo(map)
+	map.on('moveend', function (e) {
+		if(map.getZoom() >= 13) {
+			siteLocRenderer = ajaxSiteLocs(map, siteLocGroup);
+		}
+		else {
+			siteLocGroup.clearLayers();
+		}
 	});
 
 	map.on('click', function(e) {
