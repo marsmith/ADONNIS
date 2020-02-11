@@ -456,6 +456,10 @@ function updateMapSitesCallback (xml) {
 		}
 	});
 }
+
+function verifyMapSiteSnapsCallback (xml) {
+	map.removeLayer(preexistingSiteLayer);
+}
  
 
 /*
@@ -466,16 +470,145 @@ $.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitu
 	});
 */
 
-function ajaxGetStreams (e) {
+//attempt to get streams in a radius around latlng. Send features to callback in format callback(results)
+function ajaxGetStreams (latlng, callback) {
+	var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=4000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson";
 	return $.ajax({
-		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=4000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson",
+		url: queryUrl,
 		dataType: 'json',
-		success: function(result6){
+		success: function(results){
+			callback(latlng, results.features);
 		}
 	});
 }
 
-function getSnappedPointThenRun (e) {
+function snapToFeature (latlng, features) {
+	var smallestDistFeature = Number.MAX_VALUE;
+	var smallestDistFeatureIndex = -1;
+	var feature = null;
+	for (var feat of features) {
+		if (feat.attributes.GNIS_NAME) {
+			var smallestDist = "";
+			var smallestDistIndex;
+			for (var i = 0; i < feat.geometry.paths[0].length; i++) {
+				var dist = distance(latlng.lat, latlng.lng, feat.geometry.paths[0][i][1], feat.geometry.paths[0][i][0]);
+				if(dist < smallestDistFeature){
+					smallestDistFeature = dist;
+					smallestDistFeatureIndex = i;
+					feature = feat
+				}
+			}
+		}
+	}
+
+	if(smallestDistFeatureIndex == -1){
+		console.error("found no nearest feature returning [-1, -1]");
+		return [-1, -1];
+	}
+
+	//find nearest coordinate
+	globSmallestDistIndex = smallestDistFeatureIndex;
+
+	//now find whether left or right of smallestDistIndex is closer
+
+	var leftDist = Number.MAX_VALUE;
+	var rightDist = Number.MAX_VALUE;
+	//left
+	if (smallestDistFeatureIndex != 0) {
+		leftDist = distance(latlng.lat, latlng.lng, feature.geometry.paths[0][smallestDistFeatureIndex - 1][1], feature.geometry.paths[0][smallestDistFeatureIndex - 1][0]);
+	}
+
+	if (smallestDistFeatureIndex != feature.geometry.paths[0].length - 1) {
+		rightDist = distance(latlng.lat, latlng.lng, feature.geometry.paths[0][smallestDistFeatureIndex + 1][1], feature.geometry.paths[0][smallestDistFeatureIndex + 1][0]);
+	}
+	var leftCoordOfLine;
+	var rightCoordOfLine;
+	if (leftDist < rightDist) {
+		leftCoordOfLine = feature.geometry.paths[0][smallestDistFeatureIndex - 1];
+		rightCoordOfLine = feature.geometry.paths[0][smallestDistFeatureIndex];
+	} else {
+		leftCoordOfLine = feature.geometry.paths[0][smallestDistFeatureIndex];
+		rightCoordOfLine = feature.geometry.paths[0][smallestDistFeatureIndex + 1];
+	}
+
+	//now calculate closest "nonreal" point on line
+	var A = {
+		x : leftCoordOfLine[1],
+		y : leftCoordOfLine[0]
+	};
+
+	var B = {
+		x : rightCoordOfLine[1],
+		y : rightCoordOfLine[0]
+	};
+
+	var C = {
+		x : latlng.lat,
+		y : latlng.lng
+	};
+
+	var D = getSpPoint(A,B,C);
+
+	//check if the projected point is in the line segment
+
+	var isInLineSegm = calcIsInsideLineSegment(A,B,D);
+
+	if (!isInLineSegm) {
+		D.x = feature.geometry.paths[0][smallestDistFeatureIndex][1];
+		D.y = feature.geometry.paths[0][smallestDistFeatureIndex][0];
+	}
+
+	return [D.x, D.y];
+}
+
+function getSnappedPointThenRun (latlng) {
+	ajaxGetStreams(latlng, getSnappedPointThenRunCallback);
+}
+
+function getSnappedPointThenRunCallback (latlng, features) {
+	var snappedLatlng = snapToFeature(latlng, features);
+	highlightFeature(features);
+	marker.setLatLng(snappedLatlng);
+
+	var latLngs = [ marker.getLatLng() ];
+	var markerBounds = L.latLngBounds(latLngs);
+	map.fitBounds(markerBounds);
+	map.setZoom(12);
+
+	var popup = L.popup({offset: L.point(0,-50)})
+	.setLatLng(snappedLatlng)
+	.setContent('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr" style = "float:right;">Yes</button>')
+	.openOn(map);
+	$("#notCorr").click(function(){
+		map.closePopup();
+	});
+	$("#yesCorr").click(function(){
+		map.closePopup();
+		collectedData.coords = snappedLatlng;
+		collectedData.coords.x = snappedLatlng.lat;
+		collectedData.coords.y = snappedLatlng.lng;
+		//globFeature = feature;
+		callAjaxCalls(e);
+	}); 
+}
+
+function highlightFeature (features) {
+	for (var feature of features) {
+		var points = [];
+		for (const point of feature.geometry.paths[0]) {
+			points.push(new L.LatLng(point[1], point[0]));
+		}
+		firstpolyline = new L.Polyline(points, {
+			color: 'red',
+			weight: 3,
+			opacity: 0.5,
+			smoothFactor: 1
+		});
+		firstpolyline.addTo(map);
+	}
+}
+
+/* function getSnappedPointThenRun (e) {
 	$.ajax({
 		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=4000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson",
 		dataType: 'json',
@@ -605,11 +738,11 @@ function getSnappedPointThenRun (e) {
 			});
 		}
 	});
-}
+} */
 
 function ajaxNearbyPlace (e) {
 	on();
-	var feature = globFeature;
+	var feature = null;//globFeature;
 	collectedData.GNIS_NAME = feature.attributes.GNIS_NAME;
 	collectedData.REACHCODE = feature.attributes.REACHCODE;
 
@@ -732,7 +865,7 @@ $(document).ready(function () {
 
 	marker = new L.Marker([0,0], { draggable: true}).addTo(map);
 	var popup = L.popup({offset: L.point(0,-50)})
-	.setLatLng([42.75, -75.5])
+	//.setLatLng([42.75, -75.5])
 	.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc">No</button><button type="button" class="btn btn-primary" id="yesLoc" style = "float:right;">Yes</button>');
 
 
@@ -768,12 +901,12 @@ $(document).ready(function () {
 
 	function confirmLoc (marker, popup) {
 		var latlng = marker.getLatLng();
-		console.log(latlng);
 		if(popup.isPopupOpen()) {
 			popup.setLatLng(latlng);
 		}
 		else {
-			popup.openOn(map).setLatLng(latlng);
+			popup.setLatLng(latlng);
+			popup.openOn(map);
 		 }
 
 		$("#yesLoc").click(function(){
@@ -787,7 +920,9 @@ $(document).ready(function () {
 				},
 			};
 			console.log(latlng);
-			getSnappedPointThenRun(e);
+			//ajaxSiteLocs(verifyMapSiteSnapsCallback);
+			
+			getSnappedPointThenRun(latlng);
 		});
 		$("#noLoc").click(function(){
 			map.closePopup();
