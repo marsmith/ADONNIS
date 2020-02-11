@@ -1,5 +1,6 @@
 var map;
 var marker;
+var preexistingSiteLayer;
 var firstpolyline;
 var printURL = "";
 var currStationName = "";
@@ -417,7 +418,7 @@ function ajaxCountyStateFIPS (e) {
 	});
 }
 //getLayerId
-function ajaxSiteLocs (map, group) {
+function ajaxSiteLocs (callback) {
 	//on();
 
 	var bounds = map.getBounds();
@@ -431,25 +432,45 @@ function ajaxSiteLocs (map, group) {
 		"&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box",
 		dataType: 'xml',
 		success: function(xml){
-			group.clearLayers();
-			var myRenderer = L.canvas({ padding: 0.5 });
-			myRenderer.addTo(group);
-			$(xml).find('site').each(function(){
-				var type = $(this).find("site_tp_cd").text();
-				var streamCode = "ST";
-				if(type.localeCompare(streamCode) == 0) {
-					var lat = $(this).find("dec_lat_va").text();
-					var lng = $(this).find("dec_long_va").text();
-					var name = $(this).find("station_nm").text();
-					var siteID = $(this).find("site_no").text();
+			callback(xml);
+		}
+	});
+}
 
-					var tooltip = name.length > 0 ? name + "\nID: " + siteID : siteID;
-				
-					//L.circleMarker(L.latLng(lat, lng), {renderer: myRenderer}).addTo(group);
+function updateMapSitesCallback (xml) {
+	preexistingSiteLayer.clearLayers();
+	var myRenderer = L.canvas({ padding: 0.5 });
+	myRenderer.addTo(preexistingSiteLayer);
+	$(xml).find('site').each(function(){
+		var type = $(this).find("site_tp_cd").text();
+		var streamCode = "ST";
+		if(type.localeCompare(streamCode) == 0) {
+			var lat = $(this).find("dec_lat_va").text();
+			var lng = $(this).find("dec_long_va").text();
+			var name = $(this).find("station_nm").text();
+			var siteID = $(this).find("site_no").text();
 
-					L.marker(L.latLng(lat, lng), {title: tooltip}).addTo(group);
-				}
-			});
+			var tooltip = name.length > 0 ? name + "\nID: " + siteID : siteID;
+		
+			L.marker(L.latLng(lat, lng), {title: tooltip}).addTo(preexistingSiteLayer);
+		}
+	});
+}
+ 
+
+/*
+$.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7){
+		$.when(ajaxSiteName(), ajaxSiteID()).done(function(a8, a9){
+			//showFoundData();
+		});
+	});
+*/
+
+function ajaxGetStreams (e) {
+	return $.ajax({
+		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=4000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson",
+		dataType: 'json',
+		success: function(result6){
 		}
 	});
 }
@@ -697,213 +718,112 @@ $(document).ready(function () {
 		zoomControl: false
 	});
 
-	var siteLocGroup = L.layerGroup();
-	siteLocGroup.addTo(map)
+	//set up a layer group that will hold the preexisting sites
+	preexistingSiteLayer = L.layerGroup();
+	preexistingSiteLayer.addTo(map)
 	map.on('moveend', function (e) {
 		if(map.getZoom() >= 13) {
-			siteLocRenderer = ajaxSiteLocs(map, siteLocGroup);
+			siteLocRenderer = ajaxSiteLocs(updateMapSitesCallback);
 		}
 		else {
-			siteLocGroup.clearLayers();
+			preexistingSiteLayer.clearLayers();
 		}
 	});
 
+	marker = new L.Marker([0,0], { draggable: true}).addTo(map);
+	var popup = L.popup({offset: L.point(0,-50)})
+	.setLatLng([42.75, -75.5])
+	.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc">No</button><button type="button" class="btn btn-primary" id="yesLoc" style = "float:right;">Yes</button>');
+
+
+	marker.on('dragend', function(ev) {
+		moveMarker(marker, marker.getLatLng());
+		confirmLoc(marker, popup);
+	});
+
 	map.on('click', function(e) {
-		$("#SuggestedNames").html("");
-		$("#SiteID").val("");
-		$("#Alt").val("");
-		$("#CC").val("");
-		$("#TimeZone").val("");
-		$("#Drain").val("");
-		$("#HUC").val("");
-		$("#HUCN").val("");
-		$("#State").val("");
-		$("#County").val("");
-		$("#StateFIPS").val("");
-		$("#CountyFIPS").val("");
-
-		//now clear data in print section
-
-		$("#siteIDPrint").text("");
-		$("#altitudePrint").text("");
-		$("#countryCodePrint").text("");
-		$("#timezonePrint").text("");
-		$("#drainageAreaPrint").text("");
-		$("#HUCPrint").text("");
-		$("#HUCNamePrint").text("");
-		$("#statePrint").text("");
-		$("#countyPrint").text("");
-		$("#stateFIPSPrint").text("");
-		$("#countyFIPSPrint").text("");
-		$("#siteNamePrint").text("");
-
 		var latlng = map.mouseEventToLatLng(e.originalEvent);
 
-		if (marker) { // check
-			map.removeLayer(marker); // remove
-		}
-
-		marker = new L.Marker(e.latlng, { draggable: true }).addTo(map); // set
-
-		var popup = L.popup({offset: L.point(0,-50)})
-		.setLatLng(e.latlng)
-		.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc">No</button><button type="button" class="btn btn-primary" id="yesLoc" style = "float:right;">Yes</button>')
-		.openOn(map);
-		$("#yesLoc").click(function(){
-			map.closePopup();
-			marker.on('dragend', function(ev) {
-
-				$("#SuggestedNames").html("");
-				$("#SiteID").val("");
-				$("#Alt").val("");
-				$("#CC").val("");
-				$("#TimeZone").val("");
-				$("#Drain").val("");
-				$("#HUC").val("");
-				$("#HUCN").val("");
-				$("#State").val("");
-				$("#County").val("");
-				$("#StateFIPS").val("");
-				$("#CountyFIPS").val("");
-
-				//now clear data in print section
-
-				$("#siteIDPrint").text("");
-				$("#altitudePrint").text("");
-				$("#countryCodePrint").text("");
-				$("#timezonePrint").text("");
-				$("#drainageAreaPrint").text("");
-				$("#HUCPrint").text("");
-				$("#HUCNamePrint").text("");
-				$("#statePrint").text("");
-				$("#countyPrint").text("");
-				$("#stateFIPSPrint").text("");
-				$("#countyFIPSPrint").text("");
-				$("#siteNamePrint").text("");
-
-				ev.latlng = ev.target.getLatLng();
-				var popup1 = L.popup({offset: L.point(0,-50)})
-				.setLatLng(ev.latlng)
-				.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc1">No</button><button type="button" class="btn btn-primary" id="yesLoc1" style = "float:right;">Yes</button>')
-				.openOn(map);
-				$("#yesLoc1").click(function(){
-					map.closePopup();
-					e.latlng = ev.latlng;
-					getSnappedPointThenRun(ev);
-				});
-				$("#noLoc1").click(function(){
-					marker.setLatLng(e.latlng);
-					map.closePopup();
-				});
-			});
-			getSnappedPointThenRun(e);
-		});
-		$("#noLoc").click(function(){
-			map.closePopup();
-		});
+		moveMarker(marker, latlng);
+		confirmLoc(marker, popup);
 	});
 
 	$("#coordsSubmit").click(function(){
 
-		$("#SuggestedNames").html("");
-		$("#SiteID").val("");
-		$("#Alt").val("");
-		$("#CC").val("");
-		$("#TimeZone").val("");
-		$("#Drain").val("");
-		$("#HUC").val("");
-		$("#HUCN").val("");
-		$("#State").val("");
-		$("#County").val("");
-		$("#StateFIPS").val("");
-		$("#CountyFIPS").val("");
-
-		//now clear data in print section
-
-		$("#siteIDPrint").text("");
-		$("#altitudePrint").text("");
-		$("#countryCodePrint").text("");
-		$("#timezonePrint").text("");
-		$("#drainageAreaPrint").text("");
-		$("#HUCPrint").text("");
-		$("#HUCNamePrint").text("");
-		$("#statePrint").text("");
-		$("#countyPrint").text("");
-		$("#stateFIPSPrint").text("");
-		$("#countyFIPSPrint").text("");
-		$("#siteNamePrint").text("");
-
-
-		var lati = $('#latitude').val();
-		var longi = $('#longitude').val();
+		var lat = $('#latitude').val();
+		var lng = $('#longitude').val();
 
 		//make sure both fields are filled out
 		if (lati == "" || longi == "") {
 			alert("You must fill in both fields!");
 		} else {
 			$('#coordModal').modal('hide');
-			//run script with lat and long
-
-			var e = {
-				latlng : {
-					lat: lati,
-					lng: longi
-				},
-			};
-
 			map.closePopup();
-			if (marker) { // check
-				map.removeLayer(marker); // remove
-			}
-			marker = new L.Marker(e.latlng, { draggable: true }).addTo(map); // set
-			marker.on('dragend', function(ev) {
 
-				$("#SuggestedNames").html("");
-				$("#SiteID").val("");
-				$("#Alt").val("");
-				$("#CC").val("");
-				$("#TimeZone").val("");
-				$("#Drain").val("");
-				$("#HUC").val("");
-				$("#HUCN").val("");
-				$("#State").val("");
-				$("#County").val("");
-				$("#StateFIPS").val("");
-				$("#CountyFIPS").val("");
-
-				//now clear data in print section
-
-				$("#siteIDPrint").text("");
-				$("#altitudePrint").text("");
-				$("#countryCodePrint").text("");
-				$("#timezonePrint").text("");
-				$("#drainageAreaPrint").text("");
-				$("#HUCPrint").text("");
-				$("#HUCNamePrint").text("");
-				$("#statePrint").text("");
-				$("#countyPrint").text("");
-				$("#stateFIPSPrint").text("");
-				$("#countyFIPSPrint").text("");
-				$("#siteNamePrint").text("");
-
-				ev.latlng = ev.target.getLatLng();
-				var popup1 = L.popup({offset: L.point(0,-50)})
-				.setLatLng(ev.latlng)
-				.setContent('<p>Choose this location?</p><button type="button" class="btn" id="noLoc1">No</button><button type="button" class="btn btn-primary" id="yesLoc1" style = "float:right;">Yes</button>')
-				.openOn(map);
-				$("#yesLoc1").click(function(){
-					map.closePopup();
-					e.latlng = ev.latlng;
-					getSnappedPointThenRun(ev);
-				});
-				$("#noLoc1").click(function(){
-					marker.setLatLng(e.latlng);
-					map.closePopup();
-				});
-			});
-			getSnappedPointThenRun(e);
+			moveMarker(marker, [lat, lng]);
+			confirmLoc(marker, popup);
 		}
 		return false;
 	});
+
+	function confirmLoc (marker, popup) {
+		var latlng = marker.getLatLng();
+		console.log(latlng);
+		if(popup.isPopupOpen()) {
+			popup.setLatLng(latlng);
+		}
+		else {
+			popup.openOn(map).setLatLng(latlng);
+		 }
+
+		$("#yesLoc").click(function(){
+			console.log("yes");
+			popup.closePopup();
+			var latlng = marker.getLatLng();
+			var e = {
+				latlng : {
+					lat: latlng.lat,
+					lng: latlng.lng
+				},
+			};
+			console.log(latlng);
+			getSnappedPointThenRun(e);
+		});
+		$("#noLoc").click(function(){
+			map.closePopup();
+		});
+	}
+
+	function moveMarker (marker, newLocation) {
+		$("#SuggestedNames").html("");
+		$("#SiteID").val("");
+		$("#Alt").val("");
+		$("#CC").val("");
+		$("#TimeZone").val("");
+		$("#Drain").val("");
+		$("#HUC").val("");
+		$("#HUCN").val("");
+		$("#State").val("");
+		$("#County").val("");
+		$("#StateFIPS").val("");
+		$("#CountyFIPS").val("");
+
+		//now clear data in print section
+
+		$("#siteIDPrint").text("");
+		$("#altitudePrint").text("");
+		$("#countryCodePrint").text("");
+		$("#timezonePrint").text("");
+		$("#drainageAreaPrint").text("");
+		$("#HUCPrint").text("");
+		$("#HUCNamePrint").text("");
+		$("#statePrint").text("");
+		$("#countyPrint").text("");
+		$("#stateFIPSPrint").text("");
+		$("#countyFIPSPrint").text("");
+		$("#siteNamePrint").text("");
+
+		marker.setLatLng(newLocation);
+	}
 	//end document ready function
 });
