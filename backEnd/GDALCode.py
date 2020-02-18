@@ -754,6 +754,7 @@ if __name__ == "__main__":
     a = [x,y]
     gdalData = GDALData()
     gdalData.loadFromData()
+    gdalData.loadFromQuery(x, y)
     #newSite = determineNewSiteID_Timely(float(a[0]),float(a[1]),gdalData,60)
     newSite = determineNewSiteID(float(a[0]),float(a[1]),gdalData,60)
     res = {'Results': str(newSite)}

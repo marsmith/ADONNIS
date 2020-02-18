@@ -117,12 +117,13 @@ function getBoundingBox(centerPoint, distance) {
 	  minLon = MIN_LON;
 	  maxLon = MAX_LON;
 	}
-	return [
+	return L.latLngBounds(L.latLng(maxLat.radToDeg(), maxLon.radToDeg()), L.latLng(minLat.radToDeg(), minLon.radToDeg()));
+	/* return [
 	  minLon.radToDeg(),
 	  minLat.radToDeg(),
 	  maxLon.radToDeg(),
 	  maxLat.radToDeg()
-	];
+	]; */
 }
 
 function getSpPoint(A,B,C){
@@ -432,6 +433,7 @@ function ajaxSiteLocs (callback) {
 		"&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box",
 		dataType: 'xml',
 		success: function(xml){
+			console.log("success");
 			callback(xml);
 		}
 	});
@@ -457,8 +459,10 @@ function updateMapSitesCallback (xml) {
 	});
 }
 
+
+
 function verifyMapSiteSnapsCallback (xml) {
-	map.removeLayer(preexistingSiteLayer);
+	updateMapSitesCallback(xml);
 }
  
 
@@ -920,9 +924,13 @@ $(document).ready(function () {
 				},
 			};
 			console.log(latlng);
-			//ajaxSiteLocs(verifyMapSiteSnapsCallback);
+			var markerLoc = marker.getLatLng();
+			var bounds = getBoundingBox([markerLoc.lat, markerLoc.lng], 30);
+			map.fitBounds(bounds);
+
+			ajaxSiteLocs(verifyMapSiteSnapsCallback);
 			
-			getSnappedPointThenRun(latlng);
+			//getSnappedPointThenRun(latlng);
 		});
 		$("#noLoc").click(function(){
 			map.closePopup();
