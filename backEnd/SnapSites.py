@@ -2,6 +2,7 @@ from GDALData import *
 import matplotlib.pyplot as plt
 import math
 import sys
+import collections
 """ 
 class SnapSite(object):
     def __init__(self, maxSnapDist):
@@ -10,7 +11,7 @@ class SnapSite(object):
  """
 
 maxSnapDist = 1000
-snapVerificationTolerance = 0.2#if the second nearest snap location is within 20% of the distance of the nearest, raise a warning flag
+snapVerificationTolerance = 0.4#if the second nearest snap location is within 20% of the distance of the nearest, raise a warning flag
 numSecondarySnapsConsidered = 4# how many possible locations that aren't the same as the nearest do we consider?
 adverbNameSeparators = [" at ", " above ", " near "]
 waterTypeNames = [" brook", " pond", " river", " lake", " stream", " outlet", " creek", " bk", " ck"]
@@ -39,21 +40,28 @@ def getSiteStreamNameIdentifier (siteName):
 
 def Snap(gdalData):
     print("snap")
+    stationNameIndex = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
+    lineNameIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
     siteLayer = gdalData.siteLayer
     lineLayer = gdalData.lineLayer
     siteLayer.ResetReading()
     sideInd = 0
+    snappedSite = collections.namedtuple('snappedSite', 'site snappedLocation')
+    snappedSites = []
     for site in siteLayer:
         lineLayer.ResetReading()
 
         siteGeom = site.GetGeometryRef()
         buffer = siteGeom.Buffer(maxSnapDist)
-        lineLayer.SetSpatialFilter(buffer)
+        #lineLayer.SetSpatialFilter(buffer)
         potentialLines = []
         for line in lineLayer:
             potentialLines.append(line)
         
         sitePoint = siteGeom.GetPoint(0)
+        stationName = site.GetFieldAsString(stationNameIndex)
+        stationIdentifier = getSiteStreamNameIdentifier(stationName) #an identifier that could likely appear in both the station name and the 
+        #name of the correct stream it should be snapped to
 
         #for all segments, store the point on each segment nearest to the site's location
         nearestPointsOnSegments = [] #(point index, point distance, streamSegment index)
@@ -73,29 +81,46 @@ def Snap(gdalData):
                     nearestPointDist = dist
                     nearestPointIndex = i
 
-            nearestPointsOnSegments.append((nearestPointIndex, nearestPointDist, j))
+            nearestPointsOnSegments.append((nearestPointIndex, nearestPointDist, j, lineGeom.GetPoint(nearestPointIndex)))
 
-        nearestPossibleSnaps = sorted(nearestPointsOnSegments, key=lambda point: point[1])
+        sortedPossibleSnaps = sorted(nearestPointsOnSegments, key=lambda point: point[1])
 
         needsUserConfirmation = False
 
-        nearestDistance = nearestPossibleSnaps[0][1]
-        verificationDistance = nearestDistance + snapVerificationTolerance * nearestDistance
+        nearestDistance = sortedPossibleSnaps[0][1]
+        consideredDistance = nearestDistance * 2 #arbitrary cutoff. logical that the correct snap couldn't be twice as far as the nearest snap..
         
-        print(nearestPointsOnSegments[0:3])
+        chosenSnapIndex = 0
+
+        for i, possibleSnap in enumerate(sortedPossibleSnaps):
+            if possibleSnap[1] < consideredDistance:
+                snapStreamInd = possibleSnap[2]
+                streamName = potentialLines[snapStreamInd].GetFieldAsString(lineNameIndex)
+
+                # if the next stream snap option includes the identifier in its name or there is no identifier, snap here
+                if stationIdentifier in streamName or stationIdentifier == "":
+                    chosenSnapIndex = i
+                    break
+            else:
+                #end if the option we're considering is  more than twice as far away as the closest 
+                break
+
+        if chosenSnapIndex != 0:
+            print("snapped to non-closest")
+        snappedSites.append(snappedSite(site=site, snappedLocation = sortedPossibleSnaps[chosenSnapIndex][3]))
 
         lineLayer.SetSpatialFilter(None)
-        siteInd = 0
+    return snappedSites
 
-def visualize (gdalData):
+def visualize (gdalData, snapped):
     siteLayer = gdalData.siteLayer
     lineLayer = gdalData.lineLayer
     
     """ siteLayer.ResetReading()
     feat = siteLayer.GetNextFeature()
     testBuff = feat.GetGeometryRef().Buffer(3000)
-    lineLayer.SetSpatialFilter(testBuff)
- """
+    lineLayer.SetSpatialFilter(testBuff) """
+
 
     lineLayer.ResetReading()
     for line in lineLayer:
@@ -119,6 +144,14 @@ def visualize (gdalData):
         y.append(geom.GetPoint(0)[1])
     plt.scatter(x,y, color='red')
 
+    x = []
+    y = []
+    for snap in snapped:
+        site = snap[0]
+        snapLoc = snap[1]
+        x.append(snapLoc[0])
+        y.append(snapLoc[1])
+    plt.scatter(x,y, color='green')
 
     plt.show()
 
@@ -131,8 +164,8 @@ gdalData = GDALData()
 attempts = 3
 gdalData.loadFromQuery(y, x, attempts)
 #gdalData.loadFromData()
-Snap(gdalData)
-#visualize(gdalData)
+snapped = Snap(gdalData)
+visualize(gdalData, snapped)
 gdalData.siteLayer.ResetReading()
 #stationName_index = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
 
