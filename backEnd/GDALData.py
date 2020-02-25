@@ -109,23 +109,10 @@ class GDALData(object):
         print("utm is " + str(utmCode))
         transformation = osr.CoordinateTransformation(worldRef,stateRef)
 
-        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(lng) + "," + str(lat) + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=10000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"        
+        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(lng) + "," + str(lat) + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(EPSGCode) + "&distance=8000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"        
         req = self.queryWithAttempts(lineURL, 4, queryName="lineData")
-        lineJson = json.loads(req.text)
-        #change coordinates to UTM projection. Start with changing the metadata
-        lineJson["crs"]["properties"]["name"] = "EPSG" + str(EPSGCode)
-        for feature in lineJson["features"]:
-            for coords in feature["geometry"]["coordinates"]:
-                featureLat = coords[1]
-                featureLng = coords[0]
-                [projX, projY, z] = transformation.TransformPoint(featureLng, featureLat)
-                coords[0] = projX
-                coords[1] = projY
-
-        projectedJson = json.dumps(lineJson)
-        print(projectedJson[0:300])
         
-        self.lineDataSource = gdal.OpenEx(projectedJson)
+        self.lineDataSource = gdal.OpenEx(req.text)
         self.lineLayer = self.lineDataSource.GetLayer()
 
         #transform geometry to utm projection
@@ -134,7 +121,7 @@ class GDALData(object):
             geomRef = line.GetGeometryRef()
             geomRef.Transform(transformation)
 
-        radius = 10 #km this value is defined in gdalData somewhere
+        radius = 8 #km this value is defined in gdalData somewhere
         approxRadiusInDeg = self.approxKmToDegrees(radius)
 
         #northwest
@@ -154,10 +141,4 @@ class GDALData(object):
         self.siteLayer = self.siteDataSource.GetLayer()
 
         self.siteLayer.ResetReading()
-        
-        print(self.siteLayer.GetSpatialRef())
-        
-
-
-        print(EPSGCode)
 

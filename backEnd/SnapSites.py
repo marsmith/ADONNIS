@@ -60,8 +60,10 @@ def Snap(gdalData):
         
         sitePoint = siteGeom.GetPoint(0)
         stationName = site.GetFieldAsString(stationNameIndex)
-        stationIdentifier = getSiteStreamNameIdentifier(stationName) #an identifier that could likely appear in both the station name and the 
+        #an identifier that could likely appear in both the station name and the 
         #name of the correct stream it should be snapped to
+        stationIdentifier = getSiteStreamNameIdentifier(stationName) 
+        
 
         #for all segments, store the point on each segment nearest to the site's location
         nearestPointsOnSegments = [] #(point index, point distance, streamSegment index)
