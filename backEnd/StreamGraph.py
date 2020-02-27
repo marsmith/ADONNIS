@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import random
 
 #constants for neighbor relationships
-UNKNOWN = -1
-UPSTREAM = 0
-UPSTREAMTRIB = 1
-DOWNSTREAM = 2
+UNKNOWN = 0
+UPSTREAM = 1
+UPSTREAMTRIB = 2
+DOWNSTREAM = 3
 
 
 #tuples used
-NeighborRelationship = namedtuple('NeighborRelationship', 'neighbor relationship')
+NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
 #a stream node 
 class StreamNode (object):
     def __init__(self, position):
@@ -20,8 +20,25 @@ class StreamNode (object):
         self.position = position
 
     def addNeighbor (self, segment, relationship = UNKNOWN):
-        self.neighbors.append(NeighborRelationship(neighbor=segment, relationship=relationship))
+        self.neighbors.append(NeighborRelationship(segment=segment, relationship=relationship))
 
+    def getCodedNeighbors (self, neighborCode):
+        results = []
+        for neighbor in self.neighbors:
+            if neighbor.relationship == neighborCode:
+                results.append(neighbor.segment)
+        return results
+    
+    #removes the neighbor with neighborID if it exists. Return true if removed successfully
+    def removeNeighbor (self, segmentID):
+        for i, neighbor in enumerate(self.neighbors):
+            if neighbor.segment.segmentID == segmentID:
+                self.neighbors.pop(i)
+                return True
+        return False
+
+    def numNeighbors(self):
+        return len(self.neighbors)
 
 #a segment connecting two points
 class StreamSegment (object):
@@ -29,7 +46,9 @@ class StreamSegment (object):
         #streamSegments get 0 appended on the FID to ensure uniqueness
         self.upStreamNode = upStreamNode
         self.downStreamNode = downStreamNode
+        self.segmentID = ID
         self.gages = []
+        self.length = length
 
 class StreamGraph (object):
 
@@ -37,7 +56,7 @@ class StreamGraph (object):
         self.segments = {}
         self.nodes = []
 
-        self.removedSegments = frozenset()#cleaned segments. keep track to prevent duplicates
+        self.removedSegments = set()#cleaned segments. keep track to prevent duplicates
     
     def pointsEqual (self, p1, p2):
         treshold = 1
@@ -66,7 +85,7 @@ class StreamGraph (object):
         x = []
         y = []
         for streamNode in self.nodes:
-            if len(streamNode.neighbors) != 2:
+            if streamNode.numNeighbors() != 2:
                 continue
             x.append(streamNode.position[0])
             y.append(streamNode.position[1])
@@ -82,13 +101,65 @@ class StreamGraph (object):
     def removeSegment (self, segmentID):
         if segmentID in self.segments:
             del self.segments[segmentID]
+            self.removedSegments.add(segmentID)
+    
+    #add a segment to the graph
+    def addSegment (self, upstreamNode, downstreamNode, segmentID, length):
+        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length)    
+        #add the new segment to the dictionary
+        self.segments[segmentID] = newSegment
+        #from the perspective of the upstream node, this segment is downstream and vice versa
+        upstreamNode.addNeighbor(newSegment, DOWNSTREAM)
+        downstreamNode.addNeighbor(newSegment, UPSTREAM)
+
+    #has this graph ever contained this segment?
+    #used when adding new segments
+    def hasContainedSegment (self, segmentID):
+        if segmentID in self.segments or segmentID in self.removedSegments:
+            return True
+        else:
+            return False
 
 
     #remove loops, and collapse nodes with only two neighbors
     def cleanGraph (self):
-        for node in self.nodes:
-            if len(node.neighbors) == 2:
+        queue = []
 
+        # ---------------- add something here that checks to see if nodes are near 
+        # the edge of the collected data. These nodes cannot be cleaned reliably! 
+        for node in self.nodes:
+            hasUpstream = len(node.getCodedNeighbors(UPSTREAM)) > 0
+            hasDownstream = len(node.getCodedNeighbors(DOWNSTREAM)) > 0
+            if node.numNeighbors() == 2 and hasUpstream and hasDownstream:
+                queue.append(node)  
+        
+        while len(queue) > 0:
+            node = queue.pop()
+            #getCodedNeighbors returns an array since you can have multiple tributaries
+            #but in this case, there are only two, so it must only be a single upstream and downstream
+            upstreamSegment = node.getCodedNeighbors(UPSTREAM)[0]
+            downstreamSegment = node.getCodedNeighbors(DOWNSTREAM)[0]
+
+            newSegmentUpstreamNode = upstreamSegment.upStreamNode
+            newSegmentDownstreamNode = downstreamSegment.downStreamNode                
+
+            #remove the neighbor reference from the outer two nodes neighboring the two segments we remove
+            newSegmentUpstreamNode.removeNeighbor(upstreamSegment.segmentID)
+            newSegmentDownstreamNode.removeNeighbor(downstreamSegment.segmentID)
+            #remove the segment and nodes from the actual graph
+            for neighbor in node.neighbors:
+                self.removeSegment(neighbor.segment.segmentID)
+            self.nodes.remove(node)
+
+            #calculate new segment properties
+            newLength = upstreamSegment.length + downstreamSegment.length
+            # concat IDs to get a new unique ID
+            newID = upstreamSegment.segmentID + downstreamSegment.segmentID
+
+            self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength)
+
+
+                
 
     #Adds the geometry stored in the gdalData object
     #gdalData: ref to a gdalData object
@@ -102,39 +173,38 @@ class StreamGraph (object):
 
         for line in lineLayer:
             #don't add duplicates
-            objectID = line.GetFieldAsString(objectIDIndex)
+            segmentID = line.GetFieldAsString(objectIDIndex)
             length = line.GetFieldAsString(lengthIndex)
-            if objectID in self.segments:
+            if self.hasContainedSegment(segmentID):
                 continue
 
             geom = line.GetGeometryRef()
 
-            upStreamPt = geom.GetPoint(0)
+            upstreamPt = geom.GetPoint(0)
             numPoints = geom.GetPointCount()
-            downStreamPt = geom.GetPoint(numPoints-1)
+            downstreamPt = geom.GetPoint(numPoints-1)
 
-            upStreamNode = None
-            downStreamNode = None
+            upstreamNode = None
+            downstreamNode = None
 
             #see if existing nodes exist that connect to this segment
             for node in self.nodes:
-                if self.pointsEqual (upStreamPt, node.position):
-                    upStreamNode = node
-                elif self.pointsEqual (downStreamPt, node.position):
-                    downStreamNode = node
+                if self.pointsEqual (upstreamPt, node.position):
+                    upstreamNode = node
+                elif self.pointsEqual (downstreamPt, node.position):
+                    downstreamNode = node
             
-            if upStreamNode == None:
-                upStreamNode = StreamNode(upStreamPt)
-                self.nodes.append(upStreamNode)
-            if downStreamNode == None:
-                downStreamNode = StreamNode(downStreamPt)
-                self.nodes.append(downStreamNode)
+            #create new nodes if non were found
+            if upstreamNode == None:
+                upstreamNode = StreamNode(upstreamPt)
+                self.nodes.append(upstreamNode)
+            if downstreamNode == None:
+                downstreamNode = StreamNode(downstreamPt)
+                self.nodes.append(downstreamNode)
 
-            newSegment = StreamSegment(upStreamNode, downStreamNode, objectID, length)
-
-            self.segments[objectID] = newSegment
-            upStreamNode.addNeighbor(newSegment)
-            downStreamNode.addNeighbor(newSegment)
+            self.addSegment(upstreamNode, downstreamNode, segmentID, length)
+        
+        self.cleanGraph()
 
 
 

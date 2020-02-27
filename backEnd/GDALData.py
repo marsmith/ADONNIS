@@ -17,12 +17,15 @@ import math
 
 LINE_FOLDER_NAME = "NHDFlowline_Project_SplitLin3"
 SITES_FOLDER_NAME = "ProjectedSites"
+MAX_SAFE_QUERY_DIST_KM = 7
 
 class GDALData(object):
 
     def __init__(self):
         self.localPath = os.path.join( os.path.dirname(os.path.dirname( __file__ ))) + "\data"
         print("self path = " + self.localPath)
+        self.lineDataSource = None
+        self.siteDataSource = None
         self.lineLayer = None
         self.siteLayer = None
 
@@ -95,8 +98,11 @@ class GDALData(object):
                 geojson["features"].append(feature)
         return json.dumps(geojson)
 
-    def loadFromQuery(self, lat, lng, maxRequestAttempts):
+    def loadFromQuery(self, lat, lng, radiusKM, maxRequestAttempts):
         #Get UTM and EPSG codes to convert coordinates to projection
+
+        if radiusKM > MAX_SAFE_QUERY_DIST_KM:
+            raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
 
         utmCode = self.getUTM(lng)
         EPSGCode = int("269" + str(utmCode))
@@ -109,20 +115,24 @@ class GDALData(object):
         print("utm is " + str(utmCode))
         transformation = osr.CoordinateTransformation(worldRef,stateRef)
 
-        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(lng) + "," + str(lat) + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(EPSGCode) + "&distance=8000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"        
+        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(lng) + "," + str(lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(EPSGCode) + "&distance=" + str(radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
         req = self.queryWithAttempts(lineURL, 4, queryName="lineData")
         
-        self.lineDataSource = gdal.OpenEx(req.text)
-        self.lineLayer = self.lineDataSource.GetLayer()
 
-        #transform geometry to utm projection
-        self.lineLayer.ResetReading()
-        for line in self.lineLayer:
-            geomRef = line.GetGeometryRef()
-            geomRef.Transform(transformation)
+        lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
+        lineLayer = lineDataSource.GetLayer()
 
-        radius = 8 #km this value is defined in gdalData somewhere
-        approxRadiusInDeg = self.approxKmToDegrees(radius)
+        if self.lineDataSource == None:
+            self.lineDataSource = lineDataSource
+            self.lineLayer = lineLayer
+        else:
+            print(self.lineLayer.GetFeatureCount())
+            print(lineLayer.GetFeatureCount())
+            testLayer = lineDataSource.CreateLayer("union layer", self.lineLayer.GetSpatialRef(), ogr.wkbLineString)
+            self.lineLayer.Union(lineLayer, testLayer)
+            print(testLayer.GetFeatureCount())
+
+        approxRadiusInDeg = self.approxKmToDegrees(radiusKM)
 
         #northwest
         nwLat = lat + approxRadiusInDeg
@@ -137,8 +147,14 @@ class GDALData(object):
 
         xmlSites = req.text#this query returns an xml. Have to conver to geoJson
         geoJsonSites = self.buildGeoJson(xmlSites, EPSGCode, transformation)
-        self.siteDataSource = gdal.OpenEx(geoJsonSites)
-        self.siteLayer = self.siteDataSource.GetLayer()
+        siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
+        siteLayer = siteDataSource.GetLayer()
+
+        if self.siteDataSource == None:
+            self.siteDataSource = siteDataSource
+            self.siteLayer = siteLayer
+        else:
+            self.siteLayer.Union(siteLayer, self.siteLayer)
 
         self.siteLayer.ResetReading()
 
