@@ -11,6 +11,7 @@ from collections import namedtuple
 import xml.etree.ElementTree as ET
 import json
 import math
+from Helpers import *
 
 #This class provides a generic way of passing around data
 #New instances of GDALData can be generated either from online query or via local data storage. 
@@ -23,11 +24,11 @@ MANUAL = 0
 LOCALDATA = 1
 QUERYDATA = 2
 
-RESTRICTED_CODES = [55800, 33600]
+RESTRICTED_FCODES = [56600]
 
 class GDALData(object):
 
-    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4):
+    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4, dataPaddingKM = 0.5):
         self.localPath = os.path.join( os.path.dirname(os.path.dirname( __file__ ))) + "\data"
         print("self path = " + self.localPath)
         self.lineDataSource = None
@@ -39,7 +40,8 @@ class GDALData(object):
         self.lng = lng
         self.radiusKM = radiusKM
         self.queryAttempts = queryAttempts
-        
+        self.dataPaddingKM = dataPaddingKM
+        self.safeDataBoundaryKM = None
 
         if loadMethod == LOCALDATA:
             self.loadFromData()
@@ -47,8 +49,6 @@ class GDALData(object):
             self.loadFromQuery()
         if loadMethod == MANUAL:
             print("this GDALDATA object will not automatically load data. Call loadFromData or loadFromQuery")
-
-
 
     def loadFromData (self):
         linesPath = self.localPath + "/" + LINE_FOLDER_NAME + "/" + LINE_FOLDER_NAME + ".shp"
@@ -61,9 +61,6 @@ class GDALData(object):
         # if this reference isn't saved my guess is that the data source reference is destroyed 
         # this reference is likely required for things like siteLayer.GetSpatialRef()
         self.siteLayer = self.siteDataSource.GetLayer()
-
-    def approxKmToDegrees (self, km):
-        return (1/111) * km
 
     def getUTM (self, long):
         return (math.floor((long + 180)/6) % 60) + 1
@@ -152,7 +149,7 @@ class GDALData(object):
             self.lineLayer.Union(lineLayer, testLayer)
             print(testLayer.GetFeatureCount())
 
-        approxRadiusInDeg = self.approxKmToDegrees(self.radiusKM)
+        approxRadiusInDeg = approxKmToDegrees(self.radiusKM)
 
         #northwest
         nwLat = self.lat + approxRadiusInDeg
@@ -177,4 +174,8 @@ class GDALData(object):
             self.siteLayer.Union(siteLayer, self.siteLayer)
 
         self.siteLayer.ResetReading()
+         
+        queryCenter = ogr.Geometry(ogr.wkbPoint)#up stream point - wkb point is the code for point based geometry
+        queryCenter.AddPoint(self.lng, self.lat)
 
+        self.safeDataBoundaryKM = queryCenter.Buffer((self.radiusKM - self.dataPaddingKM) * 1000)

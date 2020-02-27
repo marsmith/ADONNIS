@@ -1,5 +1,6 @@
 from collections import namedtuple
-from GDALData import GDALData, RESTRICTED_CODES
+from GDALData import GDALData, RESTRICTED_FCODES
+from Helpers import *
 import matplotlib.pyplot as plt
 import random
 
@@ -55,16 +56,11 @@ class StreamGraph (object):
     def __init__(self):
         self.segments = {}
         self.nodes = []
+        self.safeDataBoundaryKM = None #gdal geometry object. Points inside should have all neighboring segments stored
 
         self.removedSegments = set()#cleaned segments. keep track to prevent duplicates
     
-    #check if two points are relatively equal. [FUTURE] This shouldn't be in this class
-    def pointsEqual (self, p1, p2):
-        treshold = 1
-        if abs(p1[0]-p2[0]) + abs(p1[1] - p2[1]) < treshold:
-            return True
-        else:
-            return False
+    
 
     #visualize the graph using matplotlib
     def visualize(self):
@@ -98,6 +94,14 @@ class StreamGraph (object):
     #calculate what branches are tributaries, etc 
     def calculateStreamStructure (self):
         pass
+
+    def findMainStreamPath (self, junctionNode):
+        #which are the possible upstream branches
+        possibleBranches = []
+        for neighbor in junctionNode.neighbors:
+            if neighbor.relationship == UPSTREAM:
+                possibleBranches.append(neighbor.segment)
+        #use the following attributes as priority for determining main path: stream name, upstream length
 
     #safely remove a segment from the graph
     def removeSegment (self, segmentID):
@@ -175,9 +179,9 @@ class StreamGraph (object):
         for line in lineLayer:
             #don't add duplicates
             segmentID = line.GetFieldAsString(objectIDIndex)
-            length = line.GetFieldAsString(lengthIndex)
-            fCode = line.GetFieldAsString(fCodeIndex)
-            if self.hasContainedSegment(segmentID) or fCode in RESTRICTED_CODES:
+            length = float(line.GetFieldAsString(lengthIndex))
+            fCode = int(line.GetFieldAsString(fCodeIndex))
+            if self.hasContainedSegment(segmentID) or fCode in RESTRICTED_FCODES:
                 continue
 
             geom = line.GetGeometryRef()
@@ -191,9 +195,9 @@ class StreamGraph (object):
 
             #see if existing nodes exist that connect to this segment
             for node in self.nodes:
-                if self.pointsEqual (upstreamPt, node.position):
+                if pointsEqual (upstreamPt, node.position):
                     upstreamNode = node
-                elif self.pointsEqual (downstreamPt, node.position):
+                elif pointsEqual (downstreamPt, node.position):
                     downstreamNode = node
             
             #create new nodes if non were found
@@ -207,6 +211,11 @@ class StreamGraph (object):
             self.addSegment(upstreamNode, downstreamNode, segmentID, length)
         
         self.cleanGraph()
+
+        if self.safeDataBoundaryKM == None:
+            self.safeDataBoundaryKM = gdalData.safeDataBoundaryKM
+        else:
+            self.safeDataBoundaryKM = self.safeDataBoundaryKM.Intersection(gdalData.selfDataBoundaryKM)
 
 
 
