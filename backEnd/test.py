@@ -136,8 +136,8 @@ class TestProject(unittest.TestCase):
     def test_NoSitesAround1(self):
         x = -75.5738275
         y = 42.084898
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
@@ -150,8 +150,8 @@ class TestProject(unittest.TestCase):
         x = -74.7391559
         y = 43.9835929
 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
@@ -163,8 +163,8 @@ class TestProject(unittest.TestCase):
         x = -73.6648475
         y = 44.9726123
 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData, True)
         if checkIfSiteExists(gdalData, newSite):
@@ -174,8 +174,8 @@ class TestProject(unittest.TestCase):
         x = -74.0457767
         y = 43.7390809
 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
@@ -186,8 +186,8 @@ class TestProject(unittest.TestCase):
         x = -75.2829214
         y = 43.9238472
 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
@@ -198,8 +198,8 @@ class TestProject(unittest.TestCase):
         x = -74.0535743
         y = 43.9645663
 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
@@ -210,8 +210,8 @@ class TestProject(unittest.TestCase):
         x = -74.7935758
         y = 43.3986814
 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
         if checkIfSiteExists(gdalData, newSite):
@@ -221,8 +221,8 @@ class TestProject(unittest.TestCase):
         x = -76.3612354  #04249020
         y = 43.4810611
 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
         if checkIfSiteExists(gdalData, newSite):
@@ -232,8 +232,8 @@ class TestProject(unittest.TestCase):
         x = -74.7125772
         y = 43.2162956
 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
         if checkIfSiteExists(gdalData, newSite):
@@ -243,8 +243,8 @@ class TestProject(unittest.TestCase):
         x = -74.4279059
         y = 41.2865867
         
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         newSite = determineNewSiteID(x,y,gdalData, True)
         print(newSite)
         if checkIfSiteExists(gdalData, newSite):
@@ -253,8 +253,8 @@ class TestProject(unittest.TestCase):
     def test_MartySite1(self):
         x = -74.0136461 # Chubb River, returned 0427389473
         y = 44.2623416
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -265,8 +265,8 @@ class TestProject(unittest.TestCase):
     def test_MartySite2(self):
         x = -73.9204767 # Unnamed Trib #1 (upstream side), returned 0427399889
         y = 44.3030970 
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -276,8 +276,8 @@ class TestProject(unittest.TestCase):
     def test_MartySite3(self):
         x =  -73.9205663 #Unnamed Trib #1 (downstream side) 0427399897
         y = 44.3038121
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -287,8 +287,8 @@ class TestProject(unittest.TestCase):
     def test_MartySite4(self):
         x =  -73.9123839   # Unnamed Trib #2 (upstream side) 04273842
         y = 44.2371825
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -298,8 +298,8 @@ class TestProject(unittest.TestCase):
     def test_MartySite5(self):
         x =  -73.9133175 # Unnamed Trib #2 (downstream side) 04273840
         y = 44.2363550
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -309,8 +309,8 @@ class TestProject(unittest.TestCase):
     def test_MartySite6(self):
         x = -73.8664487 # Sentinel Trib (downstream side) Returned 0427405868
         y = 44.3492810
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -320,8 +320,8 @@ class TestProject(unittest.TestCase):
     def test_MartySite7(self):
         x =  -73.8689959 # Sentinel Trib (upstream side) Returned 04274058
         y = 44.3470288
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -331,8 +331,8 @@ class TestProject(unittest.TestCase):
     def test_Rondout1(self):
         x =  -74.262311 #rondout creek
         y =   41.7815889
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -343,8 +343,8 @@ class TestProject(unittest.TestCase):
     def test_Rondout2(self):
         x =  -73.9938401 #rondout creek
         y =   41.9120557
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -354,8 +354,8 @@ class TestProject(unittest.TestCase):
     def test_Ostelic(self):
         x = -75.8362380 #Ostelic River
         y =  42.6063453
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -365,8 +365,8 @@ class TestProject(unittest.TestCase):
     def test_Seneca(self):
         x = -76.8795714     #Seneca Lake
         y =  42.4764193
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -376,8 +376,8 @@ class TestProject(unittest.TestCase):
     def test_Allegheny(self):
         x = -78.8950485     #Allegheny Reservoir
         y =  42.0579158
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
 
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -388,8 +388,8 @@ class TestProject(unittest.TestCase):
     def test_LongLake(self):
         x = -74.3254918    #Long Lake
         y =  44.0765791
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -402,8 +402,8 @@ class TestProject(unittest.TestCase):
     def test_isolatedOneida(self):
         x = -75.8831253     #North of oneida
         y =  43.4266847
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -414,8 +414,8 @@ class TestProject(unittest.TestCase):
     def test_LongIsland1(self):
         x = -73.6185210
         y =  40.8345079
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -425,8 +425,8 @@ class TestProject(unittest.TestCase):
     def test_belowStateLine(self):
         x = -78.3956846    #Seneca Lake
         y =  41.9783521
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)
@@ -436,8 +436,8 @@ class TestProject(unittest.TestCase):
     def test_zerogeometryLine(self):
         x = 43.34607771415082
         y = -75.05865229132792
-        gdalData = GDALData()
-        gdalData.loadFromData()
+        gdalData = GDALData.GDALData(y, x, loadMethod=GDALData.LOCALDATA)
+        
         
         newSite = determineNewSiteID(x,y,gdalData)
         print(newSite)

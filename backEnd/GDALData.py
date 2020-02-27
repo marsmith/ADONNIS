@@ -19,15 +19,35 @@ LINE_FOLDER_NAME = "NHDFlowline_Project_SplitLin3"
 SITES_FOLDER_NAME = "ProjectedSites"
 MAX_SAFE_QUERY_DIST_KM = 7
 
+MANUAL = 0
+LOCALDATA = 1
+QUERYDATA = 2
+
+RESTRICTED_CODES = [55800, 33600]
+
 class GDALData(object):
 
-    def __init__(self):
+    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4):
         self.localPath = os.path.join( os.path.dirname(os.path.dirname( __file__ ))) + "\data"
         print("self path = " + self.localPath)
         self.lineDataSource = None
         self.siteDataSource = None
         self.lineLayer = None
         self.siteLayer = None
+
+        self.lat = lat
+        self.lng = lng
+        self.radiusKM = radiusKM
+        self.queryAttempts = queryAttempts
+        
+
+        if loadMethod == LOCALDATA:
+            self.loadFromData()
+        if loadMethod == QUERYDATA:
+            self.loadFromQuery()
+        if loadMethod == MANUAL:
+            print("this GDALDATA object will not automatically load data. Call loadFromData or loadFromQuery")
+
 
 
     def loadFromData (self):
@@ -98,13 +118,13 @@ class GDALData(object):
                 geojson["features"].append(feature)
         return json.dumps(geojson)
 
-    def loadFromQuery(self, lat, lng, radiusKM, maxRequestAttempts):
+    def loadFromQuery(self):
         #Get UTM and EPSG codes to convert coordinates to projection
 
-        if radiusKM > MAX_SAFE_QUERY_DIST_KM:
+        if self.radiusKM > MAX_SAFE_QUERY_DIST_KM:
             raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
 
-        utmCode = self.getUTM(lng)
+        utmCode = self.getUTM(self.lng)
         EPSGCode = int("269" + str(utmCode))
 
         worldRef = osr.SpatialReference()
@@ -115,8 +135,8 @@ class GDALData(object):
         print("utm is " + str(utmCode))
         transformation = osr.CoordinateTransformation(worldRef,stateRef)
 
-        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(lng) + "," + str(lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(EPSGCode) + "&distance=" + str(radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
-        req = self.queryWithAttempts(lineURL, 4, queryName="lineData")
+        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(EPSGCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
+        req = self.queryWithAttempts(lineURL, self.queryAttempts, queryName="lineData")
         
 
         lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
@@ -132,15 +152,15 @@ class GDALData(object):
             self.lineLayer.Union(lineLayer, testLayer)
             print(testLayer.GetFeatureCount())
 
-        approxRadiusInDeg = self.approxKmToDegrees(radiusKM)
+        approxRadiusInDeg = self.approxKmToDegrees(self.radiusKM)
 
         #northwest
-        nwLat = lat + approxRadiusInDeg
-        nwLng = lng + approxRadiusInDeg
+        nwLat = self.lat + approxRadiusInDeg
+        nwLng = self.lng + approxRadiusInDeg
 
         #southeast
-        seLat = lat - approxRadiusInDeg
-        seLng = lng - approxRadiusInDeg
+        seLat = self.lat - approxRadiusInDeg
+        seLng = self.lng - approxRadiusInDeg
 
         siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
         req = req = self.queryWithAttempts(siteURL, 4, queryName="siteData")

@@ -1,4 +1,4 @@
-from GDALData import *
+from GDALData import GDALData, QUERYDATA
 import matplotlib.pyplot as plt
 import math
 import sys
@@ -37,6 +37,11 @@ def getSiteStreamNameIdentifier (siteName):
     if endIndex == len(siteName)-1:
         return ""
     return siteName[0:endIndex]
+
+def dist (x1, y1, x2, y2):
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+def dot (x1, y1, x2, y2):
+    return x1*x2 + y1*y2
 
 def Snap(gdalData):
     print("snap")
@@ -78,12 +83,40 @@ def Snap(gdalData):
 
             for i in range(0, numPoints):
                 point = lineGeom.GetPoint(i)
-                dist = math.sqrt((point[0] - sitePoint[0])**2 + (point[1] - sitePoint[1])**2)
-                if dist < nearestPointDist:
-                    nearestPointDist = dist
+                distance = dist(point[0], point[1], sitePoint[0], sitePoint[1])
+                if distance < nearestPointDist:
+                    nearestPointDist = distance
                     nearestPointIndex = i
+            
+            nearestPoint = lineGeom.GetPoint(nearestPointIndex)
+            #refine the snap to a midpoint along a segment
+            """ adjacentPointIndRight = min(i+1, numPoints-1)
+            adjacentPointIndLeft = max(i-1, 0)
 
-            nearestPointsOnSegments.append((nearestPointIndex, nearestPointDist, j, lineGeom.GetPoint(nearestPointIndex)))
+            adjacentPointRight = lineGeom.GetPoint(adjacentPointIndRight)
+            adjacentPointLeft = lineGeom.GetPoint(adjacentPointIndLeft)
+
+            rightDist = dist(adjacentPointRight[0], adjacentPointRight[1], sitePoint[0], sitePoint[1])
+            leftDist = dist(adjacentPointLeft[0], adjacentPointLeft[1], sitePoint[0], sitePoint[1])
+
+            secondaryPoint = None
+            if rightDist < leftDist:
+                secondaryPoint = adjacentPointRight
+            else:
+                secondaryPoint = adjacentPointLeft
+
+            segmentVec = (secondaryPoint[0] - nearestPoint[0], secondaryPoint[1], nearestPoint[1])
+            segmentVecLen = dist(0, 0, segmentVec[0], segmentVec[1])
+
+            toSitePointVec = (sitePoint[0] - nearestPoint[0], sitePoint[1] - nearestPoint[1])
+
+            toSiteAlongSeg = dot(segmentVec[0], segmentVec[1], toSitePointVec[0], toSitePointVec[1]) / segmentVecLen
+            toSiteAlongSegRatio = toSiteAlongSeg / segmentVecLen
+
+            if toSiteAlongSegRatio > 0.2:
+                print("test = " + str(toSiteAlongSegRatio)) """
+
+            nearestPointsOnSegments.append((nearestPointIndex, nearestPointDist, j, nearestPoint))
 
         sortedPossibleSnaps = sorted(nearestPointsOnSegments, key=lambda point: point[1])
 
@@ -114,6 +147,8 @@ def Snap(gdalData):
         lineLayer.SetSpatialFilter(None)
     return snappedSites
 
+
+#Visualizes 
 def visualize (gdalData, snapped):
     siteLayer = gdalData.siteLayer
     lineLayer = gdalData.lineLayer
@@ -123,9 +158,12 @@ def visualize (gdalData, snapped):
     testBuff = feat.GetGeometryRef().Buffer(3000)
     lineLayer.SetSpatialFilter(testBuff) """
 
+    lx = []
+    ly = []
 
     lineLayer.ResetReading()
     for line in lineLayer:
+        
         geom = line.GetGeometryRef()
         numPoints = geom.GetPointCount()
         x = []
@@ -135,7 +173,14 @@ def visualize (gdalData, snapped):
             x.append(p[0])
             y.append(p[1])
 
+        p1 = geom.GetPoint(0)
+        lx.append(p1[0])
+        ly.append(p1[1]+10)
+
         plt.plot(x, y, linewidth=1, color='blue')
+
+    #display line endpoints
+    plt.scatter(lx,ly, color='black')
 
     siteLayer.ResetReading()
     x = []
@@ -161,10 +206,11 @@ def visualize (gdalData, snapped):
 
 x = -74.3254918    #Long Lake
 y =  44.0765791
+#x = -76.3612354  #04249020
+#y = 43.4810611
 a = [x,y]
-gdalData = GDALData()
-attempts = 3
-gdalData.loadFromQuery(y, x, attempts)
+gdalData = GDALData(y, x, loadMethod=QUERYDATA)
+#gdalData.loadFromQuery(y, x+0.3, attempts)
 #gdalData.loadFromData()
 snapped = Snap(gdalData)
 visualize(gdalData, snapped)

@@ -13,7 +13,7 @@ import time
 import threading
 import multiprocessing
 from Timesaver import *
-from GDALData import *
+import GDALData
 from Precompiler import *
 from net_tracer import net_tracer
 
@@ -106,7 +106,7 @@ def isolateNetwork(gdalData,x,y,minDist = UC_BUFFER_MIN,maxDist= None,clFactor=2
     targRef.ImportFromEPSG(26918) # NY State Projection; consider a check from the provided site dataset instead
     
     # Create point from x,y and targRef
-    ctran = osr.CoordinateTransformation(oRef,targRef)
+    ctran = osr.CoordinateTransformation(oRef,targRef)#transformation from lat/lng to xy ny state coords
     [p_lng,p_lat,z] = ctran.TransformPoint(x,y)
     USER_CLICK_X = p_lng
     USER_CLICK_Y = p_lat
@@ -233,7 +233,6 @@ def isolateNetwork(gdalData,x,y,minDist = UC_BUFFER_MIN,maxDist= None,clFactor=2
         
     if startingLine is None:        
         raise RuntimeError("isolateNetwork() [Error]: User Click was not snapped to line!")
-    
     queue = [] # Stores keys
     queue.append(startingLine)    
     counter = 0
@@ -267,8 +266,11 @@ def isolateNetwork(gdalData,x,y,minDist = UC_BUFFER_MIN,maxDist= None,clFactor=2
             downSite = None
             
             # Check if any real sites exist at the endpoint
+            # Note that data is formatted such that lines are always split at stream site points. 
+            # Thus, only checking the endpoints is sufficient
             for s in interSites: #for all sites (up to 2) in the search area ...
                 s_geom = s[1]
+                
                 
                 if s_geom.Intersects(upPt):
                     # Found existing upper extent
@@ -749,12 +751,15 @@ if __name__ == "__main__":
     #folderPath = BASE_DIR + '/data/'
     #arguments = sys.argv[1]
     #a = arguments.split(",")
-    x = -74.3254918    #Long Lake
-    y =  44.0765791
+    #x = -74.3254918    #Long Lake
+    #y =  44.0765791
+    x = -76.3612354  #04249020
+    y = 43.4810611
     a = [x,y]
-    gdalData = GDALData()
+    gdalData = GDALData.GDALData(y, x, loadMethod = GDALData.QUERYDATA)
     gdalData.loadFromData()
-    gdalData.loadFromQuery(x, y)
+    #attempts = 3
+    #gdalData.loadFromQuery(y, x, attempts)
     #newSite = determineNewSiteID_Timely(float(a[0]),float(a[1]),gdalData,60)
     newSite = determineNewSiteID(float(a[0]),float(a[1]),gdalData,60)
     res = {'Results': str(newSite)}

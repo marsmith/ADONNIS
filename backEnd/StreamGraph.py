@@ -1,5 +1,5 @@
 from collections import namedtuple
-from GDALData import *
+from GDALData import GDALData, RESTRICTED_CODES
 import matplotlib.pyplot as plt
 import random
 
@@ -58,6 +58,7 @@ class StreamGraph (object):
 
         self.removedSegments = set()#cleaned segments. keep track to prevent duplicates
     
+    #check if two points are relatively equal. [FUTURE] This shouldn't be in this class
     def pointsEqual (self, p1, p2):
         treshold = 1
         if abs(p1[0]-p2[0]) + abs(p1[1] - p2[1]) < treshold:
@@ -98,6 +99,7 @@ class StreamGraph (object):
     def calculateStreamStructure (self):
         pass
 
+    #safely remove a segment from the graph
     def removeSegment (self, segmentID):
         if segmentID in self.segments:
             del self.segments[segmentID]
@@ -159,8 +161,6 @@ class StreamGraph (object):
             self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength)
 
 
-                
-
     #Adds the geometry stored in the gdalData object
     #gdalData: ref to a gdalData object
     #guaranteedNetLineIndex a streamline feature that is definitely on the network we are interested in
@@ -170,12 +170,14 @@ class StreamGraph (object):
 
         objectIDIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
         lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
+        fCodeIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("FCode")
 
         for line in lineLayer:
             #don't add duplicates
             segmentID = line.GetFieldAsString(objectIDIndex)
             length = line.GetFieldAsString(lengthIndex)
-            if self.hasContainedSegment(segmentID):
+            fCode = line.GetFieldAsString(fCodeIndex)
+            if self.hasContainedSegment(segmentID) or fCode in RESTRICTED_CODES:
                 continue
 
             geom = line.GetGeometryRef()
