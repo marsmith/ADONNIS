@@ -12,6 +12,8 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
   - Python 3.6
   - Numpy
   - GDAL 2.4.4
+  - Shapely 
+  - MatPlotLib
   
   
   #### Recomended Setup
