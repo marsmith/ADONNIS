@@ -1,14 +1,17 @@
 from collections import namedtuple
 from GDALData import GDALData, RESTRICTED_FCODES
 from Helpers import *
+import ogr
 import matplotlib.pyplot as plt
 import random
 
 #constants for neighbor relationships
-UNKNOWN = 0
-UPSTREAM = 1
-UPSTREAMTRIB = 2
-DOWNSTREAM = 3
+UNKNOWN = 0         #000
+UPSTREAM = 1        #001 a one in the one's place means upstream
+UPSTREAMTRIB = 3    #011 contains a one in the one's place, but also contains a 1 in the two's place, indicating upstream and a trib
+DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstream site 
+
+
 
 
 #tuples used
@@ -26,7 +29,8 @@ class StreamNode (object):
     def getCodedNeighbors (self, neighborCode):
         results = []
         for neighbor in self.neighbors:
-            if neighbor.relationship == neighborCode:
+            #does the relationship contain this flag
+            if neighbor.relationship & neighborCode == neighborCode:
                 results.append(neighbor.segment)
         return results
     
@@ -60,17 +64,23 @@ class StreamGraph (object):
 
         self.removedSegments = set()#cleaned segments. keep track to prevent duplicates
     
-    
-
     #visualize the graph using matplotlib
     def visualize(self):
         for streamSeg in self.segments.values():
-            startPt = streamSeg.downStreamNode.position
-            endPt = streamSeg.upStreamNode.position
+            startPt = streamSeg.upStreamNode.position
+            endPt = streamSeg.downStreamNode.position
 
             x = [startPt[0], endPt[0]]
             y = [startPt[1], endPt[1]]
-            plt.plot(x, y, linewidth=1, color='blue')
+            dx = endPt[0] - startPt[0]
+            dy = endPt[1] - startPt[1]
+            plt.arrow(startPt[0], startPt[1], dx, dy, width=1, head_width = 20, color='blue', length_includes_head=True)
+
+            plt.plot(x,y, lineWidth=1, color='blue')
+
+            midPoint = (startPt[0]/2 + endPt[0]/2, startPt[1]/2 + endPt[1]/2)
+
+            plt.text(midPoint[0], midPoint[1], streamSeg.segmentID, fontsize = 8)
         
         x = []
         y = []
@@ -79,14 +89,26 @@ class StreamGraph (object):
             y.append(streamNode.position[1])
         plt.scatter(x,y, color='green')
 
-        x = []
+        #display safe boundary polygon
+        geom = self.safeDataBoundaryKM
+        for ring in geom:
+            numPoints = ring.GetPointCount()
+            x = []
+            y = []
+            for i in range(0, numPoints):
+                point = ring.GetPoint(i)
+                x.append(point[0])
+                y.append(point[1])
+            plt.plot(x,y, lineWidth=1, color='red')
+
+        """ x = []
         y = []
         for streamNode in self.nodes:
             if streamNode.numNeighbors() != 2:
                 continue
             x.append(streamNode.position[0])
             y.append(streamNode.position[1])
-        plt.scatter(x,y, color='red')
+        plt.scatter(x,y, color='red') """
 
         plt.show()
 
@@ -103,9 +125,13 @@ class StreamGraph (object):
                 possibleBranches.append(neighbor.segment)
         #use the following attributes as priority for determining main path: stream name, upstream length
 
+        #need to find downstream branch. this may be difficult with loops
+
     #safely remove a segment from the graph
-    def removeSegment (self, segmentID):
+    def removeSegment (self, segment):
+        segmentID = segment.segmentID
         if segmentID in self.segments:
+            #for neighbor in segment
             del self.segments[segmentID]
             self.removedSegments.add(segmentID)
     
@@ -119,24 +145,57 @@ class StreamGraph (object):
         downstreamNode.addNeighbor(newSegment, UPSTREAM)
 
     #has this graph ever contained this segment?
-    #used when adding new segments
+    #used when adding new segments to prevent duplicates
     def hasContainedSegment (self, segmentID):
         if segmentID in self.segments or segmentID in self.removedSegments:
             return True
         else:
             return False
 
+    #Get a list of nodes that have no downstream connection. A lot of these nodes will be outside of the safe zone, but they can be used to traverse 
+    #the entire graph since every node must be upstream from a sink
+    def getSinks (self):
+        sinks = []
+        for node in self.nodes:
+            if len(node.getCodedNeighbors(DOWNSTREAM)) == 0:
+                sinks.append(node)
+        return sinks
+    
+    def pointWithinSafeDataBoundary (self, point):
+        pointGeo = ogr.Geometry(ogr.wkbPoint)
+        pointGeo.AddPoint(point[0], point[1])
+        return pointGeo.Within(self.safeDataBoundaryKM)
 
     #remove loops, and collapse nodes with only two neighbors
     def cleanGraph (self):
-        queue = []
 
-        # ---------------- add something here that checks to see if nodes are near 
-        # the edge of the collected data. These nodes cannot be cleaned reliably! 
+        #close all loops upstream of 'sinkNode'
+        def closeLoops (sinkNode):
+            frontier = [sinkNode]
+            discovered = [sinkNode]
+            while len(frontier) > 0:
+                nextNode = frontier.pop(0)
+                for neighbor in nextNode.neighbors:
+                    #this neighbor has an upstream relationship
+                    if neighbor.relationship & UPSTREAM == UPSTREAM:
+                        upstreamNode = neighbor.segment.upStreamNode
+                        if upstreamNode not in discovered:
+                            frontier.append(upstreamNode)
+                            discovered.append(upstreamNode)
+                        else:
+                            self.removeSegment(neighbor.segment)
+
+        sinks = self.getSinks()
+        #remove loops
+        for sink in sinks:
+            closeLoops(sink)
+
+        queue = []
         for node in self.nodes:
             hasUpstream = len(node.getCodedNeighbors(UPSTREAM)) > 0
             hasDownstream = len(node.getCodedNeighbors(DOWNSTREAM)) > 0
-            if node.numNeighbors() == 2 and hasUpstream and hasDownstream:
+            #ensure that the node only hs two neighbors, one upstream, one downstream,
+            if node.numNeighbors() == 2 and hasUpstream and hasDownstream and self.pointWithinSafeDataBoundary(node.position):
                 queue.append(node)  
         
         while len(queue) > 0:
@@ -154,7 +213,7 @@ class StreamGraph (object):
             newSegmentDownstreamNode.removeNeighbor(downstreamSegment.segmentID)
             #remove the segment and nodes from the actual graph
             for neighbor in node.neighbors:
-                self.removeSegment(neighbor.segment.segmentID)
+                self.removeSegment(neighbor.segment)
             self.nodes.remove(node)
 
             #calculate new segment properties
@@ -210,12 +269,12 @@ class StreamGraph (object):
 
             self.addSegment(upstreamNode, downstreamNode, segmentID, length)
         
-        self.cleanGraph()
-
         if self.safeDataBoundaryKM == None:
             self.safeDataBoundaryKM = gdalData.safeDataBoundaryKM
         else:
-            self.safeDataBoundaryKM = self.safeDataBoundaryKM.Intersection(gdalData.selfDataBoundaryKM)
+            self.safeDataBoundaryKM = self.safeDataBoundaryKM.Union(gdalData.safeDataBoundaryKM)
+
+        self.cleanGraph()
 
 
 
