@@ -35,9 +35,9 @@ class StreamNode (object):
         return results
     
     #removes the neighbor with neighborID if it exists. Return true if removed successfully
-    def removeNeighbor (self, segmentID):
+    def removeNeighbor (self, segment):
         for i, neighbor in enumerate(self.neighbors):
-            if neighbor.segment.segmentID == segmentID:
+            if neighbor.segment.segmentID == segment.segmentID:
                 self.neighbors.pop(i)
                 return True
         return False
@@ -74,13 +74,13 @@ class StreamGraph (object):
             y = [startPt[1], endPt[1]]
             dx = endPt[0] - startPt[0]
             dy = endPt[1] - startPt[1]
-            plt.arrow(startPt[0], startPt[1], dx, dy, width=1, head_width = 20, color='blue', length_includes_head=True)
+            plt.arrow(startPt[0], startPt[1], dx, dy, width=1, head_width = 5, color='blue', length_includes_head=True)
 
             plt.plot(x,y, lineWidth=1, color='blue')
 
             midPoint = (startPt[0]/2 + endPt[0]/2, startPt[1]/2 + endPt[1]/2)
 
-            plt.text(midPoint[0], midPoint[1], streamSeg.segmentID, fontsize = 8)
+            #plt.text(midPoint[0], midPoint[1], streamSeg.segmentID, fontsize = 8)
         
         x = []
         y = []
@@ -131,6 +131,8 @@ class StreamGraph (object):
     def removeSegment (self, segment):
         segmentID = segment.segmentID
         if segmentID in self.segments:
+            segment.upStreamNode.removeNeighbor(segment)
+            segment.downStreamNode.removeNeighbor(segment)
             #for neighbor in segment
             del self.segments[segmentID]
             self.removedSegments.add(segmentID)
@@ -166,9 +168,7 @@ class StreamGraph (object):
         pointGeo.AddPoint(point[0], point[1])
         return pointGeo.Within(self.safeDataBoundaryKM)
 
-    #remove loops, and collapse nodes with only two neighbors
-    def cleanGraph (self):
-
+    def removeLoops (self):
         #close all loops upstream of 'sinkNode'
         def closeLoops (sinkNode):
             frontier = [sinkNode]
@@ -185,11 +185,20 @@ class StreamGraph (object):
                         else:
                             self.removeSegment(neighbor.segment)
 
+                    """ upstreamNode = neighbor.segment.downStreamNode
+                    if upstreamNode not in discovered:
+                        frontier.append(upstreamNode)
+                        discovered.append(upstreamNode)
+                    else:
+                        self.removeSegment(neighbor.segment) """
+
         sinks = self.getSinks()
         #remove loops
         for sink in sinks:
             closeLoops(sink)
 
+    #collapse redundant nodes with only two neighbors
+    def cleanGraph (self):
         queue = []
         for node in self.nodes:
             hasUpstream = len(node.getCodedNeighbors(UPSTREAM)) > 0
@@ -208,11 +217,8 @@ class StreamGraph (object):
             newSegmentUpstreamNode = upstreamSegment.upStreamNode
             newSegmentDownstreamNode = downstreamSegment.downStreamNode                
 
-            #remove the neighbor reference from the outer two nodes neighboring the two segments we remove
-            newSegmentUpstreamNode.removeNeighbor(upstreamSegment.segmentID)
-            newSegmentDownstreamNode.removeNeighbor(downstreamSegment.segmentID)
             #remove the segment and nodes from the actual graph
-            for neighbor in node.neighbors:
+            for neighbor in reversed(node.neighbors):
                 self.removeSegment(neighbor.segment)
             self.nodes.remove(node)
 
@@ -274,7 +280,7 @@ class StreamGraph (object):
         else:
             self.safeDataBoundaryKM = self.safeDataBoundaryKM.Union(gdalData.safeDataBoundaryKM)
 
-        self.cleanGraph()
+        #self.cleanGraph()
 
 
 
