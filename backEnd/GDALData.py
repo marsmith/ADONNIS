@@ -27,6 +27,8 @@ QUERYDATA = 2
 
 RESTRICTED_FCODES = [56600]
 
+
+
 class GDALData(object):
 
     def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4, dataPaddingKM = 0.8):
@@ -44,17 +46,40 @@ class GDALData(object):
         self.dataPaddingKM = dataPaddingKM
         self.safeDataBoundaryKM = None
 
+        self.emulateQueries = True
+
         if loadMethod == LOCALDATA:
             self.loadFromData()
         if loadMethod == QUERYDATA:
             self.loadFromQuery()
         if loadMethod == MANUAL:
             print("this GDALDATA object will not automatically load data. Call loadFromData or loadFromQuery")
+    
+    def getTransformation (self):
+        utmCode = self.getUTM(self.lng)
+        EPSGCode = int("269" + str(utmCode))
+
+        worldRef = osr.SpatialReference()
+        worldRef.ImportFromEPSG(4326)
+
+        stateRef = osr.SpatialReference()
+        stateRef.ImportFromEPSG(EPSGCode) #projection from UTM zone of the current lat/lng
+        return osr.CoordinateTransformation(worldRef,stateRef)
 
     def loadFromData (self):
         linesPath = self.localPath + "/" + LINE_FOLDER_NAME + "/" + LINE_FOLDER_NAME + ".shp"
+
+        transformation = self.getTransformation()
+
+        queryCenter = ogr.Geometry(ogr.wkbPoint)
+        transformedQueryCenter = transformation.TransformPoint(self.lng, self.lat)
+        queryCenter.AddPoint(transformedQueryCenter[0], transformedQueryCenter[1])
+        #we want GDALData objects loaded from data to essentially act like queried data so we filter it around a query sized buffer
+        dataBuffer = queryCenter.Buffer(self.radiusKM*1000)
+
         self.lineDataSource = ogr.Open(linesPath)
         self.lineLayer = self.lineDataSource.GetLayer() 
+        self.lineLayer.SetSpatialFilter(dataBuffer)
     
         sitesPath = self.localPath + "/" + SITES_FOLDER_NAME + "/" + SITES_FOLDER_NAME + ".shp"   
         self.siteDataSource = ogr.Open(sitesPath)
@@ -62,6 +87,7 @@ class GDALData(object):
         # if this reference isn't saved my guess is that the data source reference is destroyed 
         # this reference is likely required for things like siteLayer.GetSpatialRef()
         self.siteLayer = self.siteDataSource.GetLayer()
+        self.siteLayer.SetSpatialFilter(dataBuffer)
 
     def getUTM (self, long):
         return (math.floor((long + 180)/6) % 60) + 1
@@ -117,21 +143,11 @@ class GDALData(object):
         return json.dumps(geojson)
 
     def loadFromQuery(self):
-        #Get UTM and EPSG codes to convert coordinates to projection
 
         if self.radiusKM > MAX_SAFE_QUERY_DIST_KM:
             raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
 
-        utmCode = self.getUTM(self.lng)
-        EPSGCode = int("269" + str(utmCode))
-
-        worldRef = osr.SpatialReference()
-        worldRef.ImportFromEPSG(4326)
-
-        stateRef = osr.SpatialReference()
-        stateRef.ImportFromEPSG(EPSGCode) #projection from UTM zone of the current lat/lng
-        print("utm is " + str(utmCode))
-        transformation = osr.CoordinateTransformation(worldRef,stateRef)
+        transformation = getTransformation()
 
         lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(EPSGCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
         req = self.queryWithAttempts(lineURL, self.queryAttempts, queryName="lineData")
@@ -181,7 +197,7 @@ class GDALData(object):
             siteLayer = siteDataSource.GetLayer()
         except:
             sys.exit("FATAL: could not read the queried stream site data")
-            return None
+            return Nonegi
 
         if self.siteDataSource == None:
             self.siteDataSource = siteDataSource
