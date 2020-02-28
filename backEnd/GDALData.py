@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 import json
 import math
 from Helpers import *
+import sys
 
 #This class provides a generic way of passing around data
 #New instances of GDALData can be generated either from online query or via local data storage. 
@@ -28,7 +29,7 @@ RESTRICTED_FCODES = [56600]
 
 class GDALData(object):
 
-    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4, dataPaddingKM = 0.5):
+    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4, dataPaddingKM = 0.8):
         self.localPath = os.path.join( os.path.dirname(os.path.dirname( __file__ ))) + "\data"
         print("self path = " + self.localPath)
         self.lineDataSource = None
@@ -135,9 +136,16 @@ class GDALData(object):
         lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(EPSGCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
         req = self.queryWithAttempts(lineURL, self.queryAttempts, queryName="lineData")
         
-
-        lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
-        lineLayer = lineDataSource.GetLayer()
+        if req == None:
+            sys.exit("FATAL: could not query stream line data")
+            return None
+        
+        try:
+            lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
+            lineLayer = lineDataSource.GetLayer()
+        except:
+            sys.exit("FATAL: could not read the queried json data")
+            return None
 
         if self.lineDataSource == None:
             self.lineDataSource = lineDataSource
@@ -162,10 +170,18 @@ class GDALData(object):
         siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
         req = req = self.queryWithAttempts(siteURL, 4, queryName="siteData")
 
+        if req == None:
+            sys.exit("FATAL: could not query stream site data")
+            return None
+
         xmlSites = req.text#this query returns an xml. Have to conver to geoJson
         geoJsonSites = self.buildGeoJson(xmlSites, EPSGCode, transformation)
-        siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
-        siteLayer = siteDataSource.GetLayer()
+        try:
+            siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
+            siteLayer = siteDataSource.GetLayer()
+        except:
+            sys.exit("FATAL: could not read the queried stream site data")
+            return None
 
         if self.siteDataSource == None:
             self.siteDataSource = siteDataSource
@@ -176,6 +192,7 @@ class GDALData(object):
         self.siteLayer.ResetReading()
          
         queryCenter = ogr.Geometry(ogr.wkbPoint)#up stream point - wkb point is the code for point based geometry
-        queryCenter.AddPoint(self.lng, self.lat)
+        transformedQueryCenter = transformation.TransformPoint(self.lng, self.lat)
+        queryCenter.AddPoint(transformedQueryCenter[0], transformedQueryCenter[1])
 
         self.safeDataBoundaryKM = queryCenter.Buffer((self.radiusKM - self.dataPaddingKM) * 1000)
