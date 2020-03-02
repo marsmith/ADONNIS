@@ -31,7 +31,7 @@ RESTRICTED_FCODES = [56600]
 
 class GDALData(object):
 
-    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4, dataPaddingKM = 0.8):
+    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4, dataPaddingKM = 0.8, timeout = 5):
         self.localPath = os.path.join( os.path.dirname(os.path.dirname( __file__ ))) + "\data"
         print("self path = " + self.localPath)
         self.lineDataSource = None
@@ -48,6 +48,9 @@ class GDALData(object):
 
         self.emulateQueries = True
 
+        self.utmCode = self.getUTM(self.lng)
+        self.EPSGCode = int("269" + str(self.utmCode))
+
         if loadMethod == LOCALDATA:
             self.loadFromData()
         if loadMethod == QUERYDATA:
@@ -56,14 +59,11 @@ class GDALData(object):
             print("this GDALDATA object will not automatically load data. Call loadFromData or loadFromQuery")
     
     def getTransformation (self):
-        utmCode = self.getUTM(self.lng)
-        EPSGCode = int("269" + str(utmCode))
-
         worldRef = osr.SpatialReference()
         worldRef.ImportFromEPSG(4326)
 
         stateRef = osr.SpatialReference()
-        stateRef.ImportFromEPSG(EPSGCode) #projection from UTM zone of the current lat/lng
+        stateRef.ImportFromEPSG(self.EPSGCode) #projection from UTM zone of the current lat/lng
         return osr.CoordinateTransformation(worldRef,stateRef)
 
     def loadFromData (self):
@@ -108,12 +108,12 @@ class GDALData(object):
             print("failed to retrieve " + queryName + " on all attempts. Failing")
             return None
 
-    def buildGeoJson (self, xmlStr, EPSGCode, transformation):
-      
+    def buildGeoJson (self, xmlStr):
+        transformation = self.getTransformation()
         root = ET.fromstring(xmlStr)
         geojson = {
             "type": "FeatureCollection",
-            "crs": {"type":"name","properties":{"name":"EPSG:" + str(EPSGCode)}},
+            "crs": {"type":"name","properties":{"name":"EPSG:" + str(self.EPSGCode)}},
             "features":[]
         }
         for site in root:
@@ -147,10 +147,10 @@ class GDALData(object):
         if self.radiusKM > MAX_SAFE_QUERY_DIST_KM:
             raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
 
-        transformation = getTransformation()
+        transformation = self.getTransformation()
 
-        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(EPSGCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
-        req = self.queryWithAttempts(lineURL, self.queryAttempts, queryName="lineData")
+        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(self.EPSGCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
+        req = self.queryWithAttempts(lineURL, self.queryAttempts, queryName="lineData", timeout = self.timeout)
         
         if req == None:
             sys.exit("FATAL: could not query stream line data")
@@ -184,20 +184,20 @@ class GDALData(object):
         seLng = self.lng - approxRadiusInDeg
 
         siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
-        req = req = self.queryWithAttempts(siteURL, 4, queryName="siteData")
+        req = req = self.queryWithAttempts(siteURL, 4, queryName="siteData", timeout = self.timeout)
 
         if req == None:
             sys.exit("FATAL: could not query stream site data")
             return None
 
         xmlSites = req.text#this query returns an xml. Have to conver to geoJson
-        geoJsonSites = self.buildGeoJson(xmlSites, EPSGCode, transformation)
+        geoJsonSites = self.buildGeoJson(xmlSites)
         try:
             siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
             siteLayer = siteDataSource.GetLayer()
         except:
             sys.exit("FATAL: could not read the queried stream site data")
-            return Nonegi
+            return None
 
         if self.siteDataSource == None:
             self.siteDataSource = siteDataSource

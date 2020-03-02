@@ -68,7 +68,7 @@ class StreamSegment (object):
 
     #we assume that this site position is indeed on our segment. 
     def addSite (self, siteID, distAlongSegment):
-        sites.append(SiteOnSegment(siteID, distAlongSegment))
+        self.sites.append(SiteOnSegment(siteID = siteID, distDownstreamAlongSegment = distAlongSegment))
 
 class StreamGraph (object):
 
@@ -83,6 +83,8 @@ class StreamGraph (object):
     
     #visualize the graph using matplotlib
     def visualize(self):
+        sitesX = []
+        sitesY = []
         for streamSeg in self.segments.values():
             startPt = streamSeg.upStreamNode.position
             endPt = streamSeg.downStreamNode.position
@@ -102,6 +104,9 @@ class StreamGraph (object):
                 percentAlongSegmentInverse = 1 - percentAlongSegment
 
                 position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
+                sitesX.append(position[0])
+                sitesY.append(position[1])
+        plt.scatter(sitesX, sitesY, color='red')
 
             #plt.text(midPoint[0], midPoint[1], streamSeg.segmentID, fontsize = 8)
         
@@ -160,6 +165,8 @@ class StreamGraph (object):
         #from the perspective of the upstream node, this segment is downstream and vice versa
         upstreamNode.addNeighbor(newSegment, DOWNSTREAM)
         downstreamNode.addNeighbor(newSegment, UPSTREAM)
+
+        return newSegment
 
     def addNode (self, position):
         newNode = StreamNode(position, self.nextNodeID)
@@ -255,19 +262,31 @@ class StreamGraph (object):
             downstreamSegment = node.getCodedNeighbors(DOWNSTREAM)[0]
 
             newSegmentUpstreamNode = upstreamSegment.upStreamNode
-            newSegmentDownstreamNode = downstreamSegment.downStreamNode                
+            newSegmentDownstreamNode = downstreamSegment.downStreamNode   
 
-            #remove the segment and nodes from the actual graph
-            for neighbor in reversed(node.neighbors):
-                self.removeSegment(neighbor.segment)
-            self.nodes.remove(node)
+            
+
 
             #calculate new segment properties
             newLength = upstreamSegment.length + downstreamSegment.length
             # concat IDs to get a new unique ID
             newID = upstreamSegment.segmentID + downstreamSegment.segmentID
 
-            self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength)
+            newSegment = self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength)    
+
+            #add the sites to the new segment
+            for site in upstreamSegment.sites:
+                newSegment.addSite(site.siteID, site.distDownstreamAlongSegment) 
+            #for the downstream segment, we must add the length of the upstream segment to get an accurate distance downstream segment number
+            for site in downstreamSegment.sites:
+                newSegment.addSite(site.siteID, site.distDownstreamAlongSegment + upstreamSegment.length) 
+
+            #remove the segment and nodes from the actual graph
+            for neighbor in reversed(node.neighbors):
+                self.removeSegment(neighbor.segment)
+            self.nodes.remove(node)
+
+            
 
 
     #Adds the geometry stored in the gdalData object

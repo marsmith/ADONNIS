@@ -88,7 +88,8 @@ def Snap(gdalData):
                 point = lineGeom.GetPoint(i)
 
                 geomSegmentLen = dist(point[0], point[1], prevPoint[0], prevPoint[1])
-                distAlongSegment += geomSegmentLen
+                #get length of each polyline of the stream segment. Divide by 1000 to get in km
+                distAlongSegment += geomSegmentLen / 1000 
 
                 distance = dist(point[0], point[1], sitePoint[0], sitePoint[1])
                 if distance < nearestPointDist:

@@ -1,3 +1,4 @@
+import math
 #approximates the number of degrees latitude or longitude equivilant to km kilometers
 def approxKmToDegrees (km):
         return (1/111) * km
@@ -9,3 +10,6 @@ def pointsEqual (p1, p2):
         return True
     else:
         return False
+
+def dist (x1, y1, x2, y2):
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
