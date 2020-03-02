@@ -18,19 +18,25 @@ DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstr
 NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
 #a stream node 
 class StreamNode (object):
-    def __init__(self, position):
+    def __init__(self, position, instanceID = 0):
         #streamNodes get 1 appended on the FID to ensure uniqueness
         self.neighbors = []
         self.position = position
+        self.instanceID = instanceID
 
     def addNeighbor (self, segment, relationship = UNKNOWN):
         self.neighbors.append(NeighborRelationship(segment=segment, relationship=relationship))
 
-    def getCodedNeighbors (self, neighborCode):
+    def neighborHasRelationShip(self, neighborTuple, relationship):
+        if neighborTuple.relationship & relationship == relationship:
+            return True
+        return False
+
+    def getCodedNeighbors (self, relationshipCode):
         results = []
         for neighbor in self.neighbors:
             #does the relationship contain this flag
-            if neighbor.relationship & neighborCode == neighborCode:
+            if self.neighborHasRelationShip(neighbor, relationshipCode):
                 results.append(neighbor.segment)
         return results
     
@@ -63,6 +69,7 @@ class StreamGraph (object):
         self.safeDataBoundaryKM = None #gdal geometry object. Points inside should have all neighboring segments stored
 
         self.removedSegments = set()#cleaned segments. keep track to prevent duplicates
+        self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
     
     #visualize the graph using matplotlib
     def visualize(self):
@@ -87,6 +94,7 @@ class StreamGraph (object):
         for streamNode in self.nodes:
             x.append(streamNode.position[0])
             y.append(streamNode.position[1])
+            #plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
         plt.scatter(x,y, color='green')
 
         #display safe boundary polygon
@@ -100,15 +108,6 @@ class StreamGraph (object):
                 x.append(point[0])
                 y.append(point[1])
             plt.plot(x,y, lineWidth=1, color='red')
-
-        """ x = []
-        y = []
-        for streamNode in self.nodes:
-            if streamNode.numNeighbors() != 2:
-                continue
-            x.append(streamNode.position[0])
-            y.append(streamNode.position[1])
-        plt.scatter(x,y, color='red') """
 
         plt.show()
 
@@ -146,6 +145,11 @@ class StreamGraph (object):
         upstreamNode.addNeighbor(newSegment, DOWNSTREAM)
         downstreamNode.addNeighbor(newSegment, UPSTREAM)
 
+    def addNode (self, position):
+        newNode = StreamNode(position, self.nextNodeID)
+        self.nodes.append(newNode)
+        self.nextNodeID += 1
+        return newNode
     #has this graph ever contained this segment?
     #used when adding new segments to prevent duplicates
     def hasContainedSegment (self, segmentID):
@@ -168,29 +172,36 @@ class StreamGraph (object):
         pointGeo.AddPoint(point[0], point[1])
         return pointGeo.Within(self.safeDataBoundaryKM)
 
+
     def removeLoops (self):
         #close all loops upstream of 'sinkNode'
+        #do a breadth first search from a sink
+        #all nodes must be upstream of SOME sink. So, running BFS from all sinks covers all nodes
+        # logic: run BFS, if we ever encounter a node that we've already seen, this is a loop, so we disconnect the segment that 
+        # connects the segment in question to the node we've already seen. Thus closing the loop
+
         def closeLoops (sinkNode):
             frontier = [sinkNode]
             discovered = [sinkNode]
             while len(frontier) > 0:
                 nextNode = frontier.pop(0)
-                for neighbor in nextNode.neighbors:
+                # skip nodes that aren't within the safe data boundary. These nodes could be missing neighbors
+                # thus causing our algo to potentially not be deterministic 
+                if not self.pointWithinSafeDataBoundary(nextNode.position):
+                    continue
+                #we want to use a formal parameter to sort neighbor priority to make sure this algorithm is deterministic 
+                sortedNeighbors = sorted(nextNode.neighbors, key=lambda neighbor: neighbor.segment.length)
+
+                # sort in reverse since within this loop we may remove a segment. Since we are looping over segments that can cause trouble
+                for neighbor in reversed(sortedNeighbors):
                     #this neighbor has an upstream relationship
-                    if neighbor.relationship & UPSTREAM == UPSTREAM:
+                    if nextNode.neighborHasRelationShip(neighbor, UPSTREAM):
                         upstreamNode = neighbor.segment.upStreamNode
                         if upstreamNode not in discovered:
                             frontier.append(upstreamNode)
                             discovered.append(upstreamNode)
                         else:
                             self.removeSegment(neighbor.segment)
-
-                    """ upstreamNode = neighbor.segment.downStreamNode
-                    if upstreamNode not in discovered:
-                        frontier.append(upstreamNode)
-                        discovered.append(upstreamNode)
-                    else:
-                        self.removeSegment(neighbor.segment) """
 
         sinks = self.getSinks()
         #remove loops
@@ -267,11 +278,9 @@ class StreamGraph (object):
             
             #create new nodes if non were found
             if upstreamNode == None:
-                upstreamNode = StreamNode(upstreamPt)
-                self.nodes.append(upstreamNode)
+                upstreamNode = self.addNode(upstreamPt)
             if downstreamNode == None:
-                downstreamNode = StreamNode(downstreamPt)
-                self.nodes.append(downstreamNode)
+                downstreamNode = self.addNode(downstreamPt)
 
             self.addSegment(upstreamNode, downstreamNode, segmentID, length)
         
