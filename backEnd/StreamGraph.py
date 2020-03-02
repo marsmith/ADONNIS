@@ -1,6 +1,7 @@
 from collections import namedtuple
 from GDALData import GDALData, RESTRICTED_FCODES
 from Helpers import *
+from SnapSites import Snap, SnappedSite
 import ogr
 import matplotlib.pyplot as plt
 import random
@@ -16,6 +17,8 @@ DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstr
 
 #tuples used
 NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
+SiteOnSegment = namedtuple('SiteOnSegment', 'distDownstreamAlongSegment siteID')
+
 #a stream node 
 class StreamNode (object):
     def __init__(self, position, instanceID = 0):
@@ -23,6 +26,8 @@ class StreamNode (object):
         self.neighbors = []
         self.position = position
         self.instanceID = instanceID
+        self.upstreamDistanceCounter = 0 #this can be assigned before the true value is known
+        self.upstreamDistanceCalculated = False # is the upstream distance fully calculated?
 
     def addNeighbor (self, segment, relationship = UNKNOWN):
         self.neighbors.append(NeighborRelationship(segment=segment, relationship=relationship))
@@ -58,8 +63,12 @@ class StreamSegment (object):
         self.upStreamNode = upStreamNode
         self.downStreamNode = downStreamNode
         self.segmentID = ID
-        self.gages = []
+        self.sites = []
         self.length = length
+
+    #we assume that this site position is indeed on our segment. 
+    def addSite (self, siteID, distAlongSegment):
+        sites.append(SiteOnSegment(siteID, distAlongSegment))
 
 class StreamGraph (object):
 
@@ -69,6 +78,7 @@ class StreamGraph (object):
         self.safeDataBoundaryKM = None #gdal geometry object. Points inside should have all neighboring segments stored
 
         self.removedSegments = set()#cleaned segments. keep track to prevent duplicates
+        self.addedSites = set()#list of sites that have already been added
         self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
     
     #visualize the graph using matplotlib
@@ -87,6 +97,12 @@ class StreamGraph (object):
 
             midPoint = (startPt[0]/2 + endPt[0]/2, startPt[1]/2 + endPt[1]/2)
 
+            for sites in streamSeg.sites:
+                percentAlongSegment = sites.distDownstreamAlongSegment / streamSeg.length
+                percentAlongSegmentInverse = 1 - percentAlongSegment
+
+                position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
+
             #plt.text(midPoint[0], midPoint[1], streamSeg.segmentID, fontsize = 8)
         
         x = []
@@ -94,7 +110,7 @@ class StreamGraph (object):
         for streamNode in self.nodes:
             x.append(streamNode.position[0])
             y.append(streamNode.position[1])
-            #plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
+            plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
         plt.scatter(x,y, color='green')
 
         #display safe boundary polygon
@@ -150,6 +166,11 @@ class StreamGraph (object):
         self.nodes.append(newNode)
         self.nextNodeID += 1
         return newNode
+
+    def addSite (self, siteID, segmentID, distAlongSegment):
+        if siteID not in self.addedSites:
+            self.segments[segmentID].addSite(siteID, distAlongSegment)
+            self.addedSites.add(siteID)
     #has this graph ever contained this segment?
     #used when adding new segments to prevent duplicates
     def hasContainedSegment (self, segmentID):
@@ -187,8 +208,8 @@ class StreamGraph (object):
                 nextNode = frontier.pop(0)
                 # skip nodes that aren't within the safe data boundary. These nodes could be missing neighbors
                 # thus causing our algo to potentially not be deterministic 
-                if not self.pointWithinSafeDataBoundary(nextNode.position):
-                    continue
+                """ if not self.pointWithinSafeDataBoundary(nextNode.position):
+                    continue """
                 #we want to use a formal parameter to sort neighbor priority to make sure this algorithm is deterministic 
                 sortedNeighbors = sorted(nextNode.neighbors, key=lambda neighbor: neighbor.segment.length)
 
@@ -201,7 +222,15 @@ class StreamGraph (object):
                             frontier.append(upstreamNode)
                             discovered.append(upstreamNode)
                         else:
-                            self.removeSegment(neighbor.segment)
+                            # this neighbor branch takes us to a node we've already seen
+                            # so disconnect this edge from that node to remove loop
+                            thisPosition = nextNode.position
+                            connectionPosition = neighbor.segment.upStreamNode.position
+                            newEndPointNodePos = ((thisPosition[0] + connectionPosition[0])/2, (thisPosition[1] + connectionPosition[1])/2)
+                            newEndPointNode = self.addNode(newEndPointNodePos)
+                            newEndPointNode.addNeighbor(neighbor.segment, DOWNSTREAM) # our segment is downstream from the new segment
+                            neighbor.segment.upStreamNode.removeNeighbor(neighbor.segment)
+                            neighbor.segment.upStreamNode = newEndPointNode
 
         sinks = self.getSinks()
         #remove loops
@@ -246,8 +275,6 @@ class StreamGraph (object):
     #guaranteedNetLineIndex a streamline feature that is definitely on the network we are interested in
     def addGeom(self, gdalData):
         lineLayer = gdalData.lineLayer
-        lineLayer.ResetReading()
-
         objectIDIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
         lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
         fCodeIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("FCode")
@@ -283,13 +310,27 @@ class StreamGraph (object):
                 downstreamNode = self.addNode(downstreamPt)
 
             self.addSegment(upstreamNode, downstreamNode, segmentID, length)
-        
+
+        siteLayer = gdalData.siteLayer
+        siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
+
+        snapped = Snap(gdalData)
+
+        for siteSnap in snapped:
+            snapPosition = siteSnap.snappedLocation
+            snapFeature = siteSnap.snappedFeature
+            featureSegmentID = snapFeature.GetFieldAsString(objectIDIndex)
+            siteIDIndex = siteSnap.site.GetFieldAsString(siteNumberIndex)
+            
+            self.addSite(siteIDIndex, featureSegmentID, siteSnap.distAlongFeature)
+
         if self.safeDataBoundaryKM == None:
             self.safeDataBoundaryKM = gdalData.safeDataBoundaryKM
         else:
             self.safeDataBoundaryKM = self.safeDataBoundaryKM.Union(gdalData.safeDataBoundaryKM)
 
-        #self.cleanGraph()
+        self.removeLoops()
+        self.cleanGraph()
 
 
 

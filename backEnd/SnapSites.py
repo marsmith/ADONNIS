@@ -1,5 +1,6 @@
 from GDALData import GDALData, QUERYDATA
 import matplotlib.pyplot as plt
+from Helpers import *
 import math
 import sys
 import collections
@@ -15,6 +16,7 @@ snapVerificationTolerance = 0.4#if the second nearest snap location is within 20
 numSecondarySnapsConsidered = 4# how many possible locations that aren't the same as the nearest do we consider?
 adverbNameSeparators = [" at ", " above ", " near "]
 waterTypeNames = [" brook", " pond", " river", " lake", " stream", " outlet", " creek", " bk", " ck"]
+SnappedSite = collections.namedtuple('SnappedSite', 'site snappedFeature snappedLocation snapDistance distAlongFeature')
 
 #Gets a key string from the site name that could be used to help snap sites later 
 def getSiteStreamNameIdentifier (siteName):
@@ -38,20 +40,17 @@ def getSiteStreamNameIdentifier (siteName):
         return ""
     return siteName[0:endIndex]
 
-def dist (x1, y1, x2, y2):
-    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 def dot (x1, y1, x2, y2):
     return x1*x2 + y1*y2
 
 def Snap(gdalData):
-    print("snap")
     stationNameIndex = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
     lineNameIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
     siteLayer = gdalData.siteLayer
     lineLayer = gdalData.lineLayer
     siteLayer.ResetReading()
     sideInd = 0
-    snappedSite = collections.namedtuple('snappedSite', 'site snappedLocation')
+    
     snappedSites = []
     for site in siteLayer:
         lineLayer.ResetReading()
@@ -71,7 +70,7 @@ def Snap(gdalData):
         
 
         #for all segments, store the point on each segment nearest to the site's location
-        nearestPointsOnSegments = [] #(point index, point distance, streamSegment index)
+        possibleSnaps = [] #(point index, point distance, streamSegment index)
 
         #get nearest point in the stream segment
         for j in range(0, len(potentialLines)):#potential in potentialLines:
@@ -80,57 +79,42 @@ def Snap(gdalData):
 
             nearestPointDist = sys.float_info.max
             nearestPointIndex = -1
+            nearestPointDistAlongSegment = 0
+
+            distAlongSegment = 0
 
             for i in range(0, numPoints):
+                prevPoint = lineGeom.GetPoint(max(0, i-1))
                 point = lineGeom.GetPoint(i)
+
+                geomSegmentLen = dist(point[0], point[1], prevPoint[0], prevPoint[1])
+                distAlongSegment += geomSegmentLen
+
                 distance = dist(point[0], point[1], sitePoint[0], sitePoint[1])
                 if distance < nearestPointDist:
                     nearestPointDist = distance
                     nearestPointIndex = i
+                    nearestPointDistAlongSegment = distAlongSegment
             
             nearestPoint = lineGeom.GetPoint(nearestPointIndex)
-            #refine the snap to a midpoint along a segment
-            """ adjacentPointIndRight = min(i+1, numPoints-1)
-            adjacentPointIndLeft = max(i-1, 0)
 
-            adjacentPointRight = lineGeom.GetPoint(adjacentPointIndRight)
-            adjacentPointLeft = lineGeom.GetPoint(adjacentPointIndLeft)
+            snap = SnappedSite(site=site, snappedFeature = potentialLines[j], snappedLocation = nearestPoint, snapDistance = nearestPointDist, distAlongFeature = nearestPointDistAlongSegment)
+            possibleSnaps.append(snap)
 
-            rightDist = dist(adjacentPointRight[0], adjacentPointRight[1], sitePoint[0], sitePoint[1])
-            leftDist = dist(adjacentPointLeft[0], adjacentPointLeft[1], sitePoint[0], sitePoint[1])
 
-            secondaryPoint = None
-            if rightDist < leftDist:
-                secondaryPoint = adjacentPointRight
-            else:
-                secondaryPoint = adjacentPointLeft
 
-            segmentVec = (secondaryPoint[0] - nearestPoint[0], secondaryPoint[1], nearestPoint[1])
-            segmentVecLen = dist(0, 0, segmentVec[0], segmentVec[1])
+        sortedPossibleSnaps = sorted(possibleSnaps, key=lambda snap: snap.snapDistance)
 
-            toSitePointVec = (sitePoint[0] - nearestPoint[0], sitePoint[1] - nearestPoint[1])
-
-            toSiteAlongSeg = dot(segmentVec[0], segmentVec[1], toSitePointVec[0], toSitePointVec[1]) / segmentVecLen
-            toSiteAlongSegRatio = toSiteAlongSeg / segmentVecLen
-
-            if toSiteAlongSegRatio > 0.2:
-                print("test = " + str(toSiteAlongSegRatio)) """
-
-            nearestPointsOnSegments.append((nearestPointIndex, nearestPointDist, j, nearestPoint))
-
-        sortedPossibleSnaps = sorted(nearestPointsOnSegments, key=lambda point: point[1])
-
-        needsUserConfirmation = False
-
-        nearestDistance = sortedPossibleSnaps[0][1]
-        consideredDistance = nearestDistance * 2 #arbitrary cutoff. logical that the correct snap couldn't be twice as far as the nearest snap..
+        nearestDistance = sortedPossibleSnaps[0].snapDistance
+        maxConsideredDistance = nearestDistance * 2 #arbitrary cutoff. logical that the correct snap couldn't be twice as far as the nearest snap..
         
         chosenSnapIndex = 0
 
         for i, possibleSnap in enumerate(sortedPossibleSnaps):
-            if possibleSnap[1] < consideredDistance:
-                snapStreamInd = possibleSnap[2]
-                streamName = potentialLines[snapStreamInd].GetFieldAsString(lineNameIndex)
+            snapDistance = possibleSnap.snapDistance
+            if snapDistance < maxConsideredDistance:
+                snappedFeature = possibleSnap.snappedFeature
+                streamName = snappedFeature.GetFieldAsString(lineNameIndex)
 
                 # if the next stream snap option includes the identifier in its name or there is no identifier, snap here
                 if stationIdentifier in streamName or stationIdentifier == "":
@@ -142,7 +126,7 @@ def Snap(gdalData):
 
         if chosenSnapIndex != 0:
             print("snapped to non-closest")
-        snappedSites.append(snappedSite(site=site, snappedLocation = sortedPossibleSnaps[chosenSnapIndex][3]))
+        snappedSites.append(sortedPossibleSnaps[chosenSnapIndex])
 
         lineLayer.SetSpatialFilter(None)
     return snappedSites
