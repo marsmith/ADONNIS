@@ -115,7 +115,7 @@ class StreamGraph (object):
         for streamNode in self.nodes:
             x.append(streamNode.position[0])
             y.append(streamNode.position[1])
-            plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
+            #plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
         plt.scatter(x,y, color='green')
 
         #display safe boundary polygon

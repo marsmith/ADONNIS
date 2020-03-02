@@ -31,6 +31,7 @@ RESTRICTED_FCODES = [56600]
 
 class GDALData(object):
 
+
     def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4, dataPaddingKM = 0.8, timeout = 5):
         self.localPath = os.path.join( os.path.dirname(os.path.dirname( __file__ ))) + "\data"
         print("self path = " + self.localPath)
@@ -46,7 +47,7 @@ class GDALData(object):
         self.dataPaddingKM = dataPaddingKM
         self.safeDataBoundaryKM = None
 
-        self.emulateQueries = True
+        self.timeout = timeout
 
         self.utmCode = self.getUTM(self.lng)
         self.EPSGCode = int("269" + str(self.utmCode))
@@ -116,30 +117,32 @@ class GDALData(object):
             "crs": {"type":"name","properties":{"name":"EPSG:" + str(self.EPSGCode)}},
             "features":[]
         }
-        for site in root:
-            siteNo = int(site.find('site_no').text)
-            stationNm = site.find('station_nm').text
-            siteType = site.find('site_tp_cd').text
-            siteLat = float(site.find('dec_lat_va').text)
-            siteLng = float(site.find('dec_long_va').text)
+        #check for no sites case
+        if "no sites found" not in xmlStr:
+            for site in root:
+                siteNo = int(site.find('site_no').text)
+                stationNm = site.find('station_nm').text
+                siteType = site.find('site_tp_cd').text
+                siteLat = float(site.find('dec_lat_va').text)
+                siteLng = float(site.find('dec_long_va').text)
 
-            [projX, projY, z] = transformation.TransformPoint(siteLng, siteLat)
+                [projX, projY, z] = transformation.TransformPoint(siteLng, siteLat)
 
-            #make sure this is a stream not a well
-            if(siteType == "ST"):
-                #build feature. This is based on the format of the geoJson returned from the streams query
-                feature = {
-                    "type":"Feature",
-                    "geometry":{
-                        "type": "Point",
-                        "coordinates": [projX, projY]
-                    },
-                    "properties": {
-                        "site_no":siteNo,
-                        "station_nm":stationNm
+                #make sure this is a stream not a well
+                if(siteType == "ST"):
+                    #build feature. This is based on the format of the geoJson returned from the streams query
+                    feature = {
+                        "type":"Feature",
+                        "geometry":{
+                            "type": "Point",
+                            "coordinates": [projX, projY]
+                        },
+                        "properties": {
+                            "site_no":siteNo,
+                            "station_nm":stationNm
+                        }
                     }
-                }
-                geojson["features"].append(feature)
+                    geojson["features"].append(feature)
         return json.dumps(geojson)
 
     def loadFromQuery(self):
