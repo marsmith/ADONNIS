@@ -58,13 +58,14 @@ class StreamNode (object):
 
 #a segment connecting two points
 class StreamSegment (object):
-    def __init__(self, upStreamNode, downStreamNode, ID, length):
+    def __init__(self, upStreamNode, downStreamNode, ID, length, streamLevel):
         #streamSegments get 0 appended on the FID to ensure uniqueness
         self.upStreamNode = upStreamNode
         self.downStreamNode = downStreamNode
         self.segmentID = ID
         self.sites = []
         self.length = length
+        self.streamLevel = streamLevel
 
     #we assume that this site position is indeed on our segment. 
     def addSite (self, siteID, distAlongSegment):
@@ -99,6 +100,8 @@ class StreamGraph (object):
 
             midPoint = (startPt[0]/2 + endPt[0]/2, startPt[1]/2 + endPt[1]/2)
 
+            plt.text(midPoint[0], midPoint[1], streamSeg.streamLevel, fontsize = 8)
+
             for sites in streamSeg.sites:
                 percentAlongSegment = sites.distDownstreamAlongSegment / streamSeg.length
                 percentAlongSegmentInverse = 1 - percentAlongSegment
@@ -106,7 +109,7 @@ class StreamGraph (object):
                 position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
                 sitesX.append(position[0])
                 sitesY.append(position[1])
-        plt.scatter(sitesX, sitesY, color='red')
+        
 
             #plt.text(midPoint[0], midPoint[1], streamSeg.segmentID, fontsize = 8)
         
@@ -117,6 +120,8 @@ class StreamGraph (object):
             y.append(streamNode.position[1])
             #plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
         plt.scatter(x,y, color='green')
+
+        plt.scatter(sitesX, sitesY, color='red')
 
         #display safe boundary polygon
         geom = self.safeDataBoundaryKM
@@ -158,8 +163,8 @@ class StreamGraph (object):
             self.removedSegments.add(segmentID)
     
     #add a segment to the graph
-    def addSegment (self, upstreamNode, downstreamNode, segmentID, length):
-        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length)    
+    def addSegment (self, upstreamNode, downstreamNode, segmentID, length, streamLevel):
+        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel)    
         #add the new segment to the dictionary
         self.segments[segmentID] = newSegment
         #from the perspective of the upstream node, this segment is downstream and vice versa
@@ -297,12 +302,14 @@ class StreamGraph (object):
         objectIDIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
         lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
         fCodeIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("FCode")
+        streamLevelIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("STREAMLEVE")
 
         for line in lineLayer:
             #don't add duplicates
             segmentID = line.GetFieldAsString(objectIDIndex)
             length = float(line.GetFieldAsString(lengthIndex))
             fCode = int(line.GetFieldAsString(fCodeIndex))
+            streamLevel = int(line.GetFieldAsString(streamLevelIndex))
             if self.hasContainedSegment(segmentID) or fCode in RESTRICTED_FCODES:
                 continue
 
@@ -328,7 +335,7 @@ class StreamGraph (object):
             if downstreamNode == None:
                 downstreamNode = self.addNode(downstreamPt)
 
-            self.addSegment(upstreamNode, downstreamNode, segmentID, length)
+            self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel)
 
         siteLayer = gdalData.siteLayer
         siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
@@ -348,8 +355,8 @@ class StreamGraph (object):
         else:
             self.safeDataBoundaryKM = self.safeDataBoundaryKM.Union(gdalData.safeDataBoundaryKM)
 
-        self.removeLoops()
-        self.cleanGraph()
+        #self.removeLoops()
+        #self.cleanGraph()
 
 
 
