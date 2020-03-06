@@ -5,7 +5,7 @@ def approxKmToDegrees (km):
 
 #check if two points are relatively equal. 
 def pointsEqual (p1, p2):
-    threshold = 1
+    threshold = approxKmToDegrees(1/1000)
     if abs(p1[0]-p2[0]) + abs(p1[1] - p2[1]) < threshold:
         return True
     else:

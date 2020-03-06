@@ -1,10 +1,11 @@
 from collections import namedtuple
-from GDALData import GDALData, RESTRICTED_FCODES
+from GDALData import GDALData, RESTRICTED_FCODES, QUERYDATA
 from Helpers import *
 from SnapSites import Snap, SnappedSite
 import ogr
 import matplotlib.pyplot as plt
 import random
+import sys
 
 #constants for neighbor relationships
 UNKNOWN = 0         #000
@@ -18,6 +19,7 @@ DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstr
 #tuples used
 NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
 SiteOnSegment = namedtuple('SiteOnSegment', 'distDownstreamAlongSegment siteID')
+GraphUpdate = namedtuple('GraphUpdate', 'fromSeg toSeg')#an update to the graph. 'from' is replaced with 'to' 
 
 #a stream node 
 class StreamNode (object):
@@ -28,6 +30,7 @@ class StreamNode (object):
         self.instanceID = instanceID
         self.upstreamDistanceCounter = 0 #this can be assigned before the true value is known
         self.upstreamDistanceCalculated = False # is the upstream distance fully calculated?
+        
 
     def addNeighbor (self, segment, relationship = UNKNOWN):
         self.neighbors.append(NeighborRelationship(segment=segment, relationship=relationship))
@@ -44,6 +47,31 @@ class StreamNode (object):
             if self.neighborHasRelationShip(neighbor, relationshipCode):
                 results.append(neighbor.segment)
         return results
+
+    # returns a list of upstream branches of this node sorted by arbolate sum (upstream distance) 
+    # the order will be:
+    # lowest arbolate sum first, followed by the mainstream branch
+    def getSortedUpstreamBranches (self):
+        tribs = []
+        minStreamLevel = float("inf")
+        for neighbor in self.neighbors:
+            if self.neighborHasRelationShip(neighbor, UPSTREAM) and neighbor.segment.streamLevel < minStreamLevel:
+                minStreamLevel = neighbor.segment.streamLevel
+        mainStreamPathSegment = None
+        #once we determine the minimum segment stream level, all stream levels > are tribs
+        for neighbor in self.neighbors:
+            if self.neighborHasRelationShip(neighbor, UPSTREAM):
+                if neighbor.segment.streamLevel > minStreamLevel:
+                    tribs.append(neighbor.segment)
+                else:
+                    mainStreamPathSegment = neighbor.segment
+
+        sortedTribs = sorted(tribs, key=lambda tribSegment: tribSegment.arbolateSum)
+        #catch case when there is no upstream path at all
+        if mainStreamPathSegment is not None:
+            sortedTribs.append(mainStreamPathSegment)
+
+        return sortedTribs
     
     #removes the neighbor with neighborID if it exists. Return true if removed successfully
     def removeNeighbor (self, segment):
@@ -58,7 +86,7 @@ class StreamNode (object):
 
 #a segment connecting two points
 class StreamSegment (object):
-    def __init__(self, upStreamNode, downStreamNode, ID, length, streamLevel):
+    def __init__(self, upStreamNode, downStreamNode, ID, length, streamLevel, arbolateSum):
         #streamSegments get 0 appended on the FID to ensure uniqueness
         self.upStreamNode = upStreamNode
         self.downStreamNode = downStreamNode
@@ -66,22 +94,50 @@ class StreamSegment (object):
         self.sites = []
         self.length = length
         self.streamLevel = streamLevel
+        self.arbolateSum = arbolateSum
 
     #we assume that this site position is indeed on our segment. 
+    #distAlongSegment = 0 would imply that the site is located at upStreamNode
+    #similarly, distAlongSegment = self.length wouold imply it is located at downStreamNode
     def addSite (self, siteID, distAlongSegment):
+        if distAlongSegment > self.length:
+            print ("Site added to segment on point that exceeds segment length. This shouldn't happen!")
+            print (self.segmentID)
+
         self.sites.append(SiteOnSegment(siteID = siteID, distDownstreamAlongSegment = distAlongSegment))
+        self.sites = sorted(self.sites, key=lambda site: site.distDownstreamAlongSegment)
+
+    #gets the nearest site ID on THIS segment above 'distanceDownSegment' if it exists. return none otherwise 
+    def getSiteAbove (self, distanceDownSegment):
+        #list sites by order downstream to upstream
+        reverseSortedSites = reversed(self.sites)
+        #the first site we find in the above list that is farther upstream than 'distanceDownSegment' is a match
+        for site in reverseSortedSites:
+            if site.distDownstreamAlongSegment < distanceDownSegment:
+                return site
+        return None
 
 class StreamGraph (object):
 
     def __init__(self):
         self.segments = {}
         self.nodes = []
-        self.safeDataBoundaryKM = None #gdal geometry object. Points inside should have all neighboring segments stored
+        self.safeDataBoundary = [] #gdal geometry objects. Points inside should have all neighboring segments stored
 
-        self.removedSegments = set()#cleaned segments. keep track to prevent duplicates
+        self.removedSegments = {}#cleaned segments. keep track to prevent duplicates. The dict values point to the segment that replaced this segment, if it exists
         self.addedSites = set()#list of sites that have already been added
         self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
-    
+        self.listeners = []
+
+    def addGraphListener(self, listener):
+        self.listeners.append(listener)
+
+    #make sure that all listeners have a notify method
+    #notify listeners of a single update
+    def notifyListeners(self, update):
+        for listener in self.listeners:
+            listener.notify(update)
+
     #visualize the graph using matplotlib
     def visualize(self):
         sitesX = []
@@ -94,13 +150,14 @@ class StreamGraph (object):
             y = [startPt[1], endPt[1]]
             dx = endPt[0] - startPt[0]
             dy = endPt[1] - startPt[1]
-            plt.arrow(startPt[0], startPt[1], dx, dy, width=1, head_width = 5, color='blue', length_includes_head=True)
+            plt.arrow(startPt[0], startPt[1], dx, dy, width=0.00001, head_width = 0.0001, color='blue', length_includes_head=True)
 
             plt.plot(x,y, lineWidth=1, color='blue')
 
             midPoint = (startPt[0]/2 + endPt[0]/2, startPt[1]/2 + endPt[1]/2)
 
-            plt.text(midPoint[0], midPoint[1], streamSeg.streamLevel, fontsize = 8)
+            #plt.text(midPoint[0], midPoint[1], streamSeg.streamLevel, fontsize = 8)
+            #plt.text(midPoint[0], midPoint[1]-100, streamSeg.arbolateSum, fontsize = 8)
 
             for sites in streamSeg.sites:
                 percentAlongSegment = sites.distDownstreamAlongSegment / streamSeg.length
@@ -109,9 +166,10 @@ class StreamGraph (object):
                 position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
                 sitesX.append(position[0])
                 sitesY.append(position[1])
-        
+                plt.text(position[0] + 0.0001, position[1] + 0.001, sites.siteID, fontsize = 8, color = 'red')
 
-            #plt.text(midPoint[0], midPoint[1], streamSeg.segmentID, fontsize = 8)
+            segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
+            plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
         
         x = []
         y = []
@@ -124,47 +182,84 @@ class StreamGraph (object):
         plt.scatter(sitesX, sitesY, color='red')
 
         #display safe boundary polygon
-        geom = self.safeDataBoundaryKM
-        for ring in geom:
-            numPoints = ring.GetPointCount()
-            x = []
-            y = []
-            for i in range(0, numPoints):
-                point = ring.GetPoint(i)
-                x.append(point[0])
-                y.append(point[1])
-            plt.plot(x,y, lineWidth=1, color='red')
+        for geom in self.safeDataBoundary:
+            for ring in geom:
+                numPoints = ring.GetPointCount()
+                x = []
+                y = []
+                for i in range(0, numPoints):
+                    point = ring.GetPoint(i)
+                    x.append(point[0])
+                    y.append(point[1])
+                plt.plot(x,y, lineWidth=1, color='red')
 
         plt.show()
 
+    #expand the graph at x,y with queried data 
+    def expandGraph (self, point):
+        print ("Expanding graph!")
+        gdalData = GDALData(point[1], point[0], loadMethod = QUERYDATA)
+        self.addGeom(gdalData)
 
-    #calculate what branches are tributaries, etc 
-    def calculateStreamStructure (self):
-        pass
+    """ #assume our graph is clean and loop free
+    #returns a tuple (siteID, distance traversed to find site)
+    # or None if no site is found
+    def getNextUpstreamSite (self, segment, downStreamPositionOnSegment):
+        #catch cases when next node is simply on this node
+        foundSite = segment.getSiteAbove(downStreamPositionOnSegment) 
+        #if there is a site on this segment, simply return it
+        if foundSite is not None:
+            return (foundSite.siteID, downStreamPositionOnSegment - foundSite.distDownstreamAlongSegment) 
 
-    def findMainStreamPath (self, junctionNode):
-        #which are the possible upstream branches
-        possibleBranches = []
-        for neighbor in junctionNode.neighbors:
-            if neighbor.relationship == UPSTREAM:
-                possibleBranches.append(neighbor.segment)
-        #use the following attributes as priority for determining main path: stream name, upstream length
+        #get upstream tributaries of this path
+        stack = [segment]
+        summedDistance = 0
+        firstSegment = True
+        while len(stack) > 0:
+            thisSegment = stack.pop()
+            if thisSegment.segmentID == "9281127CC":
+                print("test")
 
-        #need to find downstream branch. this may be difficult with loops
+            thisSegmentPosition = thisSegment.downStreamNode.position
+            #if during navigation, we reach edge of safe data boundary, expand with new query
+            if not self.pointWithinSafeDataBoundary(thisSegmentPosition):
+                self.expandGraph(thisSegmentPosition) 
+            
+            # if there was a site on the first segment, we would catch it in 
+            # our first case at the beginning
+            # we avoid this if passing on a site below our query on the first segment by checking
+            # if this is the first segment we are looking at
+            if len(thisSegment.sites) > 0 and firstSegment is False:
+                #the site we want is the farthest downstream on this segment
+                siteInfo = thisSegment.sites[-1]
+                foundSite = siteInfo
+                summedDistance += thisSegment.length - siteInfo.distDownstreamAlongSegment
+                break
+            else:
+                summedDistance += thisSegment.length
+            #reverse the list. We want the lowest priority tribs to be looked at first
+            stack.extend(reversed(thisSegment.upStreamNode.getSortedUpstreamBranches()))
+            firstSegment = False
+
+        if foundSite is not None:
+            return (foundSite.siteID, summedDistance)
+        else:
+            return None """
+
 
     #safely remove a segment from the graph
-    def removeSegment (self, segment):
+    def removeSegment (self, segment, replacedBy = None):
         segmentID = segment.segmentID
         if segmentID in self.segments:
             segment.upStreamNode.removeNeighbor(segment)
             segment.downStreamNode.removeNeighbor(segment)
             #for neighbor in segment
             del self.segments[segmentID]
-            self.removedSegments.add(segmentID)
+            self.removedSegments[segmentID] = replacedBy
     
     #add a segment to the graph
-    def addSegment (self, upstreamNode, downstreamNode, segmentID, length, streamLevel):
-        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel)    
+    def addSegment (self, upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum):
+        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum)    
         #add the new segment to the dictionary
         self.segments[segmentID] = newSegment
         #from the perspective of the upstream node, this segment is downstream and vice versa
@@ -203,7 +298,10 @@ class StreamGraph (object):
     def pointWithinSafeDataBoundary (self, point):
         pointGeo = ogr.Geometry(ogr.wkbPoint)
         pointGeo.AddPoint(point[0], point[1])
-        return pointGeo.Within(self.safeDataBoundaryKM)
+        for geo in self.safeDataBoundary:
+            if pointGeo.Within(geo):
+                return True
+        return False
 
 
     def removeLoops (self):
@@ -275,9 +373,14 @@ class StreamGraph (object):
             #calculate new segment properties
             newLength = upstreamSegment.length + downstreamSegment.length
             # concat IDs to get a new unique ID
-            newID = upstreamSegment.segmentID + downstreamSegment.segmentID
+            newID = str(downstreamSegment.segmentID) + "C"
+            #the two segments being collapsed should have the same stream level
+            newStreamLevel = downstreamSegment.streamLevel
+            #since arbolate sum is distance upstream from the most downstream point of a segment, 
+            #choosing arbolate sum of downstream segment is accurate for the collapsed segment
+            newArbolateSum = downstreamSegment.arbolateSum
 
-            newSegment = self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength)    
+            newSegment = self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength, newStreamLevel, newArbolateSum)    
 
             #add the sites to the new segment
             for site in upstreamSegment.sites:
@@ -288,10 +391,33 @@ class StreamGraph (object):
 
             #remove the segment and nodes from the actual graph
             for neighbor in reversed(node.neighbors):
-                self.removeSegment(neighbor.segment)
+                #update listeners about this simplification. The two removed segments now will be replaced
+                # with the simplified segment in any active searches
+                self.notifyListeners(GraphUpdate(fromSeg = neighbor.segment, toSeg=newSegment))
+                self.removeSegment(neighbor.segment, replacedBy = newSegment)
+                
             self.nodes.remove(node)
 
+    
+    #get a segment from the graph or if it was deleted, get the segment that replaced it
+    def getCleanedSegment (self, segmentID):
+        if segmentID in self.segments:
+            return self.segments[segmentID]
+        elif segmentID in self.removedSegments:
+            return self.getCleanedSegment(self.removedSegments[segmentID].segmentID)
+        else:
+            return None
             
+    def getNP (self, geo):
+        for ring in geo:
+            numPoints = ring.GetPointCount()
+            x = []
+            y = []
+            for i in range(0, numPoints):
+                point = ring.GetPoint(i)
+                x.append(point[0])
+                y.append(point[1])
+            plt.plot(x,y, lineWidth=1, color='red')
 
 
     #Adds the geometry stored in the gdalData object
@@ -303,6 +429,7 @@ class StreamGraph (object):
         lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
         fCodeIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("FCode")
         streamLevelIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("STREAMLEVE")
+        arbolateSumIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("ARBOLATESU")
 
         for line in lineLayer:
             #don't add duplicates
@@ -310,6 +437,7 @@ class StreamGraph (object):
             length = float(line.GetFieldAsString(lengthIndex))
             fCode = int(line.GetFieldAsString(fCodeIndex))
             streamLevel = int(line.GetFieldAsString(streamLevelIndex))
+            arbolateSum = float(line.GetFieldAsString(arbolateSumIndex))
             if self.hasContainedSegment(segmentID) or fCode in RESTRICTED_FCODES:
                 continue
 
@@ -335,7 +463,7 @@ class StreamGraph (object):
             if downstreamNode == None:
                 downstreamNode = self.addNode(downstreamPt)
 
-            self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel)
+            self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum)
 
         siteLayer = gdalData.siteLayer
         siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
@@ -350,13 +478,11 @@ class StreamGraph (object):
             
             self.addSite(siteIDIndex, featureSegmentID, siteSnap.distAlongFeature)
 
-        if self.safeDataBoundaryKM == None:
-            self.safeDataBoundaryKM = gdalData.safeDataBoundaryKM
-        else:
-            self.safeDataBoundaryKM = self.safeDataBoundaryKM.Union(gdalData.safeDataBoundaryKM)
+        self.safeDataBoundary.append(gdalData.safeDataBoundary)
 
-        #self.removeLoops()
-        #self.cleanGraph()
+
+        self.removeLoops()
+        self.cleanGraph()
 
 
 

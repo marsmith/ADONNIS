@@ -43,6 +43,40 @@ def getSiteStreamNameIdentifier (siteName):
 def dot (x1, y1, x2, y2):
     return x1*x2 + y1*y2
 
+#this is trash. Just need a way to get the segment and distance on said segment from an arbitary point
+def snapPointToSegment (point, gdalData):
+    objectIDIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
+    for line in gdalData.lineLayer:
+        lineGeom = line.GetGeometryRef()
+        numPoints = lineGeom.GetPointCount()
+        segmentID = line.GetFieldAsString(objectIDIndex)
+
+        nearestPointDist = sys.float_info.max
+        nearestPointIndex = -1
+        nearestPointDistAlongSegment = 0
+
+        distAlongSegment = 0
+
+        for i in range(0, numPoints):
+            prevLinePoint = lineGeom.GetPoint(max(0, i-1))
+            linePoint = lineGeom.GetPoint(i)
+
+            geomSegmentLen = dist(linePoint[0], linePoint[1], prevLinePoint[0], prevLinePoint[1])
+            #get length of each polyline of the stream segment. Divide by 1000 to get in km
+            distAlongSegment += geomSegmentLen / 1000 
+
+            distance = dist(linePoint[0], linePoint[1], point[0], point[1])
+            if distance < nearestPointDist:
+                nearestPointDist = distance
+                nearestPointIndex = i
+                nearestPointDistAlongSegment = distAlongSegment
+        
+        nearestPoint = lineGeom.GetPoint(nearestPointIndex)
+
+        return (segmentID, nearestPointDistAlongSegment)
+    print("Could not find a possible snap for point " + str(point))
+    return None
+
 def Snap(gdalData):
     stationNameIndex = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
     lineNameIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
@@ -68,7 +102,6 @@ def Snap(gdalData):
         #name of the correct stream it should be snapped to
         stationIdentifier = getSiteStreamNameIdentifier(stationName) 
         
-
         #for all segments, store the point on each segment nearest to the site's location
         possibleSnaps = [] #(point index, point distance, streamSegment index)
 
@@ -189,7 +222,7 @@ def visualize (gdalData, snapped):
 
 
 
-x = -74.3254918    #Long Lake
+""" x = -74.3254918    #Long Lake
 y =  44.0765791
 #x = -76.3612354  #04249020
 #y = 43.4810611
@@ -199,7 +232,7 @@ gdalData = GDALData(y, x, loadMethod=QUERYDATA)
 #gdalData.loadFromData()
 snapped = Snap(gdalData)
 visualize(gdalData, snapped)
-gdalData.siteLayer.ResetReading()
+gdalData.siteLayer.ResetReading() """
 #stationName_index = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
 
 """ for site in gdalData.siteLayer:
