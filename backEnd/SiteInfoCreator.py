@@ -16,4 +16,6 @@ def getSiteID (lat, lng):
 
     navigator = StreamGraphNavigator(streamGraph)
 
+    upstreamSite = navigator.getNextUpstreamSite()
+
     

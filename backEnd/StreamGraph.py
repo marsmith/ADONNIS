@@ -159,16 +159,16 @@ class StreamGraph (object):
             #plt.text(midPoint[0], midPoint[1], streamSeg.streamLevel, fontsize = 8)
             #plt.text(midPoint[0], midPoint[1]-100, streamSeg.arbolateSum, fontsize = 8)
 
-            for sites in streamSeg.sites:
+            for i, sites in enumerate(streamSeg.sites):
                 percentAlongSegment = sites.distDownstreamAlongSegment / streamSeg.length
                 percentAlongSegmentInverse = 1 - percentAlongSegment
 
                 position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
                 sitesX.append(position[0])
                 sitesY.append(position[1])
-                plt.text(position[0] + 0.0001, position[1] + 0.001, sites.siteID, fontsize = 8, color = 'red')
+                plt.text(position[0] + 0.0001, position[1] + 0.001 + i * 0.001, sites.siteID, fontsize = 8, color = 'red')
 
-            segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
+            segmentInfo = streamSeg.streamLevel#str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
             plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
         
         x = []
@@ -482,7 +482,7 @@ class StreamGraph (object):
 
 
         self.removeLoops()
-        self.cleanGraph()
+        #self.cleanGraph()
 
 
 

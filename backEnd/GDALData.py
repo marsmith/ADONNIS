@@ -32,9 +32,8 @@ RESTRICTED_FCODES = [56600]
 class GDALData(object):
 
 
-    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 4, dataPaddingKM = 0.8, timeout = 5):
+    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 10, dataPaddingKM = 0.6, timeout = 2, projectCoords = False):
         self.localPath = os.path.join( os.path.dirname(os.path.dirname( __file__ ))) + "\data"
-        print("self path = " + self.localPath)
         self.lineDataSource = None
         self.siteDataSource = None
         self.lineLayer = None
@@ -45,12 +44,13 @@ class GDALData(object):
         self.radiusKM = radiusKM
         self.queryAttempts = queryAttempts
         self.dataPaddingKM = dataPaddingKM
-        self.safeDataBoundaryKM = None
+        self.safeDataBoundary = None
 
         self.timeout = timeout
 
         self.utmCode = self.getUTM(self.lng)
         self.EPSGCode = int("269" + str(self.utmCode))
+        self.projectCoords = projectCoords
 
         if loadMethod == LOCALDATA:
             self.loadFromData()
@@ -126,7 +126,11 @@ class GDALData(object):
                 siteLat = float(site.find('dec_lat_va').text)
                 siteLng = float(site.find('dec_long_va').text)
 
-                [projX, projY, z] = transformation.TransformPoint(siteLng, siteLat)
+                if self.projectCoords is True:
+                    [coordX, coordY, z] = transformation.TransformPoint(siteLng, siteLat)
+                else:
+                    coordX = siteLng
+                    coordY = siteLat
 
                 #make sure this is a stream not a well
                 if(siteType == "ST"):
@@ -135,7 +139,7 @@ class GDALData(object):
                         "type":"Feature",
                         "geometry":{
                             "type": "Point",
-                            "coordinates": [projX, projY]
+                            "coordinates": [coordX, coordY]
                         },
                         "properties": {
                             "site_no":siteNo,
@@ -151,8 +155,11 @@ class GDALData(object):
             raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
 
         transformation = self.getTransformation()
+        outProjectionCode = self.EPSGCode
+        if self.projectCoords is False:
+            outProjectionCode = 4326 #code for global lat/lng
         #lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE&returnGeometry=true&outSR=" + str(self.EPSGCode) + "&returnDistinctValues=false&queryByDistance=" + str(self.radiusKM*1000) + "&featureEncoding=esriDefault&f=geojson"
-        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE%2C+FCODE%2C+OBJECTID&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(self.EPSGCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"
+        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE%2C+FCODE%2C+OBJECTID%2C+ARBOLATESU&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(outProjectionCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"
         #lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(self.EPSGCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
         req = self.queryWithAttempts(lineURL, self.queryAttempts, queryName="lineData", timeout = self.timeout)
         
@@ -212,7 +219,15 @@ class GDALData(object):
         self.siteLayer.ResetReading()
          
         queryCenter = ogr.Geometry(ogr.wkbPoint)#up stream point - wkb point is the code for point based geometry
-        transformedQueryCenter = transformation.TransformPoint(self.lng, self.lat)
-        queryCenter.AddPoint(transformedQueryCenter[0], transformedQueryCenter[1])
+        
+        if self.projectCoords is True:
+            transformedQueryCenter = transformation.TransformPoint(self.lng, self.lat)
+            queryCenter.AddPoint(transformedQueryCenter[0], transformedQueryCenter[1])
+        else:
+            queryCenter.AddPoint(self.lng, self.lat)
 
-        self.safeDataBoundaryKM = queryCenter.Buffer((self.radiusKM - self.dataPaddingKM) * 1000)
+        safeDataBoundaryRad = (self.radiusKM - self.dataPaddingKM) * 1000
+        if self.projectCoords is False:
+            safeDataBoundaryRad = approxKmToDegrees(safeDataBoundaryRad / 1000)
+
+        self.safeDataBoundary = queryCenter.Buffer(safeDataBoundaryRad)
