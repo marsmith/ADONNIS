@@ -1,7 +1,7 @@
-from backEnd.StreamGraphNavigator import StreamGraphNavigator
-from backEnd.StreamGraph import StreamGraph
-from backEnd.SnapSites import snapPoint
-from backend.GDALData import GDALData, QUERYDATA
+from StreamGraphNavigator import StreamGraphNavigator
+from StreamGraph import StreamGraph
+from SnapSites import snapPointToSegment
+from GDALData import GDALData, QUERYDATA
 
 
 def getSiteID (lat, lng):
@@ -9,13 +9,21 @@ def getSiteID (lat, lng):
 
     #typically lat/long are switched to fit the x/y order paradigm 
     point = (lng, lat)
-    gdalData = GDALData(point[0], point[1], loadMethod = QUERYDATA)
-    streamGraph.expand(point)
-
-    (snappedPoint, distAlongSegment) = snapPoint(point, gdalData)
+    gdalData = GDALData(lat, lng, loadMethod = QUERYDATA)
+    streamGraph.addGeom(gdalData)
+    streamGraph.visualize()
+    snapInfo = snapPointToSegment(point, gdalData)
+    if snapInfo is None:
+        print ("could not snap")
+        return None
+    (segmentID, distAlongSegment) = snapInfo
+    graphSegment = streamGraph.getCleanedSegment(segmentID)
 
     navigator = StreamGraphNavigator(streamGraph)
 
-    upstreamSite = navigator.getNextUpstreamSite()
+    upstreamSite = navigator.getNextUpstreamSite(graphSegment, distAlongSegment)
+    print ("upstrSite = " + str(upstreamSite))
+    streamGraph.visualize()
 
-    
+    return upstreamSite[0]
+

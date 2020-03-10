@@ -45,15 +45,18 @@ def dot (x1, y1, x2, y2):
 
 #this is trash. Just need a way to get the segment and distance on said segment from an arbitary point
 def snapPointToSegment (point, gdalData):
+
+    nearestPointDist = sys.float_info.max
+    nearestPointIndex = -1
+    nearestPointDistAlongSegment = 0
+    nearestPointSegmentID = 0
+
     objectIDIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
+    gdalData.lineLayer.ResetReading()
     for line in gdalData.lineLayer:
         lineGeom = line.GetGeometryRef()
         numPoints = lineGeom.GetPointCount()
         segmentID = line.GetFieldAsString(objectIDIndex)
-
-        nearestPointDist = sys.float_info.max
-        nearestPointIndex = -1
-        nearestPointDistAlongSegment = 0
 
         distAlongSegment = 0
 
@@ -70,12 +73,13 @@ def snapPointToSegment (point, gdalData):
                 nearestPointDist = distance
                 nearestPointIndex = i
                 nearestPointDistAlongSegment = distAlongSegment
-        
-        nearestPoint = lineGeom.GetPoint(nearestPointIndex)
+                nearestPointSegmentID = segmentID
 
-        return (segmentID, nearestPointDistAlongSegment)
-    print("Could not find a possible snap for point " + str(point))
-    return None
+    if nearestPointIndex == -1:
+        print ("Could not snap lat/lng to a stream")
+        return None
+    else:
+        return (nearestPointSegmentID, nearestPointDistAlongSegment)
 
 def Snap(gdalData):
     stationNameIndex = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")

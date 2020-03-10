@@ -27,10 +27,7 @@ class StreamNode (object):
         #streamNodes get 1 appended on the FID to ensure uniqueness
         self.neighbors = []
         self.position = position
-        self.instanceID = instanceID
-        self.upstreamDistanceCounter = 0 #this can be assigned before the true value is known
-        self.upstreamDistanceCalculated = False # is the upstream distance fully calculated?
-        
+        self.instanceID = instanceID        
 
     def addNeighbor (self, segment, relationship = UNKNOWN):
         self.neighbors.append(NeighborRelationship(segment=segment, relationship=relationship))
@@ -139,7 +136,7 @@ class StreamGraph (object):
             listener.notify(update)
 
     #visualize the graph using matplotlib
-    def visualize(self):
+    def visualize(self, showSegInfo = False):
         sitesX = []
         sitesY = []
         for streamSeg in self.segments.values():
@@ -168,7 +165,9 @@ class StreamGraph (object):
                 sitesY.append(position[1])
                 plt.text(position[0] + 0.0001, position[1] + 0.001 + i * 0.001, sites.siteID, fontsize = 8, color = 'red')
 
-            segmentInfo = streamSeg.streamLevel#str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
+            segmentInfo = streamSeg.streamLevel
+            if showSegInfo is True:
+                segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
             plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
         
         x = []
@@ -407,17 +406,6 @@ class StreamGraph (object):
             return self.getCleanedSegment(self.removedSegments[segmentID].segmentID)
         else:
             return None
-            
-    def getNP (self, geo):
-        for ring in geo:
-            numPoints = ring.GetPointCount()
-            x = []
-            y = []
-            for i in range(0, numPoints):
-                point = ring.GetPoint(i)
-                x.append(point[0])
-                y.append(point[1])
-            plt.plot(x,y, lineWidth=1, color='red')
 
 
     #Adds the geometry stored in the gdalData object
