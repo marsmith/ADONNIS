@@ -1,6 +1,6 @@
 from StreamGraph import StreamNode, StreamSegment, StreamGraph, UPSTREAM, DOWNSTREAM
 from collections import namedtuple 
-from sys import maxsize
+import sys
 #a class that has various functionality to find / expand a StreamGraph
 
 StreamSearch = namedtuple('StreamSearch', 'id openSegments')
@@ -154,45 +154,72 @@ class StreamGraphNavigator (object):
             return None
 
     def getNextDownstreamSite (self, segment, downstreamPositionOnSegment):
-
         foundSite = None
 
         for site in segment.sites:
             if site.distDownstreamAlongSegment > downstreamPositionOnSegment:
                 foundSite = site
-                return foundSite
+                return (foundSite.siteID, site.distDownstreamAlongSegment - downstreamPositionOnSegment)
 
 
         streamSearch = self.openSearch()
         queue = streamSearch.openSegments
         queue.append(segment)
 
+        summedDistance = 0
+        firstSegment = True
         while len(queue) > 0:
             current = queue.pop(0)
             currentStreamLevel = current.streamLevel
+            
+            if firstSegment is False:
+                if len(current.sites) > 0:
+                    foundSite = current.sites[0]
+                    summedDistance += current.sites[0].distDownstreamAlongSegment
+                    break
+                else:
+                    summedDistance += current.length
+            else:
+                summedDistance += current.length - downstreamPositionOnSegment
+
             adjacentUpstreamPaths = current.downStreamNode.getCodedNeighbors(UPSTREAM)
-            higherLevelNeighbor = None # this means this junction has a trib. Since we're on the main path, we have to explore all the way up the trib
+            higherLevelNeighbors = [] # this means this junction has a trib. Since we're on the main path, we have to explore all the way up the trib
+            
             for neighbor in adjacentUpstreamPaths:
                 if neighbor is current:
                     continue
                 if neighbor.streamLevel > currentStreamLevel:
-                    higherLevelNeighbor = neighbor
-            
-            if higherLevelNeighbor is not None:
-                tribSites = collectSortedUpstreamSites(higherLevelNeighbor, higherLevelNeighbor.length, siteLimit = sys.maxsize)
-                if len(tribSites) > 0:
-                    return 
+                    higherLevelNeighbors.append[neighbor]
+            #----------
+            #finish work on iterating over all high level tribs. Not just one
+            #make sure to add up lengths of tribs that don't have sites
+            # but do this after looking at all of them
+            # look at all tribs to find potential site before picking one
+            if higherLevelNeighbors is not None:
+                totalTribLength = higherLevelNeighbors.arbolateSum
+                for higherLevelNeighbor in higherLevelNeighbors:
+                    tribSites = self.collectSortedUpstreamSites(higherLevelNeighbor, higherLevelNeighbor.length, siteLimit = sys.maxsize)
+                    if len(tribSites) > 0:
+                        foundSiteInfo = tribSites[-1] #return the highest site on the trib
+                        foundSite = foundSiteInfo[0]
+                        distUpTrib = foundSiteInfo[1]
+                        #distance of streams that are higher in the network than the highest site on the trib
+                        distanceAboveSite = totalTribLength - distUpTrib
+                        summedDistance += distanceAboveSite
+                        break
+
 
             downstreamPoint = current.downStreamNode.position
             if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint):
                 self.streamGraph.expandGraph(downstreamPoint)
             nextSegments = current.downStreamNode.getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
             queue.extend(nextSegments)
+            firstSegment = False
         
         # close this search
         self.closeSearch(streamSearch.id)
 
-        return nextMainPath
+        return (foundSite.siteID, summedDistance)
 
     #update in progress stream searches based on a change to the graph
     #If we don't do this step, as we expand the graph mid-search, the graph cleaning process will remove 

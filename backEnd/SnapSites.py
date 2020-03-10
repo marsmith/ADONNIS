@@ -52,21 +52,24 @@ def snapPointToSegment (point, gdalData):
     nearestPointSegmentID = 0
 
     objectIDIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
+    lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
     gdalData.lineLayer.ResetReading()
     for line in gdalData.lineLayer:
         lineGeom = line.GetGeometryRef()
         numPoints = lineGeom.GetPointCount()
         segmentID = line.GetFieldAsString(objectIDIndex)
+        lengthKM = float(line.GetFieldAsString(lengthIndex))
 
         distAlongSegment = 0
 
         for i in range(0, numPoints):
             prevLinePoint = lineGeom.GetPoint(max(0, i-1))
             linePoint = lineGeom.GetPoint(i)
-
-            geomSegmentLen = dist(linePoint[0], linePoint[1], prevLinePoint[0], prevLinePoint[1])
+            #crude approx of length of each seg
+            #since coords are in lat/lng, getting the real distance is nontrivial
+            geomSegmentLen = lengthKM/numPoints#dist(linePoint[0], linePoint[1], prevLinePoint[0], prevLinePoint[1])
             #get length of each polyline of the stream segment. Divide by 1000 to get in km
-            distAlongSegment += geomSegmentLen / 1000 
+            distAlongSegment += geomSegmentLen 
 
             distance = dist(linePoint[0], linePoint[1], point[0], point[1])
             if distance < nearestPointDist:
@@ -84,6 +87,7 @@ def snapPointToSegment (point, gdalData):
 def Snap(gdalData):
     stationNameIndex = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
     lineNameIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
+    lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
     siteLayer = gdalData.siteLayer
     lineLayer = gdalData.lineLayer
     siteLayer.ResetReading()
@@ -113,6 +117,7 @@ def Snap(gdalData):
         for j in range(0, len(potentialLines)):#potential in potentialLines:
             lineGeom = potentialLines[j].GetGeometryRef()
             numPoints = lineGeom.GetPointCount()
+            lineLength = float(potentialLines[j].GetFieldAsString(lengthIndex))
 
             nearestPointDist = sys.float_info.max
             nearestPointIndex = -1
@@ -123,8 +128,8 @@ def Snap(gdalData):
             for i in range(0, numPoints):
                 prevPoint = lineGeom.GetPoint(max(0, i-1))
                 point = lineGeom.GetPoint(i)
-
-                geomSegmentLen = dist(point[0], point[1], prevPoint[0], prevPoint[1])
+                #approx. see above comment in the snapPoint function
+                geomSegmentLen = lineLength / numPoints#dist(point[0], point[1], prevPoint[0], prevPoint[1])
                 #get length of each polyline of the stream segment. Divide by 1000 to get in km
                 distAlongSegment += geomSegmentLen / 1000 
 

@@ -21,9 +21,12 @@ def getSiteID (lat, lng):
 
     navigator = StreamGraphNavigator(streamGraph)
 
-    upstreamSite = navigator.getNextUpstreamSite(graphSegment, distAlongSegment)
-    print ("upstrSite = " + str(upstreamSite))
-    streamGraph.visualize()
+    #upstreamSite = navigator.getNextUpstreamSite(graphSegment, distAlongSegment)
+    downstreamSite = navigator.getNextDownstreamSite(graphSegment, distAlongSegment)
+    print ("down stream site = " + str(downstreamSite))
+    queryPt = graphSegment.getPointOnSegment(distAlongSegment)
+    
+    streamGraph.visualize(showSegInfo = True, customPoints=[queryPt])
 
-    return upstreamSite[0]
+    #turn upstreamSite[0]
 

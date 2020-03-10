@@ -113,6 +113,14 @@ class StreamSegment (object):
             if site.distDownstreamAlongSegment < distanceDownSegment:
                 return site
         return None
+    
+    def getPointOnSegment (self, distDownstreamAlongSegment):
+        percent = distDownstreamAlongSegment / self.length
+
+        pointX = percent * self.downStreamNode.position[0] + (1 - percent) * self.upStreamNode.position[0]
+        pointY = percent * self.downStreamNode.position[1] + (1 - percent) * self.upStreamNode.position[1]
+
+        return (pointX, pointY)
 
 class StreamGraph (object):
 
@@ -136,7 +144,7 @@ class StreamGraph (object):
             listener.notify(update)
 
     #visualize the graph using matplotlib
-    def visualize(self, showSegInfo = False):
+    def visualize(self, showSegInfo = False, customPoints = []):
         sitesX = []
         sitesY = []
         for streamSeg in self.segments.values():
@@ -179,6 +187,16 @@ class StreamGraph (object):
         plt.scatter(x,y, color='green')
 
         plt.scatter(sitesX, sitesY, color='red')
+
+
+        x = []
+        y = []
+
+        for pt in customPoints:
+            x.append(pt[0])
+            y.append(pt[1])
+
+        plt.scatter(x,y, color='black')
 
         #display safe boundary polygon
         for geom in self.safeDataBoundary:
