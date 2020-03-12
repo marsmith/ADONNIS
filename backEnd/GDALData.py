@@ -120,7 +120,7 @@ class GDALData(object):
         #check for no sites case
         if "no sites found" not in xmlStr:
             for site in root:
-                siteNo = int(site.find('site_no').text)
+                siteNo = site.find('site_no').text
                 stationNm = site.find('station_nm').text
                 siteType = site.find('site_tp_cd').text
                 siteLat = float(site.find('dec_lat_va').text)
@@ -132,8 +132,8 @@ class GDALData(object):
                     coordX = siteLng
                     coordY = siteLat
 
-                #make sure this is a stream not a well
-                if(siteType == "ST"):
+                #make sure this is a stream not a well. Well sites have 14 digits
+                if siteType == "ST" and len(siteNo) < 13:
                     #build feature. This is based on the format of the geoJson returned from the streams query
                     feature = {
                         "type":"Feature",
