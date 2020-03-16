@@ -425,6 +425,13 @@ class StreamGraph (object):
         else:
             return None
 
+    #use for testing to remove a site and re add it
+    def removeSite (self, siteID):
+        for segment in self.segments.values():
+            for site in segment.sites:
+                if site.siteID == siteID:
+                    del segment.sites[site]
+
 
     #Adds the geometry stored in the gdalData object
     #gdalData: ref to a gdalData object
