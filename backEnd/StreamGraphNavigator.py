@@ -189,24 +189,34 @@ class StreamGraphNavigator (object):
                 if neighbor is current:
                     continue
                 if neighbor.streamLevel > currentStreamLevel:
-                    higherLevelNeighbors.append[neighbor]
-            #----------
-            #finish work on iterating over all high level tribs. Not just one
-            #make sure to add up lengths of tribs that don't have sites
-            # but do this after looking at all of them
-            # look at all tribs to find potential site before picking one
-            if higherLevelNeighbors is not None:
-                totalTribLength = higherLevelNeighbors.arbolateSum
+                    higherLevelNeighbors.append(neighbor)
+        
+            if len(higherLevelNeighbors) > 0:
+                totalTribLength = 0
+                nearestTribSite = None
+                nearestDistUpTrib = sys.maxsize
+                #find the trib with the nearest site. 
                 for higherLevelNeighbor in higherLevelNeighbors:
                     tribSites = self.collectSortedUpstreamSites(higherLevelNeighbor, higherLevelNeighbor.length, siteLimit = sys.maxsize)
                     if len(tribSites) > 0:
                         foundSiteInfo = tribSites[-1] #return the highest site on the trib
-                        foundSite = foundSiteInfo[0]
                         distUpTrib = foundSiteInfo[1]
+                        if distUpTrib < nearestDistUpTrib:
+                            nearestDistUpTrib = distUpTrib
+                            nearestTribSite = foundSiteInfo[0]
+                            totalTribLength = higherLevelNeighbor.arbolateSum
                         #distance of streams that are higher in the network than the highest site on the trib
-                        distanceAboveSite = totalTribLength - distUpTrib
-                        summedDistance += distanceAboveSite
-                        break
+                #if there was a site on one of the tribs, break and return
+                if nearestTribSite is not None:
+                    #distance of streams above the highest site that could have sites higher than nearestTribSite
+                    foundSite = nearestTribSite
+                    #distUpTrib is the address space distance.. 
+                    distanceAboveSite = totalTribLength - distUpTrib
+                    summedDistance += distanceAboveSite
+                    break
+                else:#otherwise, sum total distance of tribs
+                    for higherLevelNeighbor in higherLevelNeighbors:
+                        summedDistance += higherLevelNeighbor.arbolateSum
 
 
             downstreamPoint = current.downStreamNode.position
