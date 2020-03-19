@@ -14,86 +14,20 @@ import math
 from Helpers import *
 import sys
 
-#This class provides a generic way of passing around data
-#New instances of GDALData can be generated either from online query or via local data storage. 
 
 LINE_FOLDER_NAME = "NHDFlowline_Project_SplitLin3"
 SITES_FOLDER_NAME = "ProjectedSites"
 MAX_SAFE_QUERY_DIST_KM = 7
 
-MANUAL = 0
-LOCALDATA = 1
-QUERYDATA = 2
+BaseData = namedtuple('BaseData', 'lineLayer lineDS, siteLayer siteDS dataBoundary')
 
 RESTRICTED_FCODES = [56600]
 
+QUERY_ATTEMPTS = 10 
+DATA_PADDING = 0.6
+TIMEOUT = 2
 
-
-class GDALData(object):
-
-
-    def __init__(self, lat, lng, radiusKM = 5, loadMethod = MANUAL, queryAttempts = 10, dataPaddingKM = 0.6, timeout = 2, projectCoords = False):
-        self.localPath = os.path.join( os.path.dirname(os.path.dirname( __file__ ))) + "\data"
-        self.lineDataSource = None
-        self.siteDataSource = None
-        self.lineLayer = None
-        self.siteLayer = None
-
-        self.lat = lat
-        self.lng = lng
-        self.radiusKM = radiusKM
-        self.queryAttempts = queryAttempts
-        self.dataPaddingKM = dataPaddingKM
-        self.safeDataBoundary = None
-
-        self.timeout = timeout
-
-        self.utmCode = self.getUTM(self.lng)
-        self.EPSGCode = int("269" + str(self.utmCode))
-        self.projectCoords = projectCoords
-
-        if loadMethod == LOCALDATA:
-            self.loadFromData()
-        if loadMethod == QUERYDATA:
-            self.loadFromQuery()
-        if loadMethod == MANUAL:
-            print("this GDALDATA object will not automatically load data. Call loadFromData or loadFromQuery")
-    
-    def getTransformation (self):
-        worldRef = osr.SpatialReference()
-        worldRef.ImportFromEPSG(4326)
-
-        stateRef = osr.SpatialReference()
-        stateRef.ImportFromEPSG(self.EPSGCode) #projection from UTM zone of the current lat/lng
-        return osr.CoordinateTransformation(worldRef,stateRef)
-
-    def loadFromData (self):
-        linesPath = self.localPath + "/" + LINE_FOLDER_NAME + "/" + LINE_FOLDER_NAME + ".shp"
-
-        transformation = self.getTransformation()
-
-        queryCenter = ogr.Geometry(ogr.wkbPoint)
-        transformedQueryCenter = transformation.TransformPoint(self.lng, self.lat)
-        queryCenter.AddPoint(transformedQueryCenter[0], transformedQueryCenter[1])
-        #we want GDALData objects loaded from data to essentially act like queried data so we filter it around a query sized buffer
-        dataBuffer = queryCenter.Buffer(self.radiusKM*1000)
-
-        self.lineDataSource = ogr.Open(linesPath)
-        self.lineLayer = self.lineDataSource.GetLayer() 
-        self.lineLayer.SetSpatialFilter(dataBuffer)
-    
-        sitesPath = self.localPath + "/" + SITES_FOLDER_NAME + "/" + SITES_FOLDER_NAME + ".shp"   
-        self.siteDataSource = ogr.Open(sitesPath)
-        # we dob't really need the reference to siteDataSource, however
-        # if this reference isn't saved my guess is that the data source reference is destroyed 
-        # this reference is likely required for things like siteLayer.GetSpatialRef()
-        self.siteLayer = self.siteDataSource.GetLayer()
-        self.siteLayer.SetSpatialFilter(dataBuffer)
-
-    def getUTM (self, long):
-        return (math.floor((long + 180)/6) % 60) + 1
-
-    def queryWithAttempts (self, url, attempts, timeout = 3, queryName="data"):
+def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
         attemptsUsed = 0
         success = False
         while (attemptsUsed < attempts):
@@ -109,125 +43,183 @@ class GDALData(object):
             print("failed to retrieve " + queryName + " on all attempts. Failing")
             return None
 
-    def buildGeoJson (self, xmlStr):
-        transformation = self.getTransformation()
-        root = ET.fromstring(xmlStr)
-        geojson = {
-            "type": "FeatureCollection",
-            "crs": {"type":"name","properties":{"name":"EPSG:" + str(self.EPSGCode)}},
-            "features":[]
-        }
-        #check for no sites case
-        if "no sites found" not in xmlStr:
-            for site in root:
-                siteNo = site.find('site_no').text
-                stationNm = site.find('station_nm').text
-                siteType = site.find('site_tp_cd').text
-                siteLat = float(site.find('dec_lat_va').text)
-                siteLng = float(site.find('dec_long_va').text)
 
-                if self.projectCoords is True:
-                    [coordX, coordY, z] = transformation.TransformPoint(siteLng, siteLat)
-                else:
-                    coordX = siteLng
-                    coordY = siteLat
+""" def loadFromData (self):
+    linesPath = self.localPath + "/" + LINE_FOLDER_NAME + "/" + LINE_FOLDER_NAME + ".shp"
 
-                #make sure this is a stream not a well. Well sites have 14 digits
-                if siteType == "ST" and len(siteNo) < 13:
-                    #build feature. This is based on the format of the geoJson returned from the streams query
-                    feature = {
-                        "type":"Feature",
-                        "geometry":{
-                            "type": "Point",
-                            "coordinates": [coordX, coordY]
-                        },
-                        "properties": {
-                            "site_no":siteNo,
-                            "station_nm":stationNm
-                        }
+    transformation = self.getTransformation()
+
+    queryCenter = ogr.Geometry(ogr.wkbPoint)
+    transformedQueryCenter = transformation.TransformPoint(self.lng, self.lat)
+    queryCenter.AddPoint(transformedQueryCenter[0], transformedQueryCenter[1])
+    #we want GDALData objects loaded from data to essentially act like queried data so we filter it around a query sized buffer
+    dataBuffer = queryCenter.Buffer(self.radiusKM*1000)
+
+    self.lineDataSource = ogr.Open(linesPath)
+    self.lineLayer = self.lineDataSource.GetLayer() 
+    self.lineLayer.SetSpatialFilter(dataBuffer)
+
+    sitesPath = self.localPath + "/" + SITES_FOLDER_NAME + "/" + SITES_FOLDER_NAME + ".shp"   
+    self.siteDataSource = ogr.Open(sitesPath)
+    # we dob't really need the reference to siteDataSource, however
+    # if this reference isn't saved my guess is that the data source reference is destroyed 
+    # this reference is likely required for things like siteLayer.GetSpatialRef()
+    self.siteLayer = self.siteDataSource.GetLayer()
+    self.siteLayer.SetSpatialFilter(dataBuffer) """
+
+#convert the xml results of a stream site query to geojson
+def buildGeoJson (xmlStr):
+    root = ET.fromstring(xmlStr)
+    geojson = {
+        "type": "FeatureCollection",
+        "crs": {"type":"name","properties":{"name":"EPSG:4326"}},
+        "features":[]
+    }
+    #check for no sites case
+    if "no sites found" not in xmlStr:
+        for site in root:
+            siteNo = site.find('site_no').text
+            stationNm = site.find('station_nm').text
+            siteType = site.find('site_tp_cd').text
+            siteLat = float(site.find('dec_lat_va').text)
+            siteLng = float(site.find('dec_long_va').text)
+
+            #make sure this is a stream not a well. Well sites have 14 digits
+            if siteType == "ST" and len(siteNo) < 13:
+                #build feature. This is based on the format of the geoJson returned from the streams query
+                feature = {
+                    "type":"Feature",
+                    "geometry":{
+                        "type": "Point",
+                        "coordinates": [siteLng, siteLat]
+                    },
+                    "properties": {
+                        "site_no":siteNo,
+                        "station_nm":stationNm
                     }
-                    geojson["features"].append(feature)
-        return json.dumps(geojson)
+                }
+                geojson["features"].append(feature)
+    return json.dumps(geojson)
 
-    def loadFromQuery(self):
-
-        if self.radiusKM > MAX_SAFE_QUERY_DIST_KM:
-            raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
-
-        transformation = self.getTransformation()
-        outProjectionCode = self.EPSGCode
-        if self.projectCoords is False:
-            outProjectionCode = 4326 #code for global lat/lng
-        #lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE&returnGeometry=true&outSR=" + str(self.EPSGCode) + "&returnDistinctValues=false&queryByDistance=" + str(self.radiusKM*1000) + "&featureEncoding=esriDefault&f=geojson"
-        lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE%2C+FCODE%2C+OBJECTID%2C+ARBOLATESU&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(outProjectionCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"
-        #lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + str(self.lng) + "," + str(self.lat) + "&outFields=*&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(self.EPSGCode) + "&distance=" + str(self.radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"        
-        req = self.queryWithAttempts(lineURL, self.queryAttempts, queryName="lineData", timeout = self.timeout)
+#get site IDs similar to this site 
+def getNearbyIds (siteID, minReturnedSites = 5, cutoffDigits = 6):
+    numReturnedSites = 0
+    while numReturnedSites < minReturnedSites:
+        firstDigits = siteID[:8-cutoffDigits]#get the 8 digit number minus the number of cutoff digits
+        results = getSiteIDsStartingWith(firstDigits)
+        sitesLayer = results[0]
         
-        if req == None:
-            sys.exit("FATAL: could not query stream line data")
-            return None
-        
-        try:
-            lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
-            lineLayer = lineDataSource.GetLayer()
-        except:
-            sys.exit("FATAL: could not read the queried json data")
-            return None
+        numReturnedSites = sitesLayer.GetFeatureCount()
+    
+    return (sitesLayer, results[1])
 
-        if self.lineDataSource == None:
-            self.lineDataSource = lineDataSource
-            self.lineLayer = lineLayer
-        else:
-            print(self.lineLayer.GetFeatureCount())
-            print(lineLayer.GetFeatureCount())
-            testLayer = lineDataSource.CreateLayer("union layer", self.lineLayer.GetSpatialRef(), ogr.wkbLineString)
-            self.lineLayer.Union(lineLayer, testLayer)
-            print(testLayer.GetFeatureCount())
+def getSiteIDsStartingWith (siteID, timeout = TIMEOUT):
+    
+    similarSitesQuery = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + siteID + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=search_site_no%2Csite_tp_cd"
+    result = queryWithAttempts (similarSitesQuery, QUERY_ATTEMPTS, timeout = timeout, queryName="similarSiteIds")
+    geoJsonResults = buildGeoJson(result.text)
+    try:
+        sitesDataSource = gdal.OpenEx(geoJsonResults)#, nOpenFlags=gdalconst.GA_Update)
+        sitesLayer = sitesDataSource.GetLayer()
+    except:
+        print("could not read query")
+        return None
+    return (sitesLayer, sitesDataSource)
 
-        approxRadiusInDeg = approxKmToDegrees(self.radiusKM)
+def getSiteNeighbors (inSiteID):
 
-        #northwest
-        nwLat = self.lat + approxRadiusInDeg
-        nwLng = self.lng + approxRadiusInDeg
+    partCode = inSiteID[:2]
+    firstDigit = int(inSiteID[3:4])
+    (siteLayer, sitesDataSource) = getSiteIDsStartingWith(inSiteID[:4])
 
-        #southeast
-        seLat = self.lat - approxRadiusInDeg
-        seLng = self.lng - approxRadiusInDeg
+    siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
+    previousSiteID = None
+    sites = []
+    matchIndex = -1
+    for site in siteLayer:
+        siteID = site.GetFieldAsString(siteNumberIndex)
+        point = site.GetGeometryRef().GetPoint(0)
+        lat = point[1]
+        lng = point[0]
+        sites.append((siteID, lat, lng))
 
-        siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
-        req = req = self.queryWithAttempts(siteURL, 4, queryName="siteData", timeout = self.timeout)
+        if siteID == inSiteID:
+            matchIndex = len(sites) - 1
+    
+    if matchIndex > 0:
+        lowerNeighbor = sites[matchIndex-1]
+    else:
+        lowerNeighbor = None
+    
+    if matchIndex < len(sites)-1:
+        higherNeighbor = sites[matchIndex+1]
+    else:
+        higherNeighbor = None
 
-        if req == None:
-            sys.exit("FATAL: could not query stream site data")
-            return None
+    return (lowerNeighbor, higherNeighbor)
 
-        xmlSites = req.text#this query returns an xml. Have to conver to geoJson
-        geoJsonSites = self.buildGeoJson(xmlSites)
-        try:
-            siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
-            siteLayer = siteDataSource.GetLayer()
-        except:
-            sys.exit("FATAL: could not read the queried stream site data")
-            return None
+    
 
-        if self.siteDataSource == None:
-            self.siteDataSource = siteDataSource
-            self.siteLayer = siteLayer
-        else:
-            self.siteLayer.Union(siteLayer, self.siteLayer)
 
-        self.siteLayer.ResetReading()
-         
-        queryCenter = ogr.Geometry(ogr.wkbPoint)#up stream point - wkb point is the code for point based geometry
-        
-        if self.projectCoords is True:
-            transformedQueryCenter = transformation.TransformPoint(self.lng, self.lat)
-            queryCenter.AddPoint(transformedQueryCenter[0], transformedQueryCenter[1])
-        else:
-            queryCenter.AddPoint(self.lng, self.lat)
 
-        safeDataBoundaryRad = (self.radiusKM - self.dataPaddingKM) * 1000
-        if self.projectCoords is False:
-            safeDataBoundaryRad = approxKmToDegrees(safeDataBoundaryRad / 1000)
+def loadFromQuery(lat, lng, radiusKM = 5):
 
-        self.safeDataBoundary = queryCenter.Buffer(safeDataBoundaryRad)
+    if radiusKM > MAX_SAFE_QUERY_DIST_KM:
+        raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
+
+    outProjectionCode = 4326
+
+    lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + str(lng) + "," + str(lat) + "&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE%2C+FCODE%2C+OBJECTID%2C+ARBOLATESU&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(outProjectionCode) + "&distance=" + str(radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"
+    req = queryWithAttempts(lineURL, QUERY_ATTEMPTS, queryName="lineData", timeout = TIMEOUT)
+    
+    if req == None:
+        print("could not read query")
+        return None
+    try:
+        lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
+        lineLayer = lineDataSource.GetLayer()
+    except:
+        print("could not read query")
+        return None
+
+    approxRadiusInDeg = approxKmToDegrees(radiusKM)
+
+    #northwest
+    nwLat = lat + approxRadiusInDeg
+    nwLng = lng + approxRadiusInDeg
+
+    #southeast
+    seLat = lat - approxRadiusInDeg
+    seLng = lng - approxRadiusInDeg
+
+    siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
+    req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
+
+    if req == None:
+        print("could not read query")
+        return None
+
+    xmlSites = req.text#this query returns an xml. Have to conver to geoJson
+    geoJsonSites = buildGeoJson(xmlSites)
+    try:
+        siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
+        siteLayer = siteDataSource.GetLayer()
+    except:
+        print("could not read query")
+        return None
+
+    siteLayer.ResetReading()
+    queryCenter = ogr.Geometry(ogr.wkbPoint)#up stream point - wkb point is the code for point based geometry
+    
+    queryCenter.AddPoint(lng, lat)
+
+    safeDataBoundaryRad = (radiusKM - DATA_PADDING)
+    safeDataBoundaryRad = approxKmToDegrees(safeDataBoundaryRad)
+
+    safeDataBoundary = queryCenter.Buffer(safeDataBoundaryRad)
+
+    data = BaseData(lineLayer = lineLayer, lineDS = lineDataSource, siteLayer = siteLayer, siteDS = siteDataSource, dataBoundary = safeDataBoundary)
+
+    return data
+
+
