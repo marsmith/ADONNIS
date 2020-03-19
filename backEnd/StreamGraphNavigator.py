@@ -5,12 +5,25 @@ import sys
 
 StreamSearch = namedtuple('StreamSearch', 'id openSegments')
 
+#various ways a stream search can fail. These provide insight into what the SiteInfoCreator should do 
+QUERY_TERMINATE_CODE = "terminated_on_query"
+END_OF_BASIN_CODE = "end_of_network"
+QUERY_FAILURE_CODE = "query_failure"
+failure_codes = [QUERY_TERMINATE_CODE, END_OF_BASIN_CODE, QUERY_FAILURE_CODE]
+
+def isFailureCode (val):
+    if val in failure_codes:
+        return True
+    else:
+        return False
+
 class StreamGraphNavigator (object):
 
-    def __init__(self, streamGraph):
+    def __init__(self, streamGraph, terminateSearchOnQuery = False):
         self.streamGraph = streamGraph
         self.activeSearches = {}
         self.nextSearchId = 0
+        self.terminateSearchOnQuery = terminateSearchOnQuery
         streamGraph.addGraphListener(self)
 
     #open a new search and get a new StreamSearch tuple
@@ -34,6 +47,8 @@ class StreamGraphNavigator (object):
 
         nextMainPath = None
 
+        failureCode = None
+
         while len(queue) > 0:
             current = queue.pop(0)
             if current.streamLevel < tribLevel:
@@ -47,14 +62,26 @@ class StreamGraphNavigator (object):
             else:
                 downstreamPoint = current.downStreamNode.position
                 if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint):
-                    self.streamGraph.expandGraph(downstreamPoint)
+                    graphExpansion = self.streamGraph.expandGraph(downstreamPoint)
+                    if graphExpansion is False:
+                        failureCode = QUERY_FAILURE_CODE
+                        break
+                    elif self.terminateSearchOnQuery is True:
+                        failureCode = QUERY_TERMINATE_CODE
+                        break
+                    
                 nextSegments = current.downStreamNode.getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
                 queue.extend(nextSegments)
         
         # close this search
         self.closeSearch(streamSearch.id)
 
-        return nextMainPath
+        if failureCode is not None:
+            return failureCode
+        if nextMainPath is not None:
+            return nextMainPath
+        else:
+            return END_OF_BASIN_CODE
 
     # get a sorted list of all upstream sites from 'segment'
     # list is sorted such that sites with higher IDS (closer to the mouth of the river) are first
@@ -77,8 +104,11 @@ class StreamGraphNavigator (object):
         stack = streamSearch.openSegments
         stack.append(segment)
 
+        failureCode = None
+
         summedDistance = 0
         firstSegment = True
+        
         while len(stack) > 0:
             thisSegment = stack.pop()
 
@@ -107,17 +137,23 @@ class StreamGraphNavigator (object):
             thisSegmentPosition = thisSegment.upStreamNode.position
             #if during navigation, we reach edge of safe data boundary, expand with new query
             if not self.streamGraph.pointWithinSafeDataBoundary(thisSegmentPosition):
-                self.streamGraph.expandGraph(thisSegmentPosition)
+                graphExpansion = self.streamGraph.expandGraph(thisSegmentPosition)
+                if graphExpansion is False:
+                    failureCode = QUERY_FAILURE_CODE
+                    break
+                elif self.terminateSearchOnQuery is True:
+                    failureCode = QUERY_TERMINATE_CODE
+                    break
             
             firstSegment = False
 
         # close this search
         self.closeSearch(streamSearch.id)
 
+        if failureCode is not None:
+            return failureCode
 
         return foundSites
-        """ if len(foundSites) == 0:
-            foundSites.append((None, summedDistance)) """
     
     #assume our graph is clean and loop free
     #returns a tuple (siteID, distance traversed to find site)
@@ -125,6 +161,10 @@ class StreamGraphNavigator (object):
     def getNextUpstreamSite (self, segment, downstreamPositionOnSegment):        
         #get the first upstream site
         upstreamSites = self.collectSortedUpstreamSites(segment, downstreamPositionOnSegment, siteLimit = 1)
+
+        #if this failed, return failure code now
+        if isFailureCode(upstreamSites):
+            return upstreamSites
 
         foundSite = None
         if upstreamSites is not None and len(upstreamSites) > 0:
@@ -137,21 +177,20 @@ class StreamGraphNavigator (object):
         else:#no site found upstream...
             #find the next major branch by backtracking
             nextUpstreamSegment = self.findNextLowerStreamLevelPath(segment)
-            if nextUpstreamSegment is None:#there is no other mainstream branches. We are currently on a segment that terminates
-                print ("no paths whatsoever upstream")
-                return None
+
+            if isFailureCode(nextUpstreamSegment):
+                return nextUpstreamSegment
             else:#we found a mainstream branch!
                 print ("successful backtrack. Found next main branch")
                 #recursively call this function again starting at the first node of the next mainstream branch
                 #the next mainstream branch should be the continuation of our trib in ID space
                 #self.streamGraph.visualize()
                 newSearch = self.getNextUpstreamSite(nextUpstreamSegment, nextUpstreamSegment.length)
-                if newSearch is not None:#we found a site in the new search!
+                if isFailureCode(newSearch):
+                    return newSearch
+                else:#we found a site in the new search!
                     #we want to return the new site and the distance to it plus the distance upstream along our trib
                     return (newSearch[0], newSearch[1] + segment.arbolateSum - (segment.length - downstreamPositionOnSegment))
-                else:#no sites found on that path either. Return None for real
-                    return None
-            return None
 
     def getNextDownstreamSite (self, segment, downstreamPositionOnSegment):
         foundSite = None
@@ -166,6 +205,8 @@ class StreamGraphNavigator (object):
         queue = streamSearch.openSegments
         queue.append(segment)
 
+        failureCode = None
+
         summedDistance = 0
         firstSegment = True
         while len(queue) > 0:
@@ -173,18 +214,22 @@ class StreamGraphNavigator (object):
             currentStreamLevel = current.streamLevel
             
             if firstSegment is False:
+                #check to see if the site is on our branch
                 if len(current.sites) > 0:
                     foundSite = current.sites[0]
                     summedDistance += current.sites[0].distDownstreamAlongSegment
                     break
                 else:
+                    #if not, add distance of this segment to total sum
                     summedDistance += current.length
             else:
+                #only for first segment: add up length but subtract our relativel position on segment
                 summedDistance += current.length - downstreamPositionOnSegment
 
             adjacentUpstreamPaths = current.downStreamNode.getCodedNeighbors(UPSTREAM)
             higherLevelNeighbors = [] # this means this junction has a trib. Since we're on the main path, we have to explore all the way up the trib
-            
+            #get a list of all valid upstream paths. Normally there will only be one
+            #but in certain cases there are 3 upstream paths from a node
             for neighbor in adjacentUpstreamPaths:
                 if neighbor is current:
                     continue
@@ -197,7 +242,9 @@ class StreamGraphNavigator (object):
                 nearestDistUpTrib = sys.maxsize
                 #find the trib with the nearest site. 
                 for higherLevelNeighbor in higherLevelNeighbors:
+                    #collect all sites on this tributary
                     tribSites = self.collectSortedUpstreamSites(higherLevelNeighbor, higherLevelNeighbor.length, siteLimit = sys.maxsize)
+                    #find which site is the closest upstream
                     if len(tribSites) > 0:
                         foundSiteInfo = tribSites[-1] #return the highest site on the trib
                         distUpTrib = foundSiteInfo[1]
@@ -218,10 +265,17 @@ class StreamGraphNavigator (object):
                     for higherLevelNeighbor in higherLevelNeighbors:
                         summedDistance += higherLevelNeighbor.arbolateSum
 
-
+            #expand graph, catch failures
             downstreamPoint = current.downStreamNode.position
             if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint):
-                self.streamGraph.expandGraph(downstreamPoint)
+                graphExpansion = self.streamGraph.expandGraph(downstreamPoint)
+                if graphExpansion is False:
+                    failureCode = QUERY_FAILURE_CODE
+                    break
+                elif self.terminateSearchOnQuery is True:
+                    failureCode = QUERY_TERMINATE_CODE
+                    break
+
             nextSegments = current.downStreamNode.getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
             queue.extend(nextSegments)
             firstSegment = False
@@ -229,7 +283,13 @@ class StreamGraphNavigator (object):
         # close this search
         self.closeSearch(streamSearch.id)
 
-        return (foundSite.siteID, summedDistance)
+        if failureCode is not None:
+            return failureCode
+        if foundSite is not None:
+            return (foundSite.siteID, summedDistance)
+        else:
+            #we searched downstream and found no sites. If we terminated without error thus far it means we reached the end of the network
+            return END_OF_BASIN_CODE
 
     #update in progress stream searches based on a change to the graph
     #If we don't do this step, as we expand the graph mid-search, the graph cleaning process will remove 
