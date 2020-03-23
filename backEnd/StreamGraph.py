@@ -1,5 +1,5 @@
 from collections import namedtuple
-from GDALData import GDALData, RESTRICTED_FCODES, QUERYDATA
+from GDALData import RESTRICTED_FCODES, BaseData, loadFromQuery
 from Helpers import *
 from SnapSites import Snap, SnappedSite
 import ogr
@@ -124,7 +124,7 @@ class StreamSegment (object):
 
 class StreamGraph (object):
 
-    def __init__(self):
+    def __init__(self, withheldSites = []):
         self.segments = {}
         self.nodes = []
         self.safeDataBoundary = [] #gdal geometry objects. Points inside should have all neighboring segments stored
@@ -133,6 +133,7 @@ class StreamGraph (object):
         self.addedSites = set()#list of sites that have already been added
         self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
         self.listeners = []
+        self.withheldSites = withheldSites
 
     def addGraphListener(self, listener):
         self.listeners.append(listener)
@@ -171,20 +172,20 @@ class StreamGraph (object):
                 position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
                 sitesX.append(position[0])
                 sitesY.append(position[1])
-                plt.text(position[0] + 0.0001, position[1] + 0.001 + i * 0.001, sites.siteID, fontsize = 8, color = 'red')
+                plt.text(position[0] + 0.0001, position[1], sites.siteID, fontsize = 8, color = 'red')
 
             segmentInfo = streamSeg.streamLevel
             if showSegInfo is True:
                 segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
             plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
         
-        x = []
+        """ x = []
         y = []
         for streamNode in self.nodes:
             x.append(streamNode.position[0])
             y.append(streamNode.position[1])
             #plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
-        plt.scatter(x,y, color='green')
+        plt.scatter(x,y, color='green') """
 
         plt.scatter(sitesX, sitesY, color='red')
 
@@ -195,6 +196,7 @@ class StreamGraph (object):
         for pt in customPoints:
             x.append(pt[0])
             y.append(pt[1])
+            plt.text(pt[0], pt[1], "CUSTOM PT", fontsize=10, color = 'black')
 
         plt.scatter(x,y, color='black')
 
@@ -212,57 +214,15 @@ class StreamGraph (object):
 
         plt.show()
 
-    #expand the graph at x,y with queried data 
-    def expandGraph (self, point):
+    #expand the graph at x,y with queried data. Return true if successful
+    def expandGraph (self, lat, lng):
         print ("Expanding graph!")
-        gdalData = GDALData(point[1], point[0], loadMethod = QUERYDATA)
-        self.addGeom(gdalData)
-
-    """ #assume our graph is clean and loop free
-    #returns a tuple (siteID, distance traversed to find site)
-    # or None if no site is found
-    def getNextUpstreamSite (self, segment, downStreamPositionOnSegment):
-        #catch cases when next node is simply on this node
-        foundSite = segment.getSiteAbove(downStreamPositionOnSegment) 
-        #if there is a site on this segment, simply return it
-        if foundSite is not None:
-            return (foundSite.siteID, downStreamPositionOnSegment - foundSite.distDownstreamAlongSegment) 
-
-        #get upstream tributaries of this path
-        stack = [segment]
-        summedDistance = 0
-        firstSegment = True
-        while len(stack) > 0:
-            thisSegment = stack.pop()
-            if thisSegment.segmentID == "9281127CC":
-                print("test")
-
-            thisSegmentPosition = thisSegment.downStreamNode.position
-            #if during navigation, we reach edge of safe data boundary, expand with new query
-            if not self.pointWithinSafeDataBoundary(thisSegmentPosition):
-                self.expandGraph(thisSegmentPosition) 
-            
-            # if there was a site on the first segment, we would catch it in 
-            # our first case at the beginning
-            # we avoid this if passing on a site below our query on the first segment by checking
-            # if this is the first segment we are looking at
-            if len(thisSegment.sites) > 0 and firstSegment is False:
-                #the site we want is the farthest downstream on this segment
-                siteInfo = thisSegment.sites[-1]
-                foundSite = siteInfo
-                summedDistance += thisSegment.length - siteInfo.distDownstreamAlongSegment
-                break
-            else:
-                summedDistance += thisSegment.length
-            #reverse the list. We want the lowest priority tribs to be looked at first
-            stack.extend(reversed(thisSegment.upStreamNode.getSortedUpstreamBranches()))
-            firstSegment = False
-
-        if foundSite is not None:
-            return (foundSite.siteID, summedDistance)
-        else:
-            return None """
-
+        baseData = loadFromQuery(lat, lng)    
+        if baseData is None:
+            print ("could not expand graph")
+            return False    
+        self.addGeom(baseData)
+        return True
 
     #safely remove a segment from the graph
     def removeSegment (self, segment, replacedBy = None):
@@ -292,7 +252,7 @@ class StreamGraph (object):
         return newNode
 
     def addSite (self, siteID, segmentID, distAlongSegment):
-        if siteID not in self.addedSites:
+        if siteID not in self.addedSites and siteID not in self.withheldSites:
             self.segments[segmentID].addSite(siteID, distAlongSegment)
             self.addedSites.add(siteID)
     #has this graph ever contained this segment?
@@ -436,13 +396,13 @@ class StreamGraph (object):
     #Adds the geometry stored in the gdalData object
     #gdalData: ref to a gdalData object
     #guaranteedNetLineIndex a streamline feature that is definitely on the network we are interested in
-    def addGeom(self, gdalData):
-        lineLayer = gdalData.lineLayer
-        objectIDIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
-        lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
-        fCodeIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("FCode")
-        streamLevelIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("STREAMLEVE")
-        arbolateSumIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("ARBOLATESU")
+    def addGeom(self, baseData):
+        lineLayer = baseData.lineLayer
+        objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
+        lengthIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
+        fCodeIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("FCode")
+        streamLevelIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("STREAMLEVE")
+        arbolateSumIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("ARBOLATESU")
 
         for line in lineLayer:
             #don't add duplicates
@@ -478,20 +438,20 @@ class StreamGraph (object):
 
             self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum)
 
-        siteLayer = gdalData.siteLayer
+        siteLayer = baseData.siteLayer
         siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
 
-        snapped = Snap(gdalData)
+        snapped = Snap(baseData)
 
         for siteSnap in snapped:
             snapPosition = siteSnap.snappedLocation
             snapFeature = siteSnap.snappedFeature
             featureSegmentID = snapFeature.GetFieldAsString(objectIDIndex)
-            siteIDIndex = siteSnap.site.GetFieldAsString(siteNumberIndex)
+            siteID = siteSnap.site.GetFieldAsString(siteNumberIndex)
             
-            self.addSite(siteIDIndex, featureSegmentID, siteSnap.distAlongFeature)
+            self.addSite(siteID, featureSegmentID, siteSnap.distAlongFeature)
 
-        self.safeDataBoundary.append(gdalData.safeDataBoundary)
+        self.safeDataBoundary.append(baseData.dataBoundary)
 
 
         self.removeLoops()
