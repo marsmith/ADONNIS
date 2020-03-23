@@ -62,7 +62,7 @@ class StreamGraphNavigator (object):
             else:
                 downstreamPoint = current.downStreamNode.position
                 if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint):
-                    graphExpansion = self.streamGraph.expandGraph(downstreamPoint)
+                    graphExpansion = self.streamGraph.expandGraph(downstreamPoint[1], downstreamPoint[0])
                     if graphExpansion is False:
                         failureCode = QUERY_FAILURE_CODE
                         break
@@ -137,7 +137,7 @@ class StreamGraphNavigator (object):
             thisSegmentPosition = thisSegment.upStreamNode.position
             #if during navigation, we reach edge of safe data boundary, expand with new query
             if not self.streamGraph.pointWithinSafeDataBoundary(thisSegmentPosition):
-                graphExpansion = self.streamGraph.expandGraph(thisSegmentPosition)
+                graphExpansion = self.streamGraph.expandGraph(thisSegmentPosition[1], thisSegmentPosition[0])
                 if graphExpansion is False:
                     failureCode = QUERY_FAILURE_CODE
                     break
@@ -244,15 +244,19 @@ class StreamGraphNavigator (object):
                 for higherLevelNeighbor in higherLevelNeighbors:
                     #collect all sites on this tributary
                     tribSites = self.collectSortedUpstreamSites(higherLevelNeighbor, higherLevelNeighbor.length, siteLimit = sys.maxsize)
-                    #find which site is the closest upstream
-                    if len(tribSites) > 0:
-                        foundSiteInfo = tribSites[-1] #return the highest site on the trib
-                        distUpTrib = foundSiteInfo[1]
-                        if distUpTrib < nearestDistUpTrib:
-                            nearestDistUpTrib = distUpTrib
-                            nearestTribSite = foundSiteInfo[0]
-                            totalTribLength = higherLevelNeighbor.arbolateSum
-                        #distance of streams that are higher in the network than the highest site on the trib
+                    if isFailureCode(tribSites):
+                        failureCode = tribSites
+                        break
+                    else:
+                        #find which site is the closest upstream
+                        if len(tribSites) > 0:
+                            foundSiteInfo = tribSites[-1] #return the highest site on the trib
+                            distUpTrib = foundSiteInfo[1]
+                            if distUpTrib < nearestDistUpTrib:
+                                nearestDistUpTrib = distUpTrib
+                                nearestTribSite = foundSiteInfo[0]
+                                totalTribLength = higherLevelNeighbor.arbolateSum
+                            #distance of streams that are higher in the network than the highest site on the trib
                 #if there was a site on one of the tribs, break and return
                 if nearestTribSite is not None:
                     #distance of streams above the highest site that could have sites higher than nearestTribSite
@@ -268,7 +272,7 @@ class StreamGraphNavigator (object):
             #expand graph, catch failures
             downstreamPoint = current.downStreamNode.position
             if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint):
-                graphExpansion = self.streamGraph.expandGraph(downstreamPoint)
+                graphExpansion = self.streamGraph.expandGraph(downstreamPoint[1], downstreamPoint[0])
                 if graphExpansion is False:
                     failureCode = QUERY_FAILURE_CODE
                     break
