@@ -1,7 +1,8 @@
-from StreamGraph import StreamNode, StreamSegment, StreamGraph, UPSTREAM, DOWNSTREAM
+#from StreamGraph import UPSTREAM, DOWNSTREAM
 from collections import namedtuple 
 import sys
 #a class that has various functionality to find / expand a StreamGraph
+
 
 StreamSearch = namedtuple('StreamSearch', 'id openSegments')
 
@@ -54,7 +55,7 @@ class StreamGraphNavigator (object):
             if current.streamLevel < tribLevel:
                 #if we find a lower stream level it is downstream from the trib we started on
                 # so to find the next main stream path, we have to go up from this segment along the matching streamlevel neighbor
-                upstreamNeighbors = current.upStreamNode.getCodedNeighbors(UPSTREAM)
+                upstreamNeighbors = current.upStreamNode.getUpstreamNeighbors()#getCodedNeighbors(UPSTREAM)
                 for neighbor in upstreamNeighbors:
                     if neighbor.streamLevel == current.streamLevel:
                         nextMainPath = neighbor
@@ -70,7 +71,7 @@ class StreamGraphNavigator (object):
                         failureCode = QUERY_TERMINATE_CODE
                         break
                     
-                nextSegments = current.downStreamNode.getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
+                nextSegments = current.downStreamNode.getDownstreamNeighbors#getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
                 queue.extend(nextSegments)
         
         # close this search
@@ -86,7 +87,7 @@ class StreamGraphNavigator (object):
     # get a sorted list of all upstream sites from 'segment'
     # list is sorted such that sites with higher IDS (closer to the mouth of the river) are first
     # if there are no upstreamSites, returns (None, lengthOfUpstreamSegments)
-    def collectSortedUpstreamSites (self, segment, downStreamPositionOnSegment, siteLimit = 1):
+    def collectSortedUpstreamSites (self, segment, downStreamPositionOnSegment, siteLimit = 1, autoExpand = True):
         # contains tuples of the form (site, dist to site)
         foundSites = []
 
@@ -136,7 +137,7 @@ class StreamGraphNavigator (object):
             #expand graph if necessary 
             thisSegmentPosition = thisSegment.upStreamNode.position
             #if during navigation, we reach edge of safe data boundary, expand with new query
-            if not self.streamGraph.pointWithinSafeDataBoundary(thisSegmentPosition):
+            if not self.streamGraph.pointWithinSafeDataBoundary(thisSegmentPosition) and autoExpand is True:
                 graphExpansion = self.streamGraph.expandGraph(thisSegmentPosition[1], thisSegmentPosition[0])
                 if graphExpansion is False:
                     failureCode = QUERY_FAILURE_CODE
@@ -226,7 +227,7 @@ class StreamGraphNavigator (object):
                 #only for first segment: add up length but subtract our relativel position on segment
                 summedDistance += current.length - downstreamPositionOnSegment
 
-            adjacentUpstreamPaths = current.downStreamNode.getCodedNeighbors(UPSTREAM)
+            adjacentUpstreamPaths = current.downStreamNode.getUpstreamNeighbors()#getCodedNeighbors(UPSTREAM)
             higherLevelNeighbors = [] # this means this junction has a trib. Since we're on the main path, we have to explore all the way up the trib
             #get a list of all valid upstream paths. Normally there will only be one
             #but in certain cases there are 3 upstream paths from a node
@@ -280,7 +281,7 @@ class StreamGraphNavigator (object):
                     failureCode = QUERY_TERMINATE_CODE
                     break
 
-            nextSegments = current.downStreamNode.getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
+            nextSegments = current.downStreamNode.getDownstreamNeighbors()#getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
             queue.extend(nextSegments)
             firstSegment = False
         
@@ -294,6 +295,34 @@ class StreamGraphNavigator (object):
         else:
             #we searched downstream and found no sites. If we terminated without error thus far it means we reached the end of the network
             return END_OF_BASIN_CODE
+
+    #get comulative error in site snaps 
+    #error is defined by number of times a site that is farther upstream
+    #is listed before a site that is farther downstream
+    #this error is attributed to bad snaps
+    def getGraphSiteIDError (self):
+        cumulativeError = 0
+        sinks = self.streamGraph.getSinks()
+        for sink in sinks:
+            upstreamPaths = sink.getUpstreamNeighbors()#getCodedNeighbors(UPSTREAM)
+            for path in upstreamPaths:
+                #collect all upstream sites without expanding the graph
+                #we do verification and error checking only on the part of the graph that has
+                #been expanded thus far
+                upstreamSites = self.collectSortedUpstreamSites(path, path.length, siteLimit = sys.maxsize, autoExpand = False)
+                prevNumber = sys.maxsize
+                for site in upstreamSites:
+                    #we have to index this with [0] since collectSortedUpst.. returns a tuple like (siteID, distUpstream)
+                    siteID = site[0].siteID
+                    #normalize siteID to full 10 digits
+                    if len(siteID) < 10:
+                        siteID += "00"
+                    #get int representing the downstream address
+                    downStreamNumber = int(siteID[2:])
+                    if downStreamNumber > prevNumber:
+                        cumulativeError += 1
+                    prevNumber = downStreamNumber 
+        return cumulativeError
 
     #update in progress stream searches based on a change to the graph
     #If we don't do this step, as we expand the graph mid-search, the graph cleaning process will remove 

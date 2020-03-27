@@ -1,9 +1,12 @@
-from GDALData import GDALData, QUERYDATA
+import GDALData
 import matplotlib.pyplot as plt
 from Helpers import *
 import math
 import sys
 import collections
+from StreamGraphNavigator import StreamGraphNavigator
+import copy
+import itertools
 """ 
 class SnapSite(object):
     def __init__(self, maxSnapDist):
@@ -11,12 +14,15 @@ class SnapSite(object):
         self.maxSnapDist = maxSnapDist
  """
 
-maxSnapDist = 1000
-snapVerificationTolerance = 0.4#if the second nearest snap location is within 20% of the distance of the nearest, raise a warning flag
-numSecondarySnapsConsidered = 4# how many possible locations that aren't the same as the nearest do we consider?
+NUM_SNAPS = 4# how many possible locations that aren't the same as the nearest do we consider?
+PERCENT_DIST_CUTOFF = 4 #if a potential snap is 
 adverbNameSeparators = [" at ", " above ", " near "]
 waterTypeNames = [" brook", " pond", " river", " lake", " stream", " outlet", " creek", " bk", " ck"]
-SnappedSite = collections.namedtuple('SnappedSite', 'site snappedFeature snappedLocation snapDistance distAlongFeature')
+#a possible snap for a given point
+Snap = collections.namedtuple('Snap', 'feature snapDistance distAlongFeature')
+# a point that can be snapped. Name and ID are used occasionally to aid in snapping
+SnapablePoint = collections.namedtuple('SnapablePoint', 'point name id')
+
 
 #Gets a key string from the site name that could be used to help snap sites later 
 def getSiteStreamNameIdentifier (siteName):
@@ -38,147 +44,131 @@ def getSiteStreamNameIdentifier (siteName):
 
     if endIndex == len(siteName)-1:
         return ""
-    return siteName[0:endIndex]
+    return lowerCase[0:endIndex]
 
 def dot (x1, y1, x2, y2):
     return x1*x2 + y1*y2
 
-#this is trash. Just need a way to get the segment and distance on said segment from an arbitary point
-def snapPointToSegment (point, gdalData):
+def snapPoint(snapablePoint, baseData):
+    lineNameIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
+    lengthIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
+    objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
 
-    nearestPointDist = sys.float_info.max
-    nearestPointIndex = -1
-    nearestPointDistAlongSegment = 0
-    nearestPointSegmentID = 0
+    lineLayer = baseData.lineLayer
+    lineLayer.ResetReading()
 
-    objectIDIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
-    lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
-    gdalData.lineLayer.ResetReading()
-    for line in gdalData.lineLayer:
+    sitePoint = snapablePoint.point
+    siteName = snapablePoint.name
+    siteId = snapablePoint.id
+    
+    #for all segments, store the point on each segment nearest to the site's location
+    possibleSnaps = [] #(point index, point distance, streamSegment index)
+
+    #get nearest point in the stream segment
+    for line in lineLayer:
         lineGeom = line.GetGeometryRef()
         numPoints = lineGeom.GetPointCount()
-        segmentID = line.GetFieldAsString(objectIDIndex)
-        lengthKM = float(line.GetFieldAsString(lengthIndex))
+        lineLength = float(line.GetFieldAsString(lengthIndex))
+        objectID = line.GetFieldAsString(objectIDIndex)
+
+        nearestPointDist = sys.float_info.max
+        nearestPointIndex = -1
+        nearestPointDistAlongSegment = 0
 
         distAlongSegment = 0
-
         for i in range(0, numPoints):
-            prevLinePoint = lineGeom.GetPoint(max(0, i-1))
-            linePoint = lineGeom.GetPoint(i)
-            #crude approx of length of each seg
-            #since coords are in lat/lng, getting the real distance is nontrivial
-            geomSegmentLen = lengthKM/numPoints#dist(linePoint[0], linePoint[1], prevLinePoint[0], prevLinePoint[1])
+            point = lineGeom.GetPoint(i)
+            #we make assumption that each point in the geo is equally spaced
+            geomSegmentLen = lineLength / numPoints
             #get length of each polyline of the stream segment. Divide by 1000 to get in km
             distAlongSegment += geomSegmentLen 
 
-            distance = dist(linePoint[0], linePoint[1], point[0], point[1])
+            distance = dist(point[0], point[1], sitePoint[0], sitePoint[1])
             if distance < nearestPointDist:
                 nearestPointDist = distance
                 nearestPointIndex = i
                 nearestPointDistAlongSegment = distAlongSegment
-                nearestPointSegmentID = segmentID
+        
+        nearestPoint = lineGeom.GetPoint(nearestPointIndex)
+        snap = Snap(feature = line, snapDistance = nearestPointDist, distAlongFeature = nearestPointDistAlongSegment)
+        possibleSnaps.append(snap)
 
-    if nearestPointIndex == -1:
-        print ("Could not snap lat/lng to a stream")
+    if len(possibleSnaps) == 0:
         return None
-    else:
-        return (nearestPointSegmentID, nearestPointDistAlongSegment)
 
-def Snap(gdalData):
-    stationNameIndex = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
-    lineNameIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
-    lengthIndex = gdalData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
-    siteLayer = gdalData.siteLayer
-    lineLayer = gdalData.lineLayer
-    siteLayer.ResetReading()
-    sideInd = 0
-    
-    snappedSites = []
-    for site in siteLayer:
-        lineLayer.ResetReading()
+    sortedPossibleSnaps = sorted(possibleSnaps, key=lambda snap: snap.snapDistance)
+    #limit the number of considered snaps to a fixed number
+    consideredSnaps = sortedPossibleSnaps[:min(NUM_SNAPS, len(sortedPossibleSnaps))]
 
-        siteGeom = site.GetGeometryRef()
-        buffer = siteGeom.Buffer(maxSnapDist)
-        #lineLayer.SetSpatialFilter(buffer)
-        potentialLines = []
-        for line in lineLayer:
-            potentialLines.append(line)
-        
-        sitePoint = siteGeom.GetPoint(0)
-        stationName = site.GetFieldAsString(stationNameIndex)
-        #an identifier that could likely appear in both the station name and the 
-        #name of the correct stream it should be snapped to
-        stationIdentifier = getSiteStreamNameIdentifier(stationName) 
-        
-        #for all segments, store the point on each segment nearest to the site's location
-        possibleSnaps = [] #(point index, point distance, streamSegment index)
+    closestSnap = consideredSnaps[0].snapDistance
+    cutoff = closestSnap * PERCENT_DIST_CUTOFF
 
-        #get nearest point in the stream segment
-        for j in range(0, len(potentialLines)):#potential in potentialLines:
-            lineGeom = potentialLines[j].GetGeometryRef()
-            numPoints = lineGeom.GetPointCount()
-            lineLength = float(potentialLines[j].GetFieldAsString(lengthIndex))
+    #remove very unlikely snaps
+    for snap in reversed(consideredSnaps):
+        if snap.snapDistance > cutoff:
+            consideredSnaps.remove(snap)
 
-            nearestPointDist = sys.float_info.max
-            nearestPointIndex = -1
-            nearestPointDistAlongSegment = 0
-
-            distAlongSegment = 0
-
-            for i in range(0, numPoints):
-                prevPoint = lineGeom.GetPoint(max(0, i-1))
-                point = lineGeom.GetPoint(i)
-                #approx. see above comment in the snapPoint function
-                geomSegmentLen = lineLength / numPoints#dist(point[0], point[1], prevPoint[0], prevPoint[1])
-                #get length of each polyline of the stream segment. Divide by 1000 to get in km
-                distAlongSegment += geomSegmentLen 
-
-                distance = dist(point[0], point[1], sitePoint[0], sitePoint[1])
-                if distance < nearestPointDist:
-                    nearestPointDist = distance
-                    nearestPointIndex = i
-                    nearestPointDistAlongSegment = distAlongSegment
-            
-            nearestPoint = lineGeom.GetPoint(nearestPointIndex)
-
-            snap = SnappedSite(site=site, snappedFeature = potentialLines[j], snappedLocation = nearestPoint, snapDistance = nearestPointDist, distAlongFeature = nearestPointDistAlongSegment)
-            possibleSnaps.append(snap)
-
-
-
-        sortedPossibleSnaps = sorted(possibleSnaps, key=lambda snap: snap.snapDistance)
-
-        nearestDistance = sortedPossibleSnaps[0].snapDistance
-        maxConsideredDistance = nearestDistance * 2 #arbitrary cutoff. logical that the correct snap couldn't be twice as far as the nearest snap..
-        
-        chosenSnapIndex = 0
-
-        for i, possibleSnap in enumerate(sortedPossibleSnaps):
-            snapDistance = possibleSnap.snapDistance
-            if snapDistance < maxConsideredDistance:
-                snappedFeature = possibleSnap.snappedFeature
-                streamName = snappedFeature.GetFieldAsString(lineNameIndex)
-
-                # if the next stream snap option includes the identifier in its name or there is no identifier, snap here
-                if stationIdentifier in streamName or stationIdentifier == "":
-                    chosenSnapIndex = i
-                    break
-            else:
-                #end if the option we're considering is  more than twice as far away as the closest 
+    stationIdentifier = getSiteStreamNameIdentifier(siteName)
+    if len(stationIdentifier) > 0:
+        #find name match. If name match is found, then we can be sure of this snap
+        for snap in consideredSnaps:
+            lineName = snap.feature.GetFieldAsString(lineNameIndex).lower()
+            if stationIdentifier in lineName:
+                consideredSnaps = [snap]
                 break
 
-        if chosenSnapIndex != 0:
-            print("snapped to non-closest")
-        snappedSites.append(sortedPossibleSnaps[chosenSnapIndex])
+    return consideredSnaps
 
-        lineLayer.SetSpatialFilter(None)
-    return snappedSites
+def getSiteSnapAssignment(graph):
+    #a copy of the current graph used to try different possible snap operations
+    testingGraph = copy.deepcopy(graph)
+    testingGraphNavigator = StreamGraphNavigator(testingGraph)
 
+    allSnaps = []
+
+    for siteID in graph.siteSnaps:
+        snaps = graph.siteSnaps[siteID]
+        allSnaps.append(snaps)
+
+    combinations = list(itertools.product(*allSnaps))
+
+    bestCombinations = []
+    bestError = sys.maxsize
+
+    #get the list of combinations that has the lowest error in siteID ordering
+    #there could be multiple snaps that have this property
+    for combination in combinations:
+        testingGraph.refreshSiteSnaps(combination)
+        error = testingGraphNavigator.getGraphSiteIDError()
+
+        if error < bestError:
+            bestError = error
+            bestCombinations = [combination]
+        elif error == bestError:
+            #if this is as good as the previous best, add it as a possibility
+            bestCombinations.append(combination)
+
+    if len(bestCombinations) == 0:
+        print ("No combination of snaps found")
+        return None
+
+    smallestSumDist = sys.maxsize
+    smallestSumDistCombination = None
+    #further find a snap based on cumulative dist to snapped position
+    for combination in bestCombinations:
+        sumDist = 0
+        for snap in combination:
+            sumDist += snap.snapDist
+        if sumDist < smallestSumDist:
+            smallestSumDist = sumDist
+            smallestSumDistCombination = combination
+
+    return smallestSumDistCombination
 
 #Visualizes 
-def visualize (gdalData, snapped):
-    siteLayer = gdalData.siteLayer
-    lineLayer = gdalData.lineLayer
+def visualize (baseData, snapped):
+    siteLayer = baseData.siteLayer
+    lineLayer = baseData.lineLayer
     
     """ siteLayer.ResetReading()
     feat = siteLayer.GetNextFeature()
@@ -230,20 +220,3 @@ def visualize (gdalData, snapped):
     plt.show()
 
 
-
-""" x = -74.3254918    #Long Lake
-y =  44.0765791
-#x = -76.3612354  #04249020
-#y = 43.4810611
-a = [x,y]
-gdalData = GDALData(y, x, loadMethod=QUERYDATA)
-#gdalData.loadFromQuery(y, x+0.3, attempts)
-#gdalData.loadFromData()
-snapped = Snap(gdalData)
-visualize(gdalData, snapped)
-gdalData.siteLayer.ResetReading() """
-#stationName_index = gdalData.siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
-
-""" for site in gdalData.siteLayer:
-    stationName = site.GetFieldAsString(stationName_index)
-    print(stationName + " ------- " + getSiteStreamName(stationName)) """

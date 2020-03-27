@@ -1,57 +1,102 @@
-from StreamGraphNavigator import StreamGraphNavigator
+from StreamGraphNavigator import StreamGraphNavigator, isFailureCode, QUERY_FAILURE_CODE
 from StreamGraph import StreamGraph
-from SnapSites import snapPointToSegment
-from GDALData import GDALData, QUERYDATA
+from SnapSites import snapPoint, SnapablePoint
+import GDALData
 
+#how many queries will we try AFTER finding a single upstream/downstream site to find the other upstream/downstream site?
+MAX_SECONDARY_SITE_QUERIES = 10
 
-def getSiteID (lat, lng):
-    streamGraph = StreamGraph()
+def getSiteID (lat, lng, withheldSites = [], debug = False):
+    streamGraph = StreamGraph(withheldSites = withheldSites)
 
     #typically lat/long are switched to fit the x/y order paradigm 
     point = (lng, lat)
-    gdalData = GDALData(lat, lng, loadMethod = QUERYDATA)
-    streamGraph.addGeom(gdalData)
-    streamGraph.visualize()
-    snapInfo = snapPointToSegment(point, gdalData)
+    #get data around query point and construct a graph
+    baseData = GDALData.loadFromQuery(lat, lng)
+    if baseData is None:
+        print ("could not get data")
+        return QUERY_FAILURE_CODE
+    
+    if baseData.lineLayer.GetFeatureCount() == 0:
+        return QUERY_FAILURE_CODE
+
+    streamGraph.addGeom(baseData)
+
+    #snap query point to a segment
+    snapablePoint = SnapablePoint(point = point, name = "", id = "")
+    snapInfo = snapPoint(snapablePoint, baseData) #get the most likely snap
     if snapInfo is None:
         print ("could not snap")
         return None
-    (segmentID, distAlongSegment) = snapInfo
+    segmentID = snapInfo[0].featureObjectID
+    distAlongSegment = snapInfo[0].distAlongFeature
+    #get the segment ID of the snapped segment
     graphSegment = streamGraph.getCleanedSegment(segmentID)
 
-    navigator = StreamGraphNavigator(streamGraph)
+    #build a navigator object
+    #we want to terminate the search each time a query happens
+    #this allows us to stagger upstream and downstream searches
+    #although this means repeating parts of the search multiple times, searching a already constructed
+    #graph takes practically no time at all
+    navigator = StreamGraphNavigator(streamGraph, terminateSearchOnQuery = True)
 
-    upstreamSite = navigator.getNextUpstreamSite(graphSegment, distAlongSegment)
-    downstreamSite = navigator.getNextDownstreamSite(graphSegment, distAlongSegment)
+    upstreamSite = None
+    downstreamSite = None
+    secondaryQueries = 0
 
-    upstreamSiteID = upstreamSite[0]
-    downstreamSiteID = downstreamSite[0]
+    #each iteration extends the graph by one query worth of data
+    while (upstreamSite is None or downstreamSite is None) and secondaryQueries < MAX_SECONDARY_SITE_QUERIES:
+        if upstreamSite is None:
+            #we haven't found upstream yet
+            upstreamReturn = navigator.getNextUpstreamSite(graphSegment, distAlongSegment)
+            if isFailureCode(upstreamReturn) is not True and upstreamReturn is not None:
+                upstreamSite = upstreamReturn
 
-    partCode = upstreamSiteID[0:2]
 
-    upstreamSiteIdDonStr = upstreamSiteID[2:]
-    downstreamSiteIdDonStr = downstreamSiteID[2:]
+        if downstreamSite is None:
+            #we haven't found downstream yet
+            downstreamReturn = navigator.getNextDownstreamSite(graphSegment, distAlongSegment)
+            if isFailureCode(downstreamReturn) is not True and downstreamReturn is not None:
+                downstreamSite = downstreamReturn
 
-    if len(upstreamSiteIdDonStr) < 8:
-        upstreamSiteIdDonStr += "00"
+        if upstreamSite is not None or downstreamSite is not None:
+            #we've found at least one site
+            secondaryQueries += 1
 
-    if len(downstreamSiteIdDonStr) < 8:
-        downstreamSiteIdDonStr += "00"
 
-    upstreamSiteIdDon = int(upstreamSiteIdDonStr)
-    downstreamSiteIdDon = int(downstreamSiteIdDonStr)
+    if upstreamSite is not None and downstreamSite is not None:
+        #we have an upstream and downstream
 
-    totalAddressSpaceDistance = upstreamSite[1] + downstreamSite[1]
-    newSitePercentage = downstreamSite[1] / totalAddressSpaceDistance
+        upstreamSiteID = upstreamSite[0]
+        downstreamSiteID = downstreamSite[0]
 
-    newDon = int(downstreamSiteIdDon * (1 - newSitePercentage) + upstreamSiteIdDon * newSitePercentage)
+        partCode = upstreamSiteID[0:2]
 
-    newSiteID = partCode + str(newDon)
+        upstreamSiteIdDonStr = upstreamSiteID[2:]
+        downstreamSiteIdDonStr = downstreamSiteID[2:]
 
-    print ("New Site ID = " + newSiteID)
-    queryPt = graphSegment.getPointOnSegment(distAlongSegment)
-    
-    streamGraph.visualize(showSegInfo = True, customPoints=[queryPt])
-    print("test")
-    #turn upstreamSite[0]
+        if len(upstreamSiteIdDonStr) < 8:
+            upstreamSiteIdDonStr += "00"
+
+        if len(downstreamSiteIdDonStr) < 8:
+            downstreamSiteIdDonStr += "00"
+
+        upstreamSiteIdDon = int(upstreamSiteIdDonStr)
+        downstreamSiteIdDon = int(downstreamSiteIdDonStr)
+
+        totalAddressSpaceDistance = upstreamSite[1] + downstreamSite[1]
+        newSitePercentage = downstreamSite[1] / totalAddressSpaceDistance
+
+        newDon = int(downstreamSiteIdDon * (1 - newSitePercentage) + upstreamSiteIdDon * newSitePercentage)
+
+        newSiteID = partCode + str(newDon)
+        if debug is True:
+            streamGraph.visualize(customPoints=[point])
+        return newSiteID
+
+    else:
+        if debug is True:
+            streamGraph.visualize(customPoints=[point])
+        return "edge case"
+
 

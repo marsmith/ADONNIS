@@ -1,7 +1,7 @@
 from collections import namedtuple
 from GDALData import RESTRICTED_FCODES, BaseData, loadFromQuery
 from Helpers import *
-from SnapSites import Snap, SnappedSite
+from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment
 import ogr
 import matplotlib.pyplot as plt
 import random
@@ -14,11 +14,9 @@ UPSTREAMTRIB = 3    #011 contains a one in the one's place, but also contains a 
 DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstream site 
 
 
-
-
 #tuples used
 NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
-SiteOnSegment = namedtuple('SiteOnSegment', 'distDownstreamAlongSegment siteID')
+GraphSite = namedtuple('GraphSite', 'distDownstreamAlongSegment siteID segmentID snapDist')
 GraphUpdate = namedtuple('GraphUpdate', 'fromSeg toSeg')#an update to the graph. 'from' is replaced with 'to' 
 
 #a stream node 
@@ -37,6 +35,12 @@ class StreamNode (object):
             return True
         return False
 
+    def getUpstreamNeighbors(self):
+        return self.getCodedNeighbors(UPSTREAM)
+
+    def getDownstreamNeighbors(self):
+        return self.getCodedNeighbors(DOWNSTREAM)
+
     def getCodedNeighbors (self, relationshipCode):
         results = []
         for neighbor in self.neighbors:
@@ -45,9 +49,9 @@ class StreamNode (object):
                 results.append(neighbor.segment)
         return results
 
-    # returns a list of upstream branches of this node sorted by arbolate sum (upstream distance) 
+    # returns a list of upstream branches of this node sorted by stream level 
     # the order will be:
-    # lowest arbolate sum first, followed by the mainstream branch
+    # tribs, sorted by arbolate sum first, followed by the mainstream branch
     def getSortedUpstreamBranches (self):
         tribs = []
         minStreamLevel = float("inf")
@@ -101,7 +105,7 @@ class StreamSegment (object):
             print ("Site added to segment on point that exceeds segment length. This shouldn't happen!")
             print (self.segmentID)
 
-        self.sites.append(SiteOnSegment(siteID = siteID, distDownstreamAlongSegment = distAlongSegment))
+        self.sites.append(GraphSite(siteID = siteID, distDownstreamAlongSegment = distAlongSegment, segmentID = self.segmentID, snapDist = 0))
         self.sites = sorted(self.sites, key=lambda site: site.distDownstreamAlongSegment)
 
     #gets the nearest site ID on THIS segment above 'distanceDownSegment' if it exists. return none otherwise 
@@ -130,7 +134,7 @@ class StreamGraph (object):
         self.safeDataBoundary = [] #gdal geometry objects. Points inside should have all neighboring segments stored
 
         self.removedSegments = {}#cleaned segments. keep track to prevent duplicates. The dict values point to the segment that replaced this segment, if it exists
-        self.addedSites = set()#list of sites that have already been added
+        self.siteSnaps = {}#list of sites that have already been added
         self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
         self.listeners = []
         self.withheldSites = withheldSites
@@ -177,7 +181,7 @@ class StreamGraph (object):
             segmentInfo = streamSeg.streamLevel
             if showSegInfo is True:
                 segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
-            plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
+            #plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
         
         """ x = []
         y = []
@@ -251,10 +255,28 @@ class StreamGraph (object):
         self.nextNodeID += 1
         return newNode
 
-    def addSite (self, siteID, segmentID, distAlongSegment):
-        if siteID not in self.addedSites and siteID not in self.withheldSites:
-            self.segments[segmentID].addSite(siteID, distAlongSegment)
-            self.addedSites.add(siteID)
+    def addSiteSnaps (self, siteID, snapInfo):
+        if siteID not in self.siteSnaps and siteID not in self.withheldSites:
+            #snapInfo is a list of possible snaps. Each element is of type snap from SnapSites.py
+            self.siteSnaps[siteID] = snapInfo
+
+    def addSite (self, segmentID, siteID, distDownstreamAlongSegment):
+        self.segments[segmentID].addSite(siteID, distDownstreamAlongSegment)
+
+    #given a list of assignments (siteID, snapInfo), clear/update all segments
+    def refreshSiteSnaps (self, snapAssignments):
+        #collections.namedtuple('Snap', 'featureObjectID snapDistance distAlongFeature')
+        #start by removing old sites
+        for segment in self.segments.values():
+            segment.sites.clear()
+
+        #add sites to segments
+        for assignment in snapAssignments:
+            siteID = assignment.siteID
+            segmentID = assignment.segmentID
+            distDownstreamAlongSegment = assignment.distDownstreamAlongSegment
+            self.addSite(segmentID, siteID, distDownstreamAlongSegment)
+            
     #has this graph ever contained this segment?
     #used when adding new segments to prevent duplicates
     def hasContainedSegment (self, segmentID):
@@ -272,6 +294,7 @@ class StreamGraph (object):
                 sinks.append(node)
         return sinks
     
+    #checks if a point is within a safe distance from the center of some query
     def pointWithinSafeDataBoundary (self, point):
         pointGeo = ogr.Geometry(ogr.wkbPoint)
         pointGeo.AddPoint(point[0], point[1])
@@ -280,7 +303,7 @@ class StreamGraph (object):
                 return True
         return False
 
-
+    #removes loops in the graph
     def removeLoops (self):
         #close all loops upstream of 'sinkNode'
         #do a breadth first search from a sink
@@ -292,37 +315,39 @@ class StreamGraph (object):
             frontier = [sinkNode]
             discovered = [sinkNode]
             while len(frontier) > 0:
-                nextNode = frontier.pop(0)
-                # skip nodes that aren't within the safe data boundary. These nodes could be missing neighbors
-                # thus causing our algo to potentially not be deterministic 
-                """ if not self.pointWithinSafeDataBoundary(nextNode.position):
-                    continue """
-                #we want to use a formal parameter to sort neighbor priority to make sure this algorithm is deterministic 
-                sortedNeighbors = sorted(nextNode.neighbors, key=lambda neighbor: neighbor.segment.length)
+                nextNode = frontier.pop()                             
+                #we get sorted upstream branches to promote determinism. We're doing a depth first search along the main path
+                #secondary paths will come afterwards. Whenever a secondary path intersects a main path it will cut itself off
+                sortedNeighbors = list(reversed(nextNode.getSortedUpstreamBranches()))
 
+                newFrontier = []
                 # sort in reverse since within this loop we may remove a segment. Since we are looping over segments that can cause trouble
-                for neighbor in reversed(sortedNeighbors):
+                for neighbor in sortedNeighbors:
                     #this neighbor has an upstream relationship
-                    if nextNode.neighborHasRelationShip(neighbor, UPSTREAM):
-                        upstreamNode = neighbor.segment.upStreamNode
-                        if upstreamNode not in discovered:
-                            frontier.append(upstreamNode)
-                            discovered.append(upstreamNode)
-                        else:
-                            # this neighbor branch takes us to a node we've already seen
-                            # so disconnect this edge from that node to remove loop
-                            thisPosition = nextNode.position
-                            connectionPosition = neighbor.segment.upStreamNode.position
-                            newEndPointNodePos = ((thisPosition[0] + connectionPosition[0])/2, (thisPosition[1] + connectionPosition[1])/2)
-                            newEndPointNode = self.addNode(newEndPointNodePos)
-                            newEndPointNode.addNeighbor(neighbor.segment, DOWNSTREAM) # our segment is downstream from the new segment
-                            neighbor.segment.upStreamNode.removeNeighbor(neighbor.segment)
-                            neighbor.segment.upStreamNode = newEndPointNode
+                    upstreamNode = neighbor.upStreamNode
+                    if upstreamNode not in discovered:
+                        #insert at beginning. This makes this a depth first search following priority of stream level
+                        #the traversal will follow the lowest stream level path until its conclusion 
+                        #then follow the next higher streamlevel paths until the entire tree is searched
+                        newFrontier.insert(0, upstreamNode)
+                        discovered.append(upstreamNode)
+                    else:
+                        # this neighbor branch takes us to a node we've already seen
+                        # so disconnect this edge from that node to remove loop
+                        thisPosition = nextNode.position
+                        connectionPosition = neighbor.upStreamNode.position
+                        newEndPointNodePos = ((thisPosition[0] + connectionPosition[0])/2, (thisPosition[1] + connectionPosition[1])/2)
+                        newEndPointNode = self.addNode(newEndPointNodePos)
+                        newEndPointNode.addNeighbor(neighbor, DOWNSTREAM) # our segment is downstream from the new segment
+                        neighbor.upStreamNode.removeNeighbor(neighbor)
+                        neighbor.upStreamNode = newEndPointNode
+                frontier.extend(newFrontier)
 
         sinks = self.getSinks()
         #remove loops
         for sink in sinks:
             closeLoops(sink)
+
 
     #collapse redundant nodes with only two neighbors
     def cleanGraph (self):
@@ -392,7 +417,6 @@ class StreamGraph (object):
                 if site.siteID == siteID:
                     del segment.sites[site]
 
-
     #Adds the geometry stored in the gdalData object
     #gdalData: ref to a gdalData object
     #guaranteedNetLineIndex a streamline feature that is definitely on the network we are interested in
@@ -440,21 +464,27 @@ class StreamGraph (object):
 
         siteLayer = baseData.siteLayer
         siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
-
-        snapped = Snap(baseData)
-
-        for siteSnap in snapped:
-            snapPosition = siteSnap.snappedLocation
-            snapFeature = siteSnap.snappedFeature
-            featureSegmentID = snapFeature.GetFieldAsString(objectIDIndex)
-            siteID = siteSnap.site.GetFieldAsString(siteNumberIndex)
-            
-            self.addSite(siteID, featureSegmentID, siteSnap.distAlongFeature)
+        siteNameIndex = siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
 
         self.safeDataBoundary.append(baseData.dataBoundary)
-
-
         self.removeLoops()
+        
+        #for each site, get a list of potential snaps and store them
+        for site in siteLayer:
+            siteID = site.GetFieldAsString(siteNumberIndex)
+            siteName = site.GetFieldAsString(siteNameIndex)
+            pt = site.GetGeometryRef().GetPoint(0)
+            snapablePoint = SnapablePoint(point = pt, name = siteName, id = siteID)
+            snaps = snapPoint(snapablePoint, baseData)
+            #build a list of graphSites
+            #graphSite is similar to Snap, but stores a reference to segmentID instead of feature
+            #we assume that the feature reference itself isn't stable once the GDAL object gets
+            #removed by the garbage collector
+            potentialGraphSites = [GraphSite(siteID = siteID, segmentID = snap.feature.GetFieldAsString(objectIDIndex), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature) for snap in snaps]
+            self.addSiteSnaps(siteID, potentialGraphSites)
+
+        #refresh all site snaps given the new site data
+        self.refreshSiteSnaps(getSiteSnapAssignment(self))
         #self.cleanGraph()
 
 
