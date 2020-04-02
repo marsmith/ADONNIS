@@ -13,10 +13,10 @@ import json
 import math
 from Helpers import *
 import sys
+from pathlib import Path
 
 
-LINE_FOLDER_NAME = "NHDFlowline_Project_SplitLin3"
-SITES_FOLDER_NAME = "ProjectedSites"
+STREAM_PATH = "hu4"
 MAX_SAFE_QUERY_DIST_KM = 7
 
 BaseData = namedtuple('BaseData', 'lineLayer lineDS, siteLayer siteDS dataBoundary')
@@ -25,7 +25,7 @@ RESTRICTED_FCODES = [56600]
 
 QUERY_ATTEMPTS = 10 
 DATA_PADDING = 0.6
-TIMEOUT = 2
+TIMEOUT = 4
 
 def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
         attemptsUsed = 0
@@ -43,29 +43,6 @@ def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
             print("failed to retrieve " + queryName + " on all attempts. Failing")
             return None
 
-
-""" def loadFromData (self):
-    linesPath = self.localPath + "/" + LINE_FOLDER_NAME + "/" + LINE_FOLDER_NAME + ".shp"
-
-    transformation = self.getTransformation()
-
-    queryCenter = ogr.Geometry(ogr.wkbPoint)
-    transformedQueryCenter = transformation.TransformPoint(self.lng, self.lat)
-    queryCenter.AddPoint(transformedQueryCenter[0], transformedQueryCenter[1])
-    #we want GDALData objects loaded from data to essentially act like queried data so we filter it around a query sized buffer
-    dataBuffer = queryCenter.Buffer(self.radiusKM*1000)
-
-    self.lineDataSource = ogr.Open(linesPath)
-    self.lineLayer = self.lineDataSource.GetLayer() 
-    self.lineLayer.SetSpatialFilter(dataBuffer)
-
-    sitesPath = self.localPath + "/" + SITES_FOLDER_NAME + "/" + SITES_FOLDER_NAME + ".shp"   
-    self.siteDataSource = ogr.Open(sitesPath)
-    # we dob't really need the reference to siteDataSource, however
-    # if this reference isn't saved my guess is that the data source reference is destroyed 
-    # this reference is likely required for things like siteLayer.GetSpatialRef()
-    self.siteLayer = self.siteDataSource.GetLayer()
-    self.siteLayer.SetSpatialFilter(dataBuffer) """
 
 #convert the xml results of a stream site query to geojson
 def buildGeoJson (xmlStr):
@@ -160,7 +137,31 @@ def getSiteNeighbors (inSiteID):
 
     
 
+def loadSitesFromQuery (lat, lng, radiusKM = 5):
+    approxRadiusInDeg = approxKmToDegrees(radiusKM)
+    #northwest
+    nwLat = lat + approxRadiusInDeg
+    nwLng = lng + approxRadiusInDeg
+    #southeast
+    seLat = lat - approxRadiusInDeg
+    seLng = lng - approxRadiusInDeg
 
+    siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
+    req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
+
+    if req == None:
+        print("could not read query")
+        return None
+
+    xmlSites = req.text#this query returns an xml. Have to conver to geoJson
+    geoJsonSites = buildGeoJson(xmlSites)
+    try:
+        siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
+        siteLayer = siteDataSource.GetLayer()
+        return (siteLayer, siteDataSource)
+    except:
+        print("could not read query")
+        return None
 
 def loadFromQuery(lat, lng, radiusKM = 5):
 
@@ -182,33 +183,12 @@ def loadFromQuery(lat, lng, radiusKM = 5):
         print("could not read query")
         return None
 
-    approxRadiusInDeg = approxKmToDegrees(radiusKM)
-
-    #northwest
-    nwLat = lat + approxRadiusInDeg
-    nwLng = lng + approxRadiusInDeg
-
-    #southeast
-    seLat = lat - approxRadiusInDeg
-    seLng = lng - approxRadiusInDeg
-
-    siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
-    req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
-
-    if req == None:
-        print("could not read query")
+    sites = loadSitesFromQuery(lat, lng, radiusKM)
+    if sites is None:
         return None
+    siteLayer = sites[0]
+    siteDataSource = sites[1]
 
-    xmlSites = req.text#this query returns an xml. Have to conver to geoJson
-    geoJsonSites = buildGeoJson(xmlSites)
-    try:
-        siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
-        siteLayer = siteDataSource.GetLayer()
-    except:
-        print("could not read query")
-        return None
-
-    siteLayer.ResetReading()
     queryCenter = ogr.Geometry(ogr.wkbPoint)#up stream point - wkb point is the code for point based geometry
     
     queryCenter.AddPoint(lng, lat)
@@ -223,3 +203,27 @@ def loadFromQuery(lat, lng, radiusKM = 5):
     return data
 
 
+#for now just loads linedata from local since line data is usually much slower
+def loadFromData (lat, lng, radiusKM = 5):
+    linesPath = Path(__file__).parent.absolute() / STREAM_PATH / "hu4.shp"
+
+
+    queryCenter = ogr.Geometry(ogr.wkbPoint)
+    queryCenter.AddPoint(lat, lng)
+
+    degRadius = approxKmToDegrees(radiusKM)
+    #we want GDALData objects loaded from data to essentially act like queried data so we filter it around a query sized buffer
+    dataBuffer = queryCenter.Buffer(radiusKM*1000)
+
+    lineDataSource = ogr.Open(linesPath)
+    lineLayer = lineDataSource.GetLayer() 
+    lineLayer.SetSpatialFilter(dataBuffer)
+
+    sites = loadSitesFromQuery(lat, lng, radiusKM)
+    if sites is None:
+        return None
+    siteLayer = sites[0]
+    siteDataSource = sites[1]
+
+
+    return BaseData(lineLayer = lineLayer, lineDS = lineDataSource, siteLayer = siteLayer, siteDS = siteDataSource, dataBoundary = dataBuffer)
