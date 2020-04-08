@@ -71,7 +71,7 @@ class StreamGraphNavigator (object):
                         failureCode = QUERY_TERMINATE_CODE
                         break
                     
-                nextSegments = current.downStreamNode.getDownstreamNeighbors#getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
+                nextSegments = current.downStreamNode.getDownstreamNeighbors()#getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
                 queue.extend(nextSegments)
         
         # close this search
@@ -137,7 +137,7 @@ class StreamGraphNavigator (object):
             #expand graph if necessary 
             thisSegmentPosition = thisSegment.upStreamNode.position
             #if during navigation, we reach edge of safe data boundary, expand with new query
-            if not self.streamGraph.pointWithinSafeDataBoundary(thisSegmentPosition) and autoExpand is True:
+            if autoExpand is True and not self.streamGraph.pointWithinSafeDataBoundary(thisSegmentPosition):
                 graphExpansion = self.streamGraph.expandGraph(thisSegmentPosition[1], thisSegmentPosition[0])
                 if graphExpansion is False:
                     failureCode = QUERY_FAILURE_CODE
@@ -258,6 +258,9 @@ class StreamGraphNavigator (object):
                                 nearestTribSite = foundSiteInfo[0]
                                 totalTribLength = higherLevelNeighbor.arbolateSum
                             #distance of streams that are higher in the network than the highest site on the trib
+                #if a failure code happened in the inner loop, we want to break out of this loop too
+                if failureCode is not None:
+                    break
                 #if there was a site on one of the tribs, break and return
                 if nearestTribSite is not None:
                     #distance of streams above the highest site that could have sites higher than nearestTribSite
@@ -272,7 +275,7 @@ class StreamGraphNavigator (object):
 
             #expand graph, catch failures
             downstreamPoint = current.downStreamNode.position
-            if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint):
+            if not self.streamGraph.pointWithinSafeDataBoundary(downstreamPoint):
                 graphExpansion = self.streamGraph.expandGraph(downstreamPoint[1], downstreamPoint[0])
                 if graphExpansion is False:
                     failureCode = QUERY_FAILURE_CODE

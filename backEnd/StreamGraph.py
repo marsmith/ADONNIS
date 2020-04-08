@@ -1,11 +1,12 @@
 from collections import namedtuple
 from GDALData import RESTRICTED_FCODES, BaseData, loadFromQuery
 from Helpers import *
-from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment
+from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment, getSiteSnapAssignmentTwo
 import ogr
 import matplotlib.pyplot as plt
 import random
 import sys
+import copy
 
 #constants for neighbor relationships
 UNKNOWN = 0         #000
@@ -107,6 +108,33 @@ class StreamSegment (object):
 
         self.sites.append(GraphSite(siteID = siteID, distDownstreamAlongSegment = distAlongSegment, segmentID = self.segmentID, snapDist = 0))
         self.sites = sorted(self.sites, key=lambda site: site.distDownstreamAlongSegment)
+    
+    def addGraphSite(self, graphSite):
+        self.sites.append(graphSite)
+        self.sites = sorted(self.sites, key=lambda site: site.distDownstreamAlongSegment)
+
+
+    def isNeighbor (self, otherSegmentID):
+        isNeighbor = False
+        upstreamConnections = self.upStreamNode.neighbors
+        downstreamConnections = self.downStreamNode.neighbors
+        for neighbor in upstreamConnections:
+            segment = neighbor.segment
+            if segment.segmentID == otherSegmentID:
+                isNeighbor = True
+                break
+        if isNeighbor is True:
+            return True
+        
+        for neighbor in downstreamConnections:
+            segment = neighbor.segment
+            if segment.segmentID == otherSegmentID:
+                isNeighbor = True
+                break
+        if isNeighbor is True:
+            return True
+        return False
+        
 
     #gets the nearest site ID on THIS segment above 'distanceDownSegment' if it exists. return none otherwise 
     def getSiteAbove (self, distanceDownSegment):
@@ -160,9 +188,9 @@ class StreamGraph (object):
             y = [startPt[1], endPt[1]]
             dx = endPt[0] - startPt[0]
             dy = endPt[1] - startPt[1]
-            plt.arrow(startPt[0], startPt[1], dx, dy, width=0.00001, head_width = 0.0001, color='blue', length_includes_head=True)
+            #plt.arrow(startPt[0], startPt[1], dx, dy, width=0.00001, head_width = 0.0001, color='blue', length_includes_head=True)
 
-            plt.plot(x,y, lineWidth=1, color='blue')
+            plt.plot(x,y, lineWidth=0.5, color='blue')
 
             midPoint = (startPt[0]/2 + endPt[0]/2, startPt[1]/2 + endPt[1]/2)
 
@@ -176,12 +204,12 @@ class StreamGraph (object):
                 position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
                 sitesX.append(position[0])
                 sitesY.append(position[1])
-                plt.text(position[0] + 0.0001, position[1], sites.siteID, fontsize = 8, color = 'red')
+                plt.text(position[0], position[1], sites.siteID, fontsize = 8, color = 'red')
 
             segmentInfo = streamSeg.streamLevel
             if showSegInfo is True:
                 segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
-            #plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
+            plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
         
         """ x = []
         y = []
@@ -262,6 +290,9 @@ class StreamGraph (object):
 
     def addSite (self, segmentID, siteID, distDownstreamAlongSegment):
         self.segments[segmentID].addSite(siteID, distDownstreamAlongSegment)
+    
+    def addGraphSite (self, graphSite):
+        self.segments[graphSite.segmentID].addGraphSite(graphSite)
 
     #given a list of assignments (siteID, snapInfo), clear/update all segments
     def refreshSiteSnaps (self, snapAssignments):
@@ -272,10 +303,7 @@ class StreamGraph (object):
 
         #add sites to segments
         for assignment in snapAssignments:
-            siteID = assignment.siteID
-            segmentID = assignment.segmentID
-            distDownstreamAlongSegment = assignment.distDownstreamAlongSegment
-            self.addSite(segmentID, siteID, distDownstreamAlongSegment)
+            self.addGraphSite(assignment)
             
     #has this graph ever contained this segment?
     #used when adding new segments to prevent duplicates
@@ -311,6 +339,21 @@ class StreamGraph (object):
         # logic: run BFS, if we ever encounter a node that we've already seen, this is a loop, so we disconnect the segment that 
         # connects the segment in question to the node we've already seen. Thus closing the loop
 
+        def closeDownstreamJunctions ():
+            for node in self.nodes:
+                downstreamConnections = node.getDownstreamNeighbors()
+                sortedDownstreamConnections = sorted(downstreamConnections, key=lambda seg: seg.streamLevel)
+                for segment in sortedDownstreamConnections[1:]:
+                    downstreamPoint = segment.downStreamNode.position
+                    upstreamPoint = segment.upStreamNode.position
+                    newEndPointNodePos = ((downstreamPoint[0] + upstreamPoint[0])/2, (downstreamPoint[1] + upstreamPoint[1])/2)
+                    newEndPointNode = self.addNode(newEndPointNodePos)
+                    
+                    newEndPointNode.addNeighbor(segment, DOWNSTREAM) # our segment is downstream from the new node
+                    
+                    node.removeNeighbor(segment)
+                    segment.upStreamNode = newEndPointNode
+
         def closeLoops (sinkNode):
             frontier = [sinkNode]
             discovered = [sinkNode]
@@ -343,10 +386,11 @@ class StreamGraph (object):
                         neighbor.upStreamNode = newEndPointNode
                 frontier.extend(newFrontier)
 
-        sinks = self.getSinks()
+        """ sinks = self.getSinks()
         #remove loops
         for sink in sinks:
-            closeLoops(sink)
+            closeLoops(sink) """
+        closeDownstreamJunctions()
 
 
     #collapse redundant nodes with only two neighbors
@@ -368,9 +412,6 @@ class StreamGraph (object):
 
             newSegmentUpstreamNode = upstreamSegment.upStreamNode
             newSegmentDownstreamNode = downstreamSegment.downStreamNode   
-
-            
-
 
             #calculate new segment properties
             newLength = upstreamSegment.length + downstreamSegment.length
@@ -469,11 +510,15 @@ class StreamGraph (object):
         self.safeDataBoundary.append(baseData.dataBoundary)
         self.removeLoops()
         
+        testCount = siteLayer.GetFeatureCount()
         #for each site, get a list of potential snaps and store them
         for site in siteLayer:
             siteID = site.GetFieldAsString(siteNumberIndex)
             siteName = site.GetFieldAsString(siteNameIndex)
             pt = site.GetGeometryRef().GetPoint(0)
+            #don't try to add sites that aren't within the safe data boundary
+            if not self.pointWithinSafeDataBoundary(pt):
+                continue
             snapablePoint = SnapablePoint(point = pt, name = siteName, id = siteID)
             snaps = snapPoint(snapablePoint, baseData)
             #build a list of graphSites
@@ -484,7 +529,9 @@ class StreamGraph (object):
             self.addSiteSnaps(siteID, potentialGraphSites)
 
         #refresh all site snaps given the new site data
-        self.refreshSiteSnaps(getSiteSnapAssignment(self))
+        print("refreshing site snaps")
+        #getSiteSnapAssignmentTwo(self)
+        self.refreshSiteSnaps(getSiteSnapAssignmentTwo(self))
         #self.cleanGraph()
 
 
