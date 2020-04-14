@@ -1,7 +1,7 @@
 from collections import namedtuple
 from GDALData import RESTRICTED_FCODES, BaseData, loadFromQuery
 from Helpers import *
-from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment, getSiteSnapAssignmentTwo
+from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment
 import ogr
 import matplotlib.pyplot as plt
 import random
@@ -156,7 +156,7 @@ class StreamSegment (object):
 
 class StreamGraph (object):
 
-    def __init__(self, withheldSites = []):
+    def __init__(self, withheldSites = [], debug = False):
         self.segments = {}
         self.nodes = []
         self.safeDataBoundary = [] #gdal geometry objects. Points inside should have all neighboring segments stored
@@ -166,6 +166,7 @@ class StreamGraph (object):
         self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
         self.listeners = []
         self.withheldSites = withheldSites
+        self.debug = debug
 
     def addGraphListener(self, listener):
         self.listeners.append(listener)
@@ -188,7 +189,7 @@ class StreamGraph (object):
             y = [startPt[1], endPt[1]]
             dx = endPt[0] - startPt[0]
             dy = endPt[1] - startPt[1]
-            #plt.arrow(startPt[0], startPt[1], dx, dy, width=0.00001, head_width = 0.0001, color='blue', length_includes_head=True)
+            plt.arrow(startPt[0], startPt[1], dx, dy, width=0.00001, head_width = 0.0001, color='blue', length_includes_head=True)
 
             plt.plot(x,y, lineWidth=0.5, color='blue')
 
@@ -204,7 +205,7 @@ class StreamGraph (object):
                 position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
                 sitesX.append(position[0])
                 sitesY.append(position[1])
-                plt.text(position[0], position[1], sites.siteID, fontsize = 8, color = 'red')
+                plt.text(position[0], position[1] + 0.00001 * i, sites.siteID, fontsize = 8, color = 'red')
 
             segmentInfo = streamSeg.streamLevel
             if showSegInfo is True:
@@ -232,8 +233,17 @@ class StreamGraph (object):
 
         plt.scatter(x,y, color='black')
 
+        x = []
+        y = []
+
+        sinks = self.getSinks()
+        for sink in sinks:
+            x.append(sink.position[0])
+            y.append(sink.position[1])
+        plt.scatter(x,y, color='green')
+
         #display safe boundary polygon
-        for geom in self.safeDataBoundary:
+        for j, geom in enumerate(self.safeDataBoundary):
             for ring in geom:
                 numPoints = ring.GetPointCount()
                 x = []
@@ -242,7 +252,10 @@ class StreamGraph (object):
                     point = ring.GetPoint(i)
                     x.append(point[0])
                     y.append(point[1])
-                plt.plot(x,y, lineWidth=1, color='red')
+                if j == 0:
+                    plt.plot(x,y, lineWidth=1.5, color='green')
+                else:
+                    plt.plot(x,y, lineWidth=1, color='red')
 
         plt.show()
 
@@ -531,7 +544,7 @@ class StreamGraph (object):
         #refresh all site snaps given the new site data
         print("refreshing site snaps")
         #getSiteSnapAssignmentTwo(self)
-        self.refreshSiteSnaps(getSiteSnapAssignmentTwo(self))
+        self.refreshSiteSnaps(getSiteSnapAssignment(self, debug = self.debug))
         #self.cleanGraph()
 
 
