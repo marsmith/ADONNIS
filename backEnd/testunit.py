@@ -1,11 +1,10 @@
 import unittest
 from StreamGraph import StreamGraph
 from StreamGraphNavigator import StreamGraphNavigator
+from osgeo import ogr
 
 class GraphNavigatorTests (unittest.TestCase):
 
-    #test if a site downstream on the same segment is properly identified
-    #in this test, there is a site farther down and a site above the query point on the same segment
     def test_siteDownstreamOnSegment (self):
         streamGraph = StreamGraph()
         node1 = streamGraph.addNode((0,0))
@@ -23,6 +22,31 @@ class GraphNavigatorTests (unittest.TestCase):
 
         self.assertEqual(foundSiteID, "site2")
         self.assertEqual(foundSiteDist, 0.4)
+
+    #test if a site downstream on the same segment is properly identified
+    #in this test, there is a site farther down and a site above the query point on the same segment
+    def test_findUpstreamSiteWithBacktrack (self):
+        streamGraph = StreamGraph()
+        node1 = streamGraph.addNode((0,0))
+        node2 = streamGraph.addNode((0,-1))
+        node3 = streamGraph.addNode((1,0))
+
+        segment1 = streamGraph.addSegment (node1, node2, "1", 1, 2, 1)#trib of segment2 path
+        segment2 = streamGraph.addSegment (node3, node2, "2", 1, 1, 1)
+        streamGraph.addSite ("site1", "2", 0.2)
+        safeDataArtificial = ogr.Geometry(ogr.wkbPoint)
+        safeDataArtificial.AddPoint(0,0)
+
+        streamGraph.safeDataBoundary.append(safeDataArtificial.Buffer(10))
+
+        navigator = StreamGraphNavigator(streamGraph)
+        
+        downstreamSite = navigator.getNextUpstreamSite(segment1, 0.5)
+        foundSiteID = downstreamSite[0]
+        foundSiteDist = downstreamSite[1]
+
+        self.assertEqual(foundSiteID, "site1")
+        self.assertEqual(foundSiteDist, 1.3)
 
     def test_siteUpstreamOnSegment (self):
         streamGraph = StreamGraph()
