@@ -1,50 +1,44 @@
-from GDALData import GDALData, MANUAL, LOCALDATA, QUERYDATA
 from osgeo import gdalconst
 from StreamGraph import *
 from StreamGraphNavigator import *
 from SiteInfoCreator import getSiteID
-
-
-
-#x = -74.3254918    #Long Lake
-#y =  44.0765791
-""" x = -74.1042838
-y = 44.1551339
-x = -74.7735286
-y = 42.6466516
-attempts = 4
-
-data = GDALData(y, x, loadMethod=QUERYDATA, queryAttempts = 8, timeout = 3)
-#data3 = GDALData(y, x+0.2, loadMethod=QUERYDATA, queryAttempts = 8, timeout = 3)
-print("--------------------------done querying")
-graph = StreamGraph()
-graph.addGeom(data)
-graph.visualize()
-42.6466516,-74.7735286
-graphNav = StreamGraphNavigator(graph) """
+from GDALData import getSiteIDsStartingWith
+from SnapSites import getSiteSnapAssignment
 
 while True:
     #segID = input("enter a edge segmentID: ")
-    latLng = input("enter a lat/lng: ")
+    idReplacement = input("Test by replacing an existing site?")
+    excludedList = []
+    
+    if idReplacement == "y":
+        inputSite = input("enter a site to replace: ")
 
-    (lat, lng) = latLng.split(",")
-    lat = float(lat)
-    lng = float(lng)
+        (siteLayer, dataSource) = getSiteIDsStartingWith(inputSite)
+        featureCount = siteLayer.GetFeatureCount()
+        siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
+        if featureCount >= 1:
+            print("found site")
+            for site in siteLayer:
+                queriedID = site.GetFieldAsString(siteNumberIndex)
+                if queriedID == inputSite:
+                    point = site.GetGeometryRef().GetPoint()
+                    lat = point[1]
+                    lng = point[0]
+                    excludedList.append(inputSite)
+                    break
+        else:
+            print("failure")
+            continue
+    else:
+        latLng = input("enter a lat/lng: ")
+        latLng = latLng.split(",")
+        if len(latLng) < 2:
+            continue
 
-    """ try:
-        segment = graph.segments[segID]
-    except:
-        print("couldn't find that segment, try again")
-        continue
-    segLen = round(segment.length, 2)
-    print ("the length of that segment is " + str(segLen))
-    segPosition = input("enter position on that segment between 0-" + str(segLen) + ": ")
+        lat = float(latLng[0])
+        lng = float(latLng[1])
 
-    #upstreamSiteInfo = graph.getNextUpstreamSite(segment, float(segPosition))
-    upstreamSiteInfo = graphNav.getNextUpstreamSite(segment, float(segPosition)) """
-
-
-    siteId = getSiteID(lat, lng)
+    siteId = getSiteID(lat, lng, withheldSites = excludedList, debug = True)
 
     if getSiteID is None:
         print("failed")
