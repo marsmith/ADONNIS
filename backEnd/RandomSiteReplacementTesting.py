@@ -1,12 +1,16 @@
 import random
-from GDALData import getSiteIDsStartingWith, getSiteNeighbors, loadFromQuery
+from GDALData import loadFromQuery
 import json
 from pathlib import Path
 import os
 from SiteInfoCreator import getSiteID
 from SiteIDManager import SiteIDManager
 from SnapSites import snapPoint, SnapablePoint
+import StreamGraph
+import StreamGraphNavigator
 import Helpers
+import time
+import Failures
 
 SITE_DATA_PATH = Path("testData")
 
@@ -16,12 +20,12 @@ def getPartNumber (n):
         nString = "0" + nString
     return nString
 
-def generateTestSiteIDList (numSites, partNumber):
+def generateTestSiteIDList (numSites, partNumber, version):
     sitesPath = Path(__file__).parent.absolute() / SITE_DATA_PATH / "NYsites.txt"
     sitesString = sitesPath.read_text()
     lines = sitesString.split("\n")
 
-    outFileName = "testingSet" + str(partNumber) + ".csv"
+    outFileName = "testingSet" + str(partNumber) + version + ".csv"
     outputPath = Path(__file__).parent.absolute() / SITE_DATA_PATH / outFileName
     outputFile = open(outputPath, "a")
     
@@ -50,6 +54,42 @@ def generateTestSiteIDList (numSites, partNumber):
             if lowerNeighbor is not None and upperNeighbor is not None and siteID[:2] == partNumber:
                 print ("has upper and lower bound and correct part code")
                 baseData = loadFromQuery(lat, lng)
+                if Failures.isFailureCode (baseData):
+                    numFound+=1
+                    continue
+                
+                streamGraph = StreamGraph.StreamGraph()
+                streamGraph.addGeom(baseData)
+                testingGraphNavigator = StreamGraphNavigator.StreamGraphNavigator(streamGraph)
+
+                allSnaps = []
+                for snaps in graph.siteSnaps.values():
+                    allSnaps.extend(snaps)
+
+                #assign all possible snaps of each site to the graph
+                testingGraph.refreshSiteSnaps(allSnaps)
+
+                isolatedSites = []
+
+                #we're looking for groups of snaps that appear consecutively 
+                for sink in sinks:
+                    upstreamPaths = sink.getUpstreamNeighbors()
+                    for path in upstreamPaths:
+                        upstreamSitesInfo = testingGraphNavigator.collectSortedUpstreamSites(path, path.length, siteLimit = sys.maxsize, autoExpand = False)[0]
+                        #trim the extra distance info off of the results. Not needed
+                        upstreamSites = [siteInfo[0] for siteInfo in upstreamSitesInfo]
+                        numSeen = 0
+                        lastSeenID = None
+                        for site in upstreamSites:
+                            numRequired = len(streamGraph.siteSnaps(site.siteID))
+                            if lastSeenID is None or site.siteID != lastSeenID:
+                                lastSeenID = site.siteID
+                                numSites = 1
+                            else:
+                                numSeen += 1
+                                if numSeen == numRequired:
+                                    isolatedSites.append(site)
+
 
                 snapablePoint = SnapablePoint(point = (lng, lat), name = "", id = siteID)
                 snapInfo = snapPoint(snapablePoint, baseData)
@@ -146,6 +186,9 @@ def runTestList (fileName, outputName):
     outputFile.write(header)
     outputFile.close()
 
+    startTime = time.time()
+    numSuccesses = 0
+
     for i in range(1, len(lines)):
         line = lines[i]
         header = "siteID, lat, lng, upperBound, lowerBound \n"
@@ -168,6 +211,7 @@ def runTestList (fileName, outputName):
             
             if generatedDownstreamNum > lowerDownstreamNum and generatedDownstreamNum < upperDownstreamNum:
                 betweenBounds = "y"
+                numSuccesses += 1
         except:
             difference = "nan"
             betweenBounds = "nan"
@@ -177,8 +221,17 @@ def runTestList (fileName, outputName):
         outputFile.write(output)
         outputFile.close()
 
+    endTime = time.time()
+    totalTime = endTime - startTime
+    footerLabels = "total time(s), N success \n"
+    footer = str(totalTime) + "," + str(numSuccesses) + "\n"
+
+    outputFile = open(outputPath, "a")
+    outputFile.write(footerLabels)
+    outputFile.write(footer)
+    outputFile.close()
+
 
 runTestList("testingSet01.csv", "testingSet01_1.csv")
-#generateTestSiteIDList(100, "01")
+#generateTestSiteIDList(100, "01", "_2")
 #randomReplacementTesting(30)
-#print(getSiteNeighbors("01348000"))
