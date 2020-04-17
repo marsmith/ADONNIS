@@ -13,3 +13,33 @@ def pointsEqual (p1, p2):
 
 def dist (x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+def fastMagDist (x1, y1, x2, y2):
+    return (x2 - x1)**2 + (y2 - y1)**2
+
+def getFullID (id):
+    newID = id + ""
+    if len(id) < 10:
+        newID += "00"
+    return newID
+
+# if a is larger than b: returns > 0
+# if a is equal to b: returns 0
+# if a is less than b: returns < 0
+def siteIDCompare (a, b):
+    fullA = getFullID(a)
+    fullB = getFullID(b)
+
+    aDSN = int(fullA[2:])
+    bDSN = int(fullB[2:])
+
+    return aDSN - bDSN
+
+
+def dot (x1, y1, x2, y2):
+    return x1*x2 + y1*y2
+
+def normalize (x, y):
+    mag = math.sqrt(x*x + y*y)
+
+    return (x/mag, y/mag)
