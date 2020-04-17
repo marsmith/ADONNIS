@@ -14,6 +14,7 @@ import math
 from Helpers import *
 import sys
 from pathlib import Path
+import Failures
 
 
 STREAM_PATH = "hu4"
@@ -24,24 +25,26 @@ BaseData = namedtuple('BaseData', 'lineLayer lineDS, siteLayer siteDS dataBounda
 RESTRICTED_FCODES = [56600]
 
 QUERY_ATTEMPTS = 10 
+# the distance in km around a queried data radius that we consider the data 
+# to be safe from edge effects
 DATA_PADDING = 0.6
-TIMEOUT = 4
+TIMEOUT = 6
 
 def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
-        attemptsUsed = 0
-        success = False
-        while (attemptsUsed < attempts):
-            try:
-                req = requests.get(url, timeout=timeout)
-                success = True
-                print("queried " + queryName + " successfully!")
-                return req
-            except requests.exceptions.ReadTimeout:
-                attemptsUsed += 1
-                print("failed to retrieve " + queryName + " on attempt " + str(attemptsUsed) + ". Trying again")
-        if success == False:
-            print("failed to retrieve " + queryName + " on all attempts. Failing")
-            return None
+    attemptsUsed = 0
+    success = False
+    while (attemptsUsed < attempts):
+        try:
+            req = requests.get(url, timeout=timeout)
+            success = True
+            print("queried " + queryName + " successfully!")
+            return req
+        except requests.exceptions.ReadTimeout:
+            attemptsUsed += 1
+            print("failed to retrieve " + queryName + " on attempt " + str(attemptsUsed) + ". Trying again")
+    if success == False:
+        print("failed to retrieve " + queryName + " on all attempts. Failing")
+        return Failures.QUERY_FAILURE_CODE
 
 
 #convert the xml results of a stream site query to geojson
@@ -78,64 +81,22 @@ def buildGeoJson (xmlStr):
                 geojson["features"].append(feature)
     return json.dumps(geojson)
 
-#get site IDs similar to this site 
-def getNearbyIds (siteID, minReturnedSites = 5, cutoffDigits = 6):
-    numReturnedSites = 0
-    while numReturnedSites < minReturnedSites:
-        firstDigits = siteID[:8-cutoffDigits]#get the 8 digit number minus the number of cutoff digits
-        results = getSiteIDsStartingWith(firstDigits)
-        sitesLayer = results[0]
-        
-        numReturnedSites = sitesLayer.GetFeatureCount()
-    
-    return (sitesLayer, results[1])
-
 def getSiteIDsStartingWith (siteID, timeout = TIMEOUT):
     
     similarSitesQuery = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + siteID + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=search_site_no%2Csite_tp_cd"
     result = queryWithAttempts (similarSitesQuery, QUERY_ATTEMPTS, timeout = timeout, queryName="similarSiteIds")
+    
+    if Failures.isFailureCode(result):
+        return result
+
     geoJsonResults = buildGeoJson(result.text)
     try:
         sitesDataSource = gdal.OpenEx(geoJsonResults)#, nOpenFlags=gdalconst.GA_Update)
         sitesLayer = sitesDataSource.GetLayer()
     except:
         print("could not read query")
-        return None
-    return (sitesLayer, sitesDataSource)
-
-def getSiteNeighbors (inSiteID):
-
-    partCode = inSiteID[:2]
-    firstDigit = int(inSiteID[3:4])
-    (siteLayer, sitesDataSource) = getSiteIDsStartingWith(inSiteID[:4])
-
-    siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
-    previousSiteID = None
-    sites = []
-    matchIndex = -1
-    for site in siteLayer:
-        siteID = site.GetFieldAsString(siteNumberIndex)
-        point = site.GetGeometryRef().GetPoint(0)
-        lat = point[1]
-        lng = point[0]
-        sites.append((siteID, lat, lng))
-
-        if siteID == inSiteID:
-            matchIndex = len(sites) - 1
-    
-    if matchIndex > 0:
-        lowerNeighbor = sites[matchIndex-1]
-    else:
-        lowerNeighbor = None
-    
-    if matchIndex < len(sites)-1:
-        higherNeighbor = sites[matchIndex+1]
-    else:
-        higherNeighbor = None
-
-    return (lowerNeighbor, higherNeighbor)
-
-    
+        return Failures.QUERY_PARSE_FAILURE_CODE
+    return (sitesLayer, sitesDataSource)  
 
 def loadSitesFromQuery (lat, lng, radiusKM = 5):
     approxRadiusInDeg = approxKmToDegrees(radiusKM)
@@ -148,10 +109,8 @@ def loadSitesFromQuery (lat, lng, radiusKM = 5):
 
     siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
     req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
-
-    if req == None:
-        print("could not read query")
-        return None
+    if Failures.isFailureCode(req):
+        return req
 
     xmlSites = req.text#this query returns an xml. Have to conver to geoJson
     geoJsonSites = buildGeoJson(xmlSites)
@@ -161,7 +120,7 @@ def loadSitesFromQuery (lat, lng, radiusKM = 5):
         return (siteLayer, siteDataSource)
     except:
         print("could not read query")
-        return None
+        return Failures.QUERY_PARSE_FAILURE_CODE
 
 def loadFromQuery(lat, lng, radiusKM = 5):
 
@@ -173,19 +132,23 @@ def loadFromQuery(lat, lng, radiusKM = 5):
     lineURL = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + str(lng) + "," + str(lat) + "&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE%2C+FCODE%2C+OBJECTID%2C+ARBOLATESU&geometryType=esriGeometryPoint&inSR=4326&outSR=" + str(outProjectionCode) + "&distance=" + str(radiusKM*1000) + "&units=esriSRUnit_Meter&returnGeometry=true&f=geojson"
     req = queryWithAttempts(lineURL, QUERY_ATTEMPTS, queryName="lineData", timeout = TIMEOUT)
     
-    if req == None:
+    if Failures.isFailureCode(req):
         print("could not read query")
-        return None
+        return req
     try:
         lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
         lineLayer = lineDataSource.GetLayer()
     except:
         print("could not read query")
-        return None
+        return Failures.QUERY_PARSE_FAILURE_CODE
+    
+    if lineLayer.GetFeatureCount() == 0:
+        return Failures.EMPTY_QUERY_CODE
 
     sites = loadSitesFromQuery(lat, lng, radiusKM)
-    if sites is None:
-        return None
+    
+    if Failures.isFailureCode(sites):
+        return sites
     siteLayer = sites[0]
     siteDataSource = sites[1]
 
@@ -220,10 +183,9 @@ def loadFromData (lat, lng, radiusKM = 5):
     lineLayer.SetSpatialFilter(dataBuffer)
 
     sites = loadSitesFromQuery(lat, lng, radiusKM)
-    if sites is None:
-        return None
+    if Failures.isFailureCode(sites):
+        return sites
     siteLayer = sites[0]
     siteDataSource = sites[1]
-
 
     return BaseData(lineLayer = lineLayer, lineDS = lineDataSource, siteLayer = siteLayer, siteDS = siteDataSource, dataBoundary = dataBuffer)

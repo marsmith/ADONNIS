@@ -1,22 +1,11 @@
 #from StreamGraph import UPSTREAM, DOWNSTREAM
 from collections import namedtuple 
 import sys
+import Failures
 #a class that has various functionality to find / expand a StreamGraph
 
 
 StreamSearch = namedtuple('StreamSearch', 'id openSegments')
-
-#various ways a stream search can fail. These provide insight into what the SiteInfoCreator should do 
-QUERY_TERMINATE_CODE = "terminated_on_query"
-END_OF_BASIN_CODE = "end_of_network"
-QUERY_FAILURE_CODE = "query_failure"
-failure_codes = [QUERY_TERMINATE_CODE, END_OF_BASIN_CODE, QUERY_FAILURE_CODE]
-
-def isFailureCode (val):
-    if val in failure_codes:
-        return True
-    else:
-        return False
 
 class StreamGraphNavigator (object):
 
@@ -41,15 +30,11 @@ class StreamGraphNavigator (object):
     #directly upstream from the junction of the main path and the tributary that 'segment' is on
     def findNextLowerStreamLevelPath (self, segment):
         tribLevel = segment.streamLevel
-        #request a new safe array that will respond to updates in the stream graph
-        streamSearch = self.openSearch()
-        queue = streamSearch.openSegments
+
+        queue = []
         queue.append(segment)
 
         nextMainPath = None
-
-        failureCode = None
-
         while len(queue) > 0:
             current = queue.pop(0)
             if current.streamLevel < tribLevel:
@@ -64,29 +49,23 @@ class StreamGraphNavigator (object):
                 downstreamPoint = current.downStreamNode.position
                 if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint):
                     graphExpansion = self.streamGraph.expandGraph(downstreamPoint[1], downstreamPoint[0])
-                    if graphExpansion is False:
-                        failureCode = QUERY_FAILURE_CODE
-                        break
+                    
+                    if Failures.isFailureCode(graphExpansion):
+                        return graphExpansion
                     elif self.terminateSearchOnQuery is True:
-                        failureCode = QUERY_TERMINATE_CODE
-                        break
+                        return Failures.QUERY_TERMINATE_CODE
                     
                 nextSegments = current.downStreamNode.getDownstreamNeighbors()#getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
                 queue.extend(nextSegments)
         
-        # close this search
-        self.closeSearch(streamSearch.id)
-
-        if failureCode is not None:
-            return failureCode
         if nextMainPath is not None:
             return nextMainPath
         else:
-            return END_OF_BASIN_CODE
+            return Failures.END_OF_BASIN_CODE
 
     # get a sorted list of all upstream sites from 'segment'
     # list is sorted such that sites with higher IDS (closer to the mouth of the river) are first
-    # if there are no upstreamSites, returns (None, lengthOfUpstreamSegments)
+    # returns either an error code or a tuple (upstream sites, collectedUpstreamDistance)
     def collectSortedUpstreamSites (self, segment, downStreamPositionOnSegment, siteLimit = 1, autoExpand = True):
         # contains tuples of the form (site, dist to site)
         foundSites = []
@@ -98,14 +77,12 @@ class StreamGraphNavigator (object):
                 foundSites.append((site, downStreamPositionOnSegment - site.distDownstreamAlongSegment)) 
 
         if len(foundSites) >= siteLimit:
-            return foundSites
+            #return the list of found sites and the distance upstream of the last site found
+            return (foundSites, foundSites[-1][1])
 
         #get upstream tributaries of this path
-        streamSearch = self.openSearch()
-        stack = streamSearch.openSegments
+        stack = []
         stack.append(segment)
-
-        failureCode = None
 
         summedDistance = 0
         firstSegment = True
@@ -139,33 +116,31 @@ class StreamGraphNavigator (object):
             #if during navigation, we reach edge of safe data boundary, expand with new query
             if autoExpand is True and not self.streamGraph.pointWithinSafeDataBoundary(thisSegmentPosition):
                 graphExpansion = self.streamGraph.expandGraph(thisSegmentPosition[1], thisSegmentPosition[0])
-                if graphExpansion is False:
-                    failureCode = QUERY_FAILURE_CODE
-                    break
+                if Failures.isFailureCode(graphExpansion):
+                    return graphExpansion
                 elif self.terminateSearchOnQuery is True:
-                    failureCode = QUERY_TERMINATE_CODE
-                    break
+                    return Failures.QUERY_TERMINATE_CODE
             
             firstSegment = False
 
-        # close this search
-        self.closeSearch(streamSearch.id)
-
-        if failureCode is not None:
-            return failureCode
-
-        return foundSites
+        return (foundSites, summedDistance)
     
     #assume our graph is clean and loop free
     #returns a tuple (siteID, distance traversed to find site)
     # or None if no site is found
     def getNextUpstreamSite (self, segment, downstreamPositionOnSegment):        
         #get the first upstream site
-        upstreamSites = self.collectSortedUpstreamSites(segment, downstreamPositionOnSegment, siteLimit = 1)
-
+        upstreamSitesInfo = self.collectSortedUpstreamSites(segment, downstreamPositionOnSegment, siteLimit = 1)
+        
         #if this failed, return failure code now
-        if isFailureCode(upstreamSites):
-            return upstreamSites
+        if Failures.isFailureCode(upstreamSitesInfo):
+            return upstreamSitesInfo
+
+        upstreamSites = upstreamSitesInfo[0]
+        # we are only looking for one upstream site here, but, we only need this distance variable in the case
+        # where we don't find any upstream sites and have to backtrack. Thus, in that case, collectSortedUp... will have explored all of the graph
+        # upstream from segment
+        totalDistance = upstreamSitesInfo[1]
 
         foundSite = None
         if upstreamSites is not None and len(upstreamSites) > 0:
@@ -179,7 +154,7 @@ class StreamGraphNavigator (object):
             #find the next major branch by backtracking
             nextUpstreamSegment = self.findNextLowerStreamLevelPath(segment)
 
-            if isFailureCode(nextUpstreamSegment):
+            if Failures.isFailureCode(nextUpstreamSegment):
                 return nextUpstreamSegment
             else:#we found a mainstream branch!
                 print ("successful backtrack. Found next main branch")
@@ -187,11 +162,11 @@ class StreamGraphNavigator (object):
                 #the next mainstream branch should be the continuation of our trib in ID space
                 #self.streamGraph.visualize()
                 newSearch = self.getNextUpstreamSite(nextUpstreamSegment, nextUpstreamSegment.length)
-                if isFailureCode(newSearch):
+                if Failures.isFailureCode(newSearch):
                     return newSearch
                 else:#we found a site in the new search!
                     #we want to return the new site and the distance to it plus the distance upstream along our trib
-                    return (newSearch[0], newSearch[1] + segment.arbolateSum - (segment.length - downstreamPositionOnSegment))
+                    return (newSearch[0], newSearch[1] + totalDistance)
 
     def getNextDownstreamSite (self, segment, downstreamPositionOnSegment):
         foundSite = None
@@ -201,12 +176,8 @@ class StreamGraphNavigator (object):
                 foundSite = site
                 return (foundSite.siteID, site.distDownstreamAlongSegment - downstreamPositionOnSegment)
 
-
-        streamSearch = self.openSearch()
-        queue = streamSearch.openSegments
+        queue = []
         queue.append(segment)
-
-        failureCode = None
 
         summedDistance = 0
         firstSegment = True
@@ -227,7 +198,7 @@ class StreamGraphNavigator (object):
                 #only for first segment: add up length but subtract our relativel position on segment
                 summedDistance += current.length - downstreamPositionOnSegment
 
-            adjacentUpstreamPaths = current.downStreamNode.getUpstreamNeighbors()#getCodedNeighbors(UPSTREAM)
+            adjacentUpstreamPaths = current.downStreamNode.getUpstreamNeighbors()
             higherLevelNeighbors = [] # this means this junction has a trib. Since we're on the main path, we have to explore all the way up the trib
             #get a list of all valid upstream paths. Normally there will only be one
             #but in certain cases there are 3 upstream paths from a node
@@ -240,27 +211,30 @@ class StreamGraphNavigator (object):
             if len(higherLevelNeighbors) > 0:
                 totalTribLength = 0
                 nearestTribSite = None
-                nearestDistUpTrib = sys.maxsize
+                nearestDistUpTrib = 0
+
+                higherLevelNeighborsTribLengths = []
                 #find the trib with the nearest site. 
                 for higherLevelNeighbor in higherLevelNeighbors:
                     #collect all sites on this tributary
-                    tribSites = self.collectSortedUpstreamSites(higherLevelNeighbor, higherLevelNeighbor.length, siteLimit = sys.maxsize)
-                    if isFailureCode(tribSites):
-                        failureCode = tribSites
-                        break
+                    tribSitesInfo = self.collectSortedUpstreamSites(higherLevelNeighbor, higherLevelNeighbor.length, siteLimit = sys.maxsize)
+                    
+                    if Failures.isFailureCode(tribSitesInfo):
+                        return tribSitesInfo
                     else:
+                        tribSites = tribSitesInfo[0]
+                        tribLength = tribSitesInfo[1]
+                        higherLevelNeighborsTribLengths.append(tribLength)
                         #find which site is the closest upstream
                         if len(tribSites) > 0:
                             foundSiteInfo = tribSites[-1] #return the highest site on the trib
                             distUpTrib = foundSiteInfo[1]
-                            if distUpTrib < nearestDistUpTrib:
+                            #the farther the site is up the trib, the nearer it is to the main branch in ID space
+                            if distUpTrib > nearestDistUpTrib:
                                 nearestDistUpTrib = distUpTrib
                                 nearestTribSite = foundSiteInfo[0]
-                                totalTribLength = higherLevelNeighbor.arbolateSum
+                                totalTribLength = tribLength
                             #distance of streams that are higher in the network than the highest site on the trib
-                #if a failure code happened in the inner loop, we want to break out of this loop too
-                if failureCode is not None:
-                    break
                 #if there was a site on one of the tribs, break and return
                 if nearestTribSite is not None:
                     #distance of streams above the highest site that could have sites higher than nearestTribSite
@@ -270,34 +244,27 @@ class StreamGraphNavigator (object):
                     summedDistance += distanceAboveSite
                     break
                 else:#otherwise, sum total distance of tribs
-                    for higherLevelNeighbor in higherLevelNeighbors:
-                        summedDistance += higherLevelNeighbor.arbolateSum
+                    for neighborLength in higherLevelNeighborsTribLengths:
+                        summedDistance += neighborLength
 
             #expand graph, catch failures
             downstreamPoint = current.downStreamNode.position
             if not self.streamGraph.pointWithinSafeDataBoundary(downstreamPoint):
                 graphExpansion = self.streamGraph.expandGraph(downstreamPoint[1], downstreamPoint[0])
-                if graphExpansion is False:
-                    failureCode = QUERY_FAILURE_CODE
-                    break
+                if Failures.isFailureCode(graphExpansion):
+                    return graphExpansion
                 elif self.terminateSearchOnQuery is True:
-                    failureCode = QUERY_TERMINATE_CODE
-                    break
+                    return Failures.QUERY_TERMINATE_CODE
 
             nextSegments = current.downStreamNode.getDownstreamNeighbors()#getCodedNeighbors(DOWNSTREAM)#most likely only one such segment unless there is a fork in the river
             queue.extend(nextSegments)
             firstSegment = False
-        
-        # close this search
-        self.closeSearch(streamSearch.id)
-
-        if failureCode is not None:
-            return failureCode
+            
         if foundSite is not None:
             return (foundSite.siteID, summedDistance)
         else:
             #we searched downstream and found no sites. If we terminated without error thus far it means we reached the end of the network
-            return END_OF_BASIN_CODE
+            return Failures.END_OF_BASIN_CODE
 
     #get comulative error in site snaps 
     #error is defined by number of times a site that is farther upstream
@@ -312,7 +279,7 @@ class StreamGraphNavigator (object):
                 #collect all upstream sites without expanding the graph
                 #we do verification and error checking only on the part of the graph that has
                 #been expanded thus far
-                upstreamSites = self.collectSortedUpstreamSites(path, path.length, siteLimit = sys.maxsize, autoExpand = False)
+                upstreamSites = self.collectSortedUpstreamSites(path, path.length, siteLimit = sys.maxsize, autoExpand = False)[0]
                 prevNumber = sys.maxsize
                 for site in upstreamSites:
                     #we have to index this with [0] since collectSortedUpst.. returns a tuple like (siteID, distUpstream)

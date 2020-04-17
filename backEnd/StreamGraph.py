@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import random
 import sys
 import copy
+import Failures
 
 #constants for neighbor relationships
 UNKNOWN = 0         #000
@@ -17,7 +18,7 @@ DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstr
 
 #tuples used
 NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
-GraphSite = namedtuple('GraphSite', 'distDownstreamAlongSegment siteID segmentID snapDist')
+GraphSite = namedtuple('GraphSite', 'distDownstreamAlongSegment siteID segmentID snapDist nameMatch')
 GraphUpdate = namedtuple('GraphUpdate', 'fromSeg toSeg')#an update to the graph. 'from' is replaced with 'to' 
 
 #a stream node 
@@ -189,7 +190,7 @@ class StreamGraph (object):
             y = [startPt[1], endPt[1]]
             dx = endPt[0] - startPt[0]
             dy = endPt[1] - startPt[1]
-            plt.arrow(startPt[0], startPt[1], dx, dy, width=0.00001, head_width = 0.0001, color='blue', length_includes_head=True)
+            plt.arrow(startPt[0], startPt[1], dx, dy, width=0.000001, head_width = 0.00001, color='blue', length_includes_head=True)
 
             plt.plot(x,y, lineWidth=0.5, color='blue')
 
@@ -209,7 +210,7 @@ class StreamGraph (object):
 
             segmentInfo = streamSeg.streamLevel
             if showSegInfo is True:
-                segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel)
+                segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel) + "\n" + str(streamSeg.arbolateSum)
             plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
         
         """ x = []
@@ -263,9 +264,9 @@ class StreamGraph (object):
     def expandGraph (self, lat, lng):
         print ("Expanding graph!")
         baseData = loadFromQuery(lat, lng)    
-        if baseData is None:
+        if Failures.isFailureCode(baseData):
             print ("could not expand graph")
-            return False    
+            return baseData
         self.addGeom(baseData)
         return True
 
@@ -538,14 +539,11 @@ class StreamGraph (object):
             #graphSite is similar to Snap, but stores a reference to segmentID instead of feature
             #we assume that the feature reference itself isn't stable once the GDAL object gets
             #removed by the garbage collector
-            potentialGraphSites = [GraphSite(siteID = siteID, segmentID = snap.feature.GetFieldAsString(objectIDIndex), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature) for snap in snaps]
-            self.addSiteSnaps(siteID, potentialGraphSites)
+            if len(snaps) > 0:
+                potentialGraphSites = [GraphSite(siteID = siteID, segmentID = snap.feature.GetFieldAsString(objectIDIndex), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch) for snap in snaps]
+                self.addSiteSnaps(siteID, potentialGraphSites)
 
         #refresh all site snaps given the new site data
         print("refreshing site snaps")
-        #getSiteSnapAssignmentTwo(self)
         self.refreshSiteSnaps(getSiteSnapAssignment(self, debug = self.debug))
         #self.cleanGraph()
-
-
-

@@ -7,16 +7,10 @@ import collections
 from StreamGraphNavigator import StreamGraphNavigator
 import copy
 import itertools
-""" 
-class SnapSite(object):
-    def __init__(self, maxSnapDist):
-        #the assumed farthest distance between a site and its coorisponding snapped location
-        self.maxSnapDist = maxSnapDist
- """
+import Failures
 
-NUM_SNAPS = 3# how many possible locations that aren't the same as the nearest do we consider?
-PERCENT_DIST_CUTOFF = 3 #if a potential snap is 
-CUTOFF_DIST = 0.0005
+NUM_SNAPS = 6# how many possible locations that aren't the same as the nearest do we consider?
+CUTOFF_DIST = 0.004
 adverbNameSeparators = [" at ", " above ", " near ", " below "]
 waterTypeNames = [" brook", " pond", " river", " lake", " stream", " outlet", " creek", " bk", " ck"]
 #a possible snap for a given point
@@ -36,18 +30,9 @@ def getSiteStreamNameIdentifier (siteName):
             pass
     split = lowerCase[0:endIndex]
     
-    """ for waterBody in waterTypeNames:
-        try:
-            endIndex = split.index(waterBody)
-        except:
-            pass """
-
     if endIndex == len(siteName)-1:
         return ""
     return lowerCase[0:endIndex]
-
-def dot (x1, y1, x2, y2):
-    return x1*x2 + y1*y2
 
 def snapPoint(snapablePoint, baseData, graph = None):
     lineNameIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
@@ -60,6 +45,7 @@ def snapPoint(snapablePoint, baseData, graph = None):
     sitePoint = snapablePoint.point
     siteName = snapablePoint.name
     siteId = snapablePoint.id
+    stationIdentifier = getSiteStreamNameIdentifier(siteName)
 
     #mum of points to sample along the feature per kilometer in length
     #we assume that adjacent points in the geometry of the line are relatively continuous 
@@ -100,6 +86,7 @@ def snapPoint(snapablePoint, baseData, graph = None):
         numPoints = lineGeom.GetPointCount()
         lineLength = float(line.GetFieldAsString(lengthIndex))
         objectID = line.GetFieldAsString(objectIDIndex)
+        lineName = line.GetFieldAsString(lineNameIndex).lower()
 
         nearestPointDist = sys.float_info.max
         nearestPointIndex = -1
@@ -122,50 +109,25 @@ def snapPoint(snapablePoint, baseData, graph = None):
         nearestPoint = lineGeom.GetPoint(nearestPointIndex)
         #calculate the true distance
         nearestPointDist = Helpers.dist(sitePoint[0], sitePoint[1], nearestPoint[0], nearestPoint[1])
-        snap = Snap(feature = line, snapDistance = nearestPointDist, distAlongFeature = nearestPointDistAlongSegment)
+        nameMatch = False
+
+        #check if this snap features a name match
+        if len(stationIdentifier) > 0:
+            if stationIdentifier in lineName:
+                nameMatch = True
+
+        snap = Snap(feature = line, snapDistance = nearestPointDist, distAlongFeature = nearestPointDistAlongSegment, nameMatch = nameMatch)
         possibleSnaps.append(snap)
 
     if len(possibleSnaps) == 0:
-        return None
+        return Failures.SNAP_FAILURE_CODE
 
     sortedPossibleSnaps = sorted(possibleSnaps, key=lambda snap: snap.snapDistance)
     #limit the number of considered snaps to a fixed number
-    consideredSnaps = sortedPossibleSnaps[:min(NUM_SNAPS, len(sortedPossibleSnaps))]
-
-    #closestSnap = consideredSnaps[0].snapDistance
-    #cutoff = closestSnap * PERCENT_DIST_CUTOFF
-
-    #remove very unlikely snaps
-    """ for snap in reversed(consideredSnaps):
+    consideredSnaps = sortedPossibleSnaps#sortedPossibleSnaps[:min(NUM_SNAPS, len(sortedPossibleSnaps))]
+    for i, snap in reversed(list(enumerate(consideredSnaps))):
         if snap.snapDistance > CUTOFF_DIST:
-            consideredSnaps.remove(snap) """
-    if siteId == "01309900":
-        print("test")
-
-    stationIdentifier = getSiteStreamNameIdentifier(siteName)
-    if len(stationIdentifier) > 0:
-        nameMatch = False
-        nameMatchSnaps = []
-        #find name match. If name match is found, then we can be sure of this snap
-        for snap in consideredSnaps:
-            lineName = snap.feature.GetFieldAsString(lineNameIndex).lower()
-            if stationIdentifier in lineName:
-                nameMatch = True
-                nameMatchSnaps.append(snap)
-        if nameMatch is True:
-            consideredSnaps = nameMatchSnaps
-
-    """ if len(stationIdentifier) > 0:
-        nameMatch = False
-        nameMatchSnaps = []
-        #find name match. If name match is found, then we can be sure of this snap
-        for snap in consideredSnaps:
-            lineName = snap.feature.GetFieldAsString(lineNameIndex).lower()
-            if stationIdentifier in lineName:
-                nameMatch = True
-                nameMatchSnaps.append(snap)
-        if nameMatch is True:
-            consideredSnaps = nameMatchSnaps """
+            consideredSnaps.pop(i)
 
     return consideredSnaps
 
@@ -221,6 +183,13 @@ def getSiteSnapAssignment (graph, debug = False):
             upstreamSitesInfo = testingGraphNavigator.collectSortedUpstreamSites(path, path.length, siteLimit = sys.maxsize, autoExpand = False)[0]
             #trim the extra distance info off of the results. Not needed
             upstreamSites = [siteInfo[0] for siteInfo in upstreamSitesInfo]
+
+            siteIndexRanges = {}
+            for site in upstreamSites:
+                siteID = site.siteID
+                if siteID not in siteIndexRanges:
+                    firstOccuranceIdx, lastOccuranceIdx = getSiteIndexRange(siteID, upstreamSites)
+                    siteIndexRanges[siteID] = (firstOccuranceIdx, lastOccuranceIdx)
             
             #count all unique sites found on this branch. List them in order of appearance
             uniqueOrderedIDs = []
@@ -228,9 +197,12 @@ def getSiteSnapAssignment (graph, debug = False):
                 siteID = site.siteID
                 if siteID not in uniqueOrderedIDs:
                     uniqueOrderedIDs.append(siteID)
+            uniqueOrderedIDs = sorted(uniqueOrderedIDs, key=lambda site: int(Helpers.getFullID(site)), reverse=True)
+            
+            resolvedSites = set()
 
             for orderedIdx, siteID in enumerate(uniqueOrderedIDs):
-                firstOccuranceIdx, lastOccuranceIdx = getSiteIndexRange(siteID, upstreamSites)
+                firstOccuranceIdx, lastOccuranceIdx = siteIndexRanges[siteID]
 
                 #get a list of possible assignments for this ID
                 #Here, an choice is a tuple (assignment, index)
@@ -242,16 +214,17 @@ def getSiteSnapAssignment (graph, debug = False):
                 for i in range(firstOccuranceIdx, lastOccuranceIdx+1):
                     if upstreamSites[i].siteID == siteID:
                         siteChoices.append((upstreamSites[i], i))
-                
+
                 for choice in siteChoices:
                     assignment = choice[0]
                     upstreamSitesIdx = choice[1] #the index of this site in the list 'upstreamSites'
                     orderError = 0
                     distanceScore = 0
+                    nameMatch = assignment.nameMatch
                     #calculate the order error for this choice
-                    for i in range(orderedIdx, len(uniqueOrderedIDs)):
+                    for i in range(0, len(uniqueOrderedIDs)):
                         cmpSiteID = uniqueOrderedIDs[i]
-                        cmpFirstOccuranceIdx, cmpLastOccuranceIdx = getSiteIndexRange(cmpSiteID, upstreamSites)
+                        cmpFirstOccuranceIdx, cmpLastOccuranceIdx = siteIndexRanges[cmpSiteID]
                         compare = Helpers.siteIDCompare(assignment.siteID, cmpSiteID)
                         #moving forward, if I choose this choice, will I cut off all the assignments for any remaining sites?
                         if cmpLastOccuranceIdx < upstreamSitesIdx and compare > 0:
@@ -263,13 +236,29 @@ def getSiteSnapAssignment (graph, debug = False):
                             # for cmpSite upstream from our current choice even though 
                             # cmpSiteID is higher than us 
                             orderError += 1
+                    #get list of sites involved in the outcome of this sites snap choice
+                    #this is all site IDs that have a snap choice that appears between the first instance of the 
+                    #current site id and the last instance in the traversal 
+                    involvedSites = set()
+                    for i in range(firstOccuranceIdx+1, lastOccuranceIdx):
+                        if upstreamSites[i].siteID != siteID and upstreamSites[i].siteID not in resolvedSites:
+                            involvedSites.add(upstreamSites[i].siteID)
+
                     #for all sites that are 'involved' (appear between the first and last occurance index of the current site),
                     #find the best nearest possible distance allowed if we choose this assignment
                     minDistOfInvolved = {}
 
-                    for i in range(upstreamSitesIdx, lastOccuranceIdx+1):
+                    # by starting this loop at the index of the choice,
+                    # we won't get snap options of this involved site that occur before the index of the current 
+                    # choice. This is because if we choose this choice, anything before it on the traversal can't be chosen anymore
+                    # if there are no instances of an involved site that occur after this choice, it won't be counted
+                    # But, then that should trigger an increase in order error.
+                    # since order error is taken as higher priority than distance, the fact we don't
+                    # count up the distance for the missing site shouldn't be an issue
+                    for i in range(upstreamSitesIdx, len(upstreamSites)):
                         involvedID = upstreamSites[i].siteID
-                        if involvedID != siteID:
+                        #check if this site is truely an involved site
+                        if involvedID in involvedSites:
                             #if this site is not the same as the one we are trying to assign:
                             if involvedID in minDistOfInvolved:
                                 minDistOfInvolved[involvedID] = min(minDistOfInvolved[involvedID], upstreamSites[i].snapDist)
@@ -282,7 +271,7 @@ def getSiteSnapAssignment (graph, debug = False):
                     for minDist in minDistOfInvolved.values():
                         distanceScore += minDist
                     
-                    rankedChoices.append((assignment, orderError, distanceScore, upstreamSitesIdx))
+                    rankedChoices.append((assignment, orderError, distanceScore, upstreamSitesIdx, nameMatch))
 
                 minOrderError = sys.maxsize
                 bestScoreChoice = None
@@ -290,6 +279,7 @@ def getSiteSnapAssignment (graph, debug = False):
                 for choice in rankedChoices:
                     orderError = choice[1]
                     distanceScore = choice[2]
+                    nameMatch = choice[4]
                     #if we find a better order error, always choose this option
                     if orderError < minOrderError:
                         bestScoreChoice = choice
@@ -297,7 +287,10 @@ def getSiteSnapAssignment (graph, debug = False):
                     elif orderError == minOrderError:
                         #if we find an equal order error but smaller dist score choice, choose it
                         bestDistScore = bestScoreChoice[2]
-                        if distanceScore < bestDistScore:
+                        bestScoreNameMatch = bestScoreChoice[4]
+                        # if this dist is better than previous
+                        # AND either this choice is a name match or this isn't and the previous best isn't
+                        if distanceScore < bestDistScore and (nameMatch or (not nameMatch and not bestScoreNameMatch)):
                             bestScoreChoice = choice
                 if bestScoreChoice[1] > 0:
                     print("adding a site with " + str(bestScoreChoice[1]) + " order error")
@@ -305,6 +298,7 @@ def getSiteSnapAssignment (graph, debug = False):
                 bestScoreAssignment = bestScoreChoice[0]
                 bestScoreUpstreamSitesIdx = bestScoreChoice[3]
                 addAssignment(bestScoreAssignment)
+                resolvedSites.add(siteID)
 
 
     accountedForSiteIDs = set()
