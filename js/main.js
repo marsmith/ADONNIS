@@ -1,10 +1,14 @@
 var map;
 var marker;
 var preexistingSiteLayer;
+var highlightedStreamsLayer;
 var firstpolyline;
 var printURL = "";
 var currStationName = "";
 var counter = 0;
+
+var queryingStreams = false;
+var currentQueriedStreams;
 
 var collectedData = {
 	placeName: "",
@@ -124,6 +128,10 @@ function getBoundingBox(centerPoint, distance) {
 	  maxLon.radToDeg(),
 	  maxLat.radToDeg()
 	]; */
+}
+
+function getDistanceKM (lat1, lng1, lat2, lng2){
+	
 }
 
 function getSpPoint(A,B,C){
@@ -459,13 +467,10 @@ function updateMapSitesCallback (xml) {
 	});
 }
 
-
-
 function verifyMapSiteSnapsCallback (xml) {
 	updateMapSitesCallback(xml);
 }
  
-
 /*
 $.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7){
 		$.when(ajaxSiteName(), ajaxSiteID()).done(function(a8, a9){
@@ -476,13 +481,31 @@ $.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitu
 
 //attempt to get streams in a radius around latlng. Send features to callback in format callback(results)
 function ajaxGetStreams (latlng, callback) {
-	var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=4000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson";
+	var radius = 2000;
+	var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=" + radius + "&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson";
+	
+	if (queryingStreams == true) {
+		console.log("already querying");
+		return;
+	}
+	
+	queryingStreams = true;
+
+	
+
 	return $.ajax({
 		url: queryUrl,
 		dataType: 'json',
+		timeout: 5000,
 		success: function(results){
-			callback(latlng, results.features);
-		}
+			queryingStreams = false;
+			currentQueriedStreams = [results.features, latlng, radius]
+			callback(latlng, results.features, radius);
+		},
+		error: function(){
+			queryingStreams = false;
+			console.log("query failure. Attempting again.");
+		},
 	});
 }
 
@@ -566,18 +589,20 @@ function snapToFeature (latlng, features) {
 }
 
 function getSnappedPointThenRun (latlng) {
+
 	ajaxGetStreams(latlng, getSnappedPointThenRunCallback);
 }
 
-function getSnappedPointThenRunCallback (latlng, features) {
+function getSnappedPointThenRunCallback (latlng, features, radius) {
 	var snappedLatlng = snapToFeature(latlng, features);
 	highlightFeature(features);
 	marker.setLatLng(snappedLatlng);
 
-	var latLngs = [ marker.getLatLng() ];
-	var markerBounds = L.latLngBounds(latLngs);
-	map.fitBounds(markerBounds);
-	map.setZoom(12);
+	//var latLngs = [ marker.getLatLng() ];
+	//var markerBounds = L.latLngBounds(latLngs);
+	//map.fitBounds(markerBounds);
+	//map.setZoom(14);
+	map.flyTo(marker.getLatLng(), 14)
 
 	var popup = L.popup({offset: L.point(0,-50)})
 	.setLatLng(snappedLatlng)
@@ -597,6 +622,7 @@ function getSnappedPointThenRunCallback (latlng, features) {
 }
 
 function highlightFeature (features) {
+	highlightedStreamsLayer.clearLayers();
 	for (var feature of features) {
 		var points = [];
 		for (const point of feature.geometry.paths[0]) {
@@ -608,141 +634,10 @@ function highlightFeature (features) {
 			opacity: 0.5,
 			smoothFactor: 1
 		});
-		firstpolyline.addTo(map);
+		firstpolyline.addTo(highlightedStreamsLayer);
 	}
 }
 
-/* function getSnappedPointThenRun (e) {
-	$.ajax({
-		url: "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + e.latlng.lng + "," + e.latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=4000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson",
-		dataType: 'json',
-		success: function(result6){
-			var theFeatures = result6.features;
-			var smallestDistFeatureFeature = undefined;
-			var smallestDistFeature = Number.MAX_VALUE;
-			var smallestDistFeatureIndex = -1;
-			for (var feature of theFeatures) {
-				var points = [];
-				for (const point of feature.geometry.paths[0]) {
-					points.push(new L.LatLng(point[1], point[0]));
-				}
-				firstpolyline = new L.Polyline(points, {
-					color: 'red',
-					weight: 3,
-					opacity: 0.5,
-					smoothFactor: 1
-				});
-				firstpolyline.addTo(map);
-
-				if (feature.attributes.GNIS_NAME) {
-					var smallestDist = "";
-					var smallestDistIndex;
-					for (var i = 0; i < feature.geometry.paths[0].length; i++) {
-						var theDist = distance(e.latlng.lat, e.latlng.lng, feature.geometry.paths[0][i][1], feature.geometry.paths[0][i][0]);
-						if (smallestDist == "") {
-							smallestDist = theDist;
-							smallestDistIndex = 0;
-						} else {
-							if (theDist < smallestDist) {
-								smallestDist = theDist;
-								smallestDistIndex = i;
-							}
-						}
-					}
-					if (smallestDist < smallestDistFeature) {
-						smallestDistFeature = smallestDist;
-						smallestDistFeatureIndex = smallestDistIndex;
-						smallestDistFeatureFeature = feature;
-					}
-				}
-			}
-
-			var feature = smallestDistFeatureFeature;
-
-			//find nearest coordinate
-			var smallestDist = smallestDistFeature;
-			var smallestDistIndex = smallestDistFeatureIndex;
-			globSmallestDistIndex = smallestDistIndex;
-
-			//now find whether left or right of smallestDistIndex is closer
-
-			var leftDist = Number.MAX_VALUE;
-			var rightDist = Number.MAX_VALUE;
-			//left
-			if (smallestDistIndex != 0) {
-				leftDist = distance(e.latlng.lat, e.latlng.lng, feature.geometry.paths[0][smallestDistIndex - 1][1], feature.geometry.paths[0][smallestDistIndex - 1][0]);
-			}
-
-			if (smallestDistIndex != feature.geometry.paths[0].length - 1) {
-				rightDist = distance(e.latlng.lat, e.latlng.lng, feature.geometry.paths[0][smallestDistIndex + 1][1], feature.geometry.paths[0][smallestDistIndex + 1][0]);
-			}
-			var leftCoordOfLine;
-			var rightCoordOfLine;
-			if (leftDist < rightDist) {
-				leftCoordOfLine = feature.geometry.paths[0][smallestDistIndex - 1];
-				rightCoordOfLine = feature.geometry.paths[0][smallestDistIndex];
-			} else {
-				leftCoordOfLine = feature.geometry.paths[0][smallestDistIndex];
-				rightCoordOfLine = feature.geometry.paths[0][smallestDistIndex + 1];
-			}
-
-			//now calculate closest "nonreal" point on line
-			var A = {
-				x : leftCoordOfLine[1],
-				y : leftCoordOfLine[0]
-			};
-
-			var B = {
-				x : rightCoordOfLine[1],
-				y : rightCoordOfLine[0]
-			};
-
-			var C = {
-				x : e.latlng.lat,
-				y : e.latlng.lng
-			};
-
-			var D = getSpPoint(A,B,C);
-
-			//check if the projected point is in the line segment
-
-			var isInLineSegm = calcIsInsideLineSegment(A,B,D);
-
-			if (!isInLineSegm) {
-				D.x = feature.geometry.paths[0][smallestDistIndex][1];
-				D.y = feature.geometry.paths[0][smallestDistIndex][0];
-			}
-
-			closestPoint = D;
-			closestPoint.latlng = {
-				lat : closestPoint.x,
-				lng : closestPoint.y
-			};
-			marker.setLatLng(closestPoint.latlng);
-
-			var latLngs = [ marker.getLatLng() ];
-			var markerBounds = L.latLngBounds(latLngs);
-			map.fitBounds(markerBounds);
-			map.setZoom(12);
-
-			var popup = L.popup({offset: L.point(0,-50)})
-			.setLatLng(closestPoint.latlng)
-			.setContent('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr" style = "float:right;">Yes</button>')
-			.openOn(map);
-			$("#notCorr").click(function(){
-				map.closePopup();
-			});
-			$("#yesCorr").click(function(){
-				map.closePopup();
-				collectedData.coords = closestPoint.latlng;
-				collectedData.coords.x = closestPoint.x;
-				collectedData.coords.y = closestPoint.y;
-				globFeature = feature;
-				callAjaxCalls(e);
-			});
-		}
-	});
-} */
 
 function ajaxNearbyPlace (e) {
 	on();
@@ -857,7 +752,11 @@ $(document).ready(function () {
 
 	//set up a layer group that will hold the preexisting sites
 	preexistingSiteLayer = L.layerGroup();
-	preexistingSiteLayer.addTo(map)
+	preexistingSiteLayer.addTo(map);
+
+	highlightedStreamsLayer = L.layerGroup();
+	highlightedStreamsLayer.addTo(map);
+
 	map.on('moveend', function (e) {
 		if(map.getZoom() >= 13) {
 			siteLocRenderer = ajaxSiteLocs(updateMapSitesCallback);
@@ -926,11 +825,9 @@ $(document).ready(function () {
 			console.log(latlng);
 			var markerLoc = marker.getLatLng();
 			var bounds = getBoundingBox([markerLoc.lat, markerLoc.lng], 30);
-			map.fitBounds(bounds);
-
-			ajaxSiteLocs(verifyMapSiteSnapsCallback);
+			//map.fitBounds(bounds);
 			
-			//getSnappedPointThenRun(latlng);
+			getSnappedPointThenRun(latlng);
 		});
 		$("#noLoc").click(function(){
 			map.closePopup();
