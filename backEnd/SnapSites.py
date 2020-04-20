@@ -11,6 +11,7 @@ import Failures
 
 NUM_SNAPS = 6# how many possible locations that aren't the same as the nearest do we consider?
 CUTOFF_DIST = 0.004
+POINTS_PER_LINE = 2
 adverbNameSeparators = [" at ", " above ", " near ", " below "]
 waterTypeNames = [" brook", " pond", " river", " lake", " stream", " outlet", " creek", " bk", " ck"]
 #a possible snap for a given point
@@ -88,36 +89,44 @@ def snapPoint(snapablePoint, baseData, graph = None):
         objectID = line.GetFieldAsString(objectIDIndex)
         lineName = line.GetFieldAsString(lineNameIndex).lower()
 
-        nearestPointDist = sys.float_info.max
-        nearestPointIndex = -1
-        nearestPointDistAlongSegment = 0
+        points = []
 
         distAlongSegment = 0
+        #collect all points and their respective distances
         for i in range(0, numPoints):
             point = lineGeom.GetPoint(i)
             #we make assumption that each point in the geo is equally spaced
             geomSegmentLen = lineLength / numPoints
             #get a fast approx dist            
             distance = Helpers.fastMagDist(point[0], point[1], sitePoint[0], sitePoint[1])
-            if distance < nearestPointDist:
-                nearestPointDist = distance
-                nearestPointIndex = i
-                nearestPointDistAlongSegment = distAlongSegment
 
+            points.append((distance, distAlongSegment, i))
             distAlongSegment += geomSegmentLen
-        
-        nearestPoint = lineGeom.GetPoint(nearestPointIndex)
-        #calculate the true distance
-        nearestPointDist = Helpers.dist(sitePoint[0], sitePoint[1], nearestPoint[0], nearestPoint[1])
-        nameMatch = False
+
+        #sort possible line points on their distance to the site 
+        sortedPoints = sorted(points, key=lambda point: point[0])
+        #cutoff all but POINTS_PER_LINE of the line points
+        pointsToConsider = min(POINTS_PER_LINE, len(sortedPoints))
+        sortedPoints = sortedPoints[:pointsToConsider]
 
         #check if this snap features a name match
+        nameMatch = False
         if len(stationIdentifier) > 0:
             if stationIdentifier in lineName:
                 nameMatch = True
 
-        snap = Snap(feature = line, snapDistance = nearestPointDist, distAlongFeature = nearestPointDistAlongSegment, nameMatch = nameMatch)
-        possibleSnaps.append(snap)
+        for point in sortedPoints:
+            pointIndex = point[2]
+            pointPosition = lineGeom.GetPoint(pointIndex)
+
+            #calculate the true distance
+            trueDist = Helpers.dist(sitePoint[0], sitePoint[1], pointPosition[0], pointPosition[1])
+
+            distAlongSeg = point[1]
+
+
+            snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch)
+            possibleSnaps.append(snap)
 
     if len(possibleSnaps) == 0:
         return Failures.SNAP_FAILURE_CODE
