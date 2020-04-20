@@ -500,7 +500,7 @@ function ajaxGetStreams (latlng, callback) {
 		success: function(results){
 			queryingStreams = false;
 			currentQueriedStreams = [results.features, latlng, radius]
-			callback(latlng, results.features, radius);
+			callback(latlng, results.features);
 		},
 		error: function(){
 			queryingStreams = false;
@@ -514,16 +514,14 @@ function snapToFeature (latlng, features) {
 	var smallestDistFeatureIndex = -1;
 	var feature = null;
 	for (var feat of features) {
-		if (feat.attributes.GNIS_NAME) {
-			var smallestDist = "";
-			var smallestDistIndex;
-			for (var i = 0; i < feat.geometry.paths[0].length; i++) {
-				var dist = distance(latlng.lat, latlng.lng, feat.geometry.paths[0][i][1], feat.geometry.paths[0][i][0]);
-				if(dist < smallestDistFeature){
-					smallestDistFeature = dist;
-					smallestDistFeatureIndex = i;
-					feature = feat
-				}
+		var smallestDist = "";
+		var smallestDistIndex;
+		for (var i = 0; i < feat.geometry.paths[0].length; i++) {
+			var dist = distance(latlng.lat, latlng.lng, feat.geometry.paths[0][i][1], feat.geometry.paths[0][i][0]);
+			if(dist < smallestDistFeature){
+				smallestDistFeature = dist;
+				smallestDistFeatureIndex = i;
+				feature = feat
 			}
 		}
 	}
@@ -590,18 +588,26 @@ function snapToFeature (latlng, features) {
 
 function getSnappedPointThenRun (latlng) {
 
+	if (currentQueriedStreams != null) {
+		currentQueryFeatures = currentQueriedStreams[0]
+		currentQueryCenter = currentQueriedStreams[1]
+		currentQueryRad = currentQueriedStreams[2]
+
+		if (latlng.distanceTo(currentQueryCenter) < currentQueryRad/2)
+		{
+			console.log("within previous");
+			getSnappedPointThenRunCallback(latlng, currentQueryFeatures);
+		}
+	} 
+
 	ajaxGetStreams(latlng, getSnappedPointThenRunCallback);
 }
 
-function getSnappedPointThenRunCallback (latlng, features, radius) {
+function getSnappedPointThenRunCallback (latlng, features) {
 	var snappedLatlng = snapToFeature(latlng, features);
 	highlightFeature(features);
 	marker.setLatLng(snappedLatlng);
 
-	//var latLngs = [ marker.getLatLng() ];
-	//var markerBounds = L.latLngBounds(latLngs);
-	//map.fitBounds(markerBounds);
-	//map.setZoom(14);
 	map.flyTo(marker.getLatLng(), 14)
 
 	var popup = L.popup({offset: L.point(0,-50)})
