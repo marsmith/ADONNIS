@@ -157,6 +157,7 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
         testingGraph.visualize()
 
     assignments = []
+    allRankedChoices = {}
     #for each site, holds a list of other sites that 
     siteConflicts = set()
 
@@ -187,6 +188,28 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
                 lastIndex = i
         return (firstIndex, lastIndex)
 
+    def getBestRankedChoice (rankedChoices):
+        minOrderError = sys.maxsize
+        bestScoreChoice = None
+        #find the choice that minimize ordering error
+        for choice in rankedChoices:
+            orderError = choice[1]
+            distanceScore = choice[2]
+            nameMatch = choice[4]
+            #if we find a better order error, always choose this option
+            if orderError < minOrderError:
+                bestScoreChoice = choice
+                minOrderError = orderError
+            elif orderError == minOrderError:
+                #if we find an equal order error but smaller dist score choice, choose it
+                bestDistScore = bestScoreChoice[2]
+                bestScoreNameMatch = bestScoreChoice[4]
+                # if this dist is better than previous
+                # AND either this choice is a name match or this isn't and the previous best isn't
+                if distanceScore < bestDistScore and (nameMatch or (not nameMatch and not bestScoreNameMatch)):
+                    bestScoreChoice = choice
+        return bestScoreChoice
+
     sinks = graph.getSinks()
     for sink in sinks:
         upstreamPaths = sink.getUpstreamNeighbors()
@@ -209,11 +232,14 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
                 if siteID not in uniqueOrderedIDs:
                     uniqueOrderedIDs.append(siteID)
             uniqueOrderedIDs = sorted(uniqueOrderedIDs, key=lambda site: int(Helpers.getFullID(site)), reverse=True)
-            
-            resolvedSites = set()
+            #list of sites that have already been chosen on this branch
+            resolvedSites = dict()
 
             for orderedIdx, siteID in enumerate(uniqueOrderedIDs):
                 firstOccuranceIdx, lastOccuranceIdx = siteIndexRanges[siteID]
+
+                if siteID == "01499400":
+                    print("test")
 
                 #get a list of possible assignments for this ID
                 #Here, an choice is a tuple (assignment, index)
@@ -237,20 +263,40 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
                     #calculate the order error for this choice
                     for i in range(0, len(uniqueOrderedIDs)):
                         cmpSiteID = uniqueOrderedIDs[i]
-                        cmpFirstOccuranceIdx, cmpLastOccuranceIdx = siteIndexRanges[cmpSiteID]
-                        compare = Helpers.siteIDCompare(assignment.siteID, cmpSiteID)
-                        #moving forward, if I choose this choice, will I cut off all the assignments for any remaining sites?
-                        if cmpLastOccuranceIdx < upstreamSitesIdx and compare > 0:
-                            # by choosing this choice, I'm stranding the the last snap choice 
-                            # of a site with a lower ID than us downstream from us. 
-                            orderError += 1
-                            orderConflicts.append(cmpSiteID)
-                        if cmpFirstOccuranceIdx > upstreamSitesIdx and compare < 0:
-                            # by choosing this choice, I'm stranding all of the snap options 
-                            # for cmpSite upstream from our current choice even though 
-                            # cmpSiteID is higher than us 
-                            orderError += 1
-                            orderConflicts.append(cmpSiteID)
+                        #the case when we are comparing to a site thats been resolved
+                        #is different than the case when a site we compare to is unresolved 
+
+                        #if the cmp site is unresolved, we are looking to see if this site's choice 
+                        #will force an order error for site that has yet to be chosen
+
+                        #if the cmp site is resolved, we are looking to see if this site's choice
+                        #conflicts with the choice ALREADY made for the cmp site
+
+
+
+                        if cmpSiteID in resolvedSites:
+                            #the third elem in the tuple is the ranked choice's upstream sites index
+                            resolvedCmpUpstreamSitesIdx = resolvedSites[cmpSiteID][3]
+                            #if this cmp site is resolved it must be a larger ID than us because
+                            #sites are resolved in decending order of their IDs
+                            if upstreamSitesIdx < resolvedCmpUpstreamSitesIdx:
+                                orderError += 1
+                                orderConflicts.append(cmpSiteID)
+                        else:
+                            cmpFirstOccuranceIdx, cmpLastOccuranceIdx = siteIndexRanges[cmpSiteID]
+                            compare = Helpers.siteIDCompare(assignment.siteID, cmpSiteID)
+                            #moving forward, if I choose this choice, will I cut off all the assignments for any remaining sites?
+                            if cmpLastOccuranceIdx < upstreamSitesIdx and compare > 0:
+                                # by choosing this choice, I'm stranding the the last snap choice 
+                                # of a site with a lower ID than us downstream from us. 
+                                orderError += 1
+                                orderConflicts.append(cmpSiteID)
+                            if cmpFirstOccuranceIdx > upstreamSitesIdx and compare < 0:
+                                # by choosing this choice, I'm stranding all of the snap options 
+                                # for cmpSite upstream from our current choice even though 
+                                # cmpSiteID is higher than us 
+                                orderError += 1
+                                orderConflicts.append(cmpSiteID)
                     #get list of sites involved in the outcome of this sites snap choice
                     #this is all site IDs that have a snap choice that appears between the first instance of the 
                     #current site id and the last instance in the traversal 
@@ -288,43 +334,42 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
                     
                     rankedChoices.append((assignment, orderError, distanceScore, upstreamSitesIdx, nameMatch, orderConflicts))
 
-                minOrderError = sys.maxsize
-                bestScoreChoice = None
-                #find the choice that minimize ordering error
-                for choice in rankedChoices:
-                    orderError = choice[1]
-                    distanceScore = choice[2]
-                    nameMatch = choice[4]
-                    #if we find a better order error, always choose this option
-                    if orderError < minOrderError:
-                        bestScoreChoice = choice
-                        minOrderError = orderError
-                    elif orderError == minOrderError:
-                        #if we find an equal order error but smaller dist score choice, choose it
-                        bestDistScore = bestScoreChoice[2]
-                        bestScoreNameMatch = bestScoreChoice[4]
-                        # if this dist is better than previous
-                        # AND either this choice is a name match or this isn't and the previous best isn't
-                        if distanceScore < bestDistScore and (nameMatch or (not nameMatch and not bestScoreNameMatch)):
-                            bestScoreChoice = choice
+                bestScoreChoice = getBestRankedChoice(rankedChoices)
+                resolvedSites[siteID] = bestScoreChoice
+
+                if siteID in allRankedChoices:
+                    #catch case when a site gets snapped onto two networks 
+                    #later on we choose which network has the best fit
+                    allRankedChoices[siteID].append(bestScoreChoice)
+                else:
+                    allRankedChoices[siteID] = [bestScoreChoice]
+
+    #choose an assignment from the best picked ranked choices
+    #in almost all cases, there will only be one ranked choice to choose from
+    #there will only be two if the site had possible snaps on networks with different sinks
+    for choices in allRankedChoices.values():
+        bestRankedChoice = getBestRankedChoice(choices)
+        assignment = bestRankedChoice[0]
+        addAssignment(assignment)
+
+        # for each conflict forced by this choice, add a conflict to the total list going 
+        # in both directions (a conflicts with b AND b conflicts with a)
+        for conflictingSite in bestRankedChoice[5]:
+            conflictingCmp = Helpers.siteIDCompare(conflictingSite, assignment.siteID)
+            #make sure we put the larger ID first so that if this pair appears again we don't add it again (bc we use a set)
+            if conflictingCmp > 0:
+                siteConflicts.add((conflictingSite, assignment.siteID))
+            else:
+                siteConflicts.add((assignment.siteID, conflictingSite))
+
+        if bestRankedChoice[1] > 0 and debug is True:
+            print("adding " + assignment.siteID + " with " + str(bestRankedChoice[1]) + " order error:")
+            for conflictingSite in bestRankedChoice[5]:
+                print("\t conflicts with " + conflictingSite)
+
+            #bestScoreAssignment = bestScoreChoice[0]
+            # addAssignment(bestScoreAssignment)
                 
-                # for each conflict forced by this choice, add a conflict to the total list going 
-                # in both directions (a conflicts with b AND b conflicts with a)
-                for conflictingSite in bestScoreChoice[5]:
-                    conflictingCmp = Helpers.siteIDCompare(conflictingSite, siteID)
-
-                    if conflictingCmp > 0:
-                        siteConflicts.add((conflictingSite, siteID))
-                    else:
-                        siteConflicts.add((siteID, conflictingSite))
-
-                if bestScoreChoice[1] > 0 and debug is True:
-                    print("adding a site with " + str(bestScoreChoice[1]) + " order error")
-
-                bestScoreAssignment = bestScoreChoice[0]
-                bestScoreUpstreamSitesIdx = bestScoreChoice[3]
-                addAssignment(bestScoreAssignment)
-                resolvedSites.add(siteID)
 
     #verify that all site IDs are accounted for
     #this code should never really have to run
@@ -366,7 +411,7 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
                     mostConflictingSite = conflictB
             
             #remove this conflict and keep track of it as a problem site
-            atFaultSites.append(mostConflictingSite)
+            atFaultSites.append((mostConflictingSite, mostConflicts))
             siteConflictsCpy = siteConflicts.copy()
             for conflict in siteConflictsCpy:
                 #a conflict is between two sites
@@ -377,7 +422,9 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
                     siteConflicts.remove(conflict)
 
         for faultySite in atFaultSites:
-            message = str(faultySite) + " may be the cause of a site conflict. Consider changing this site's ID"
+            faultySiteID = faultySite[0]
+            faultySiteConflictCount = faultySite[1]
+            message = str(faultySiteID) + " conflicts with " + str(faultySiteConflictCount) + " other sites. Consider changing this site's ID"
             warningLog.addWarning(WarningLog.SITE_ORDER_ERROR, message)
 
     return assignments

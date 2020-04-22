@@ -4,6 +4,8 @@ from StreamGraphNavigator import *
 from SiteInfoCreator import getSiteID
 from GDALData import getSiteIDsStartingWith
 from SnapSites import getSiteSnapAssignment
+import json
+import sys
 
 while True:
     #segID = input("enter a edge segmentID: ")
@@ -38,9 +40,17 @@ while True:
         lat = float(latLng[0])
         lng = float(latLng[1])
 
-    siteId = getSiteID(lat, lng, withheldSites = excludedList, debug = True)
+    debug = False
 
-    if getSiteID is None:
+    arguments = sys.argv
+    if len(arguments) > 1:
+        debug = arguments[1] == "y"
+
+    results = getSiteID(lat, lng, withheldSites = excludedList, debug = debug)
+
+    if results is None:
         print("failed")
     else:
-        print ("site is " + str(siteId))
+        print ("site:\n " + results["id"])
+        print ("story:\n " + results["story"])
+        print ("log:\n " + results["log"])
