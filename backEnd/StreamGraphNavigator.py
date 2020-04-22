@@ -9,11 +9,12 @@ StreamSearch = namedtuple('StreamSearch', 'id openSegments')
 
 class StreamGraphNavigator (object):
 
-    def __init__(self, streamGraph, terminateSearchOnQuery = False):
+    def __init__(self, streamGraph, terminateSearchOnQuery = False, debug = False):
         self.streamGraph = streamGraph
         self.activeSearches = {}
         self.nextSearchId = 0
         self.terminateSearchOnQuery = terminateSearchOnQuery
+        self.debug = debug
         streamGraph.addGraphListener(self)
 
     #open a new search and get a new StreamSearch tuple
@@ -157,7 +158,8 @@ class StreamGraphNavigator (object):
             if Failures.isFailureCode(nextUpstreamSegment):
                 return nextUpstreamSegment
             else:#we found a mainstream branch!
-                print ("successful backtrack. Found next main branch")
+                if self.debug:
+                    print ("successful backtrack. Found next main branch")
                 #recursively call this function again starting at the first node of the next mainstream branch
                 #the next mainstream branch should be the continuation of our trib in ID space
                 #self.streamGraph.visualize()

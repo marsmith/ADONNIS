@@ -103,9 +103,6 @@ class StreamSegment (object):
     #distAlongSegment = 0 would imply that the site is located at upStreamNode
     #similarly, distAlongSegment = self.length wouold imply it is located at downStreamNode
     def addSite (self, siteID, distAlongSegment):
-        if distAlongSegment > self.length:
-            print ("Site added to segment on point that exceeds segment length. This shouldn't happen!")
-            print (self.segmentID)
 
         self.sites.append(GraphSite(siteID = siteID, distDownstreamAlongSegment = distAlongSegment, segmentID = self.segmentID, snapDist = 0))
         self.sites = sorted(self.sites, key=lambda site: site.distDownstreamAlongSegment)
@@ -136,7 +133,6 @@ class StreamSegment (object):
             return True
         return False
         
-
     #gets the nearest site ID on THIS segment above 'distanceDownSegment' if it exists. return none otherwise 
     def getSiteAbove (self, distanceDownSegment):
         #list sites by order downstream to upstream
@@ -157,7 +153,7 @@ class StreamSegment (object):
 
 class StreamGraph (object):
 
-    def __init__(self, withheldSites = [], debug = False):
+    def __init__(self, withheldSites = [], debug = False, warningLog = None):
         self.segments = {}
         self.nodes = []
         self.safeDataBoundary = [] #gdal geometry objects. Points inside should have all neighboring segments stored
@@ -168,6 +164,7 @@ class StreamGraph (object):
         self.listeners = []
         self.withheldSites = withheldSites
         self.debug = debug
+        self.warningLog = warningLog
 
     def addGraphListener(self, listener):
         self.listeners.append(listener)
@@ -262,10 +259,12 @@ class StreamGraph (object):
 
     #expand the graph at x,y with queried data. Return true if successful
     def expandGraph (self, lat, lng):
-        print ("Expanding graph!")
+        if self.debug:
+            print ("Expanding graph!")
         baseData = loadFromQuery(lat, lng)    
         if Failures.isFailureCode(baseData):
-            print ("could not expand graph")
+            if self.debug:
+                print ("could not expand graph")
             return baseData
         self.addGeom(baseData)
         return True
@@ -544,6 +543,7 @@ class StreamGraph (object):
                 self.addSiteSnaps(siteID, potentialGraphSites)
 
         #refresh all site snaps given the new site data
-        print("refreshing site snaps")
-        self.refreshSiteSnaps(getSiteSnapAssignment(self, debug = self.debug))
+        if self.debug:
+            print("refreshing site snaps")
+        self.refreshSiteSnaps(getSiteSnapAssignment(self, debug = self.debug, warningLog = self.warningLog))
         #self.cleanGraph()

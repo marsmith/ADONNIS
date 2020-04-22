@@ -8,6 +8,7 @@ from StreamGraphNavigator import StreamGraphNavigator
 import copy
 import itertools
 import Failures
+import WarningLog
 
 NUM_SNAPS = 6# how many possible locations that aren't the same as the nearest do we consider?
 CUTOFF_DIST = 0.004
@@ -140,7 +141,7 @@ def snapPoint(snapablePoint, baseData, graph = None):
 
     return consideredSnaps
 
-def getSiteSnapAssignment (graph, debug = False):
+def getSiteSnapAssignment (graph, debug = False, warningLog = None):
     #a copy of the current graph used to try different possible snap operations
     testingGraph = graph#copy.deepcopy(graph)#.clone()
     testingGraphNavigator = StreamGraphNavigator(testingGraph)
@@ -156,7 +157,8 @@ def getSiteSnapAssignment (graph, debug = False):
         testingGraph.visualize()
 
     assignments = []
-    possibleSnaps = {}
+    #for each site, holds a list of other sites that 
+    siteConflicts = set()
 
     def addAssignment (siteAssignment):
         alreadyContainedAssignment = False
@@ -167,14 +169,14 @@ def getSiteSnapAssignment (graph, debug = False):
                 if siteAssignment.snapDist < assignment.snapDist:
                     #then replace
                     assignments[i] = siteAssignment
-                else:
+                elif debug is True:
                     print("tried to add a second assignment")
                 #at this point, we've either replaced, or not since our current assignment is worse
                 return
         #if we reach this line then we don't have an assignment for this ID yet. Add one
         assignments.append(siteAssignment)
 
-    def getSiteIndexRange (siteID, sites):
+    def getSiteIndexRange (siteID, sites, debug = False):
         firstIndex = -1
         lastIndex = -1
 
@@ -230,6 +232,8 @@ def getSiteSnapAssignment (graph, debug = False):
                     orderError = 0
                     distanceScore = 0
                     nameMatch = assignment.nameMatch
+                    #siteIDs that this assignment will force an out of sequence snap for
+                    orderConflicts = []
                     #calculate the order error for this choice
                     for i in range(0, len(uniqueOrderedIDs)):
                         cmpSiteID = uniqueOrderedIDs[i]
@@ -240,11 +244,13 @@ def getSiteSnapAssignment (graph, debug = False):
                             # by choosing this choice, I'm stranding the the last snap choice 
                             # of a site with a lower ID than us downstream from us. 
                             orderError += 1
+                            orderConflicts.append(cmpSiteID)
                         if cmpFirstOccuranceIdx > upstreamSitesIdx and compare < 0:
                             # by choosing this choice, I'm stranding all of the snap options 
                             # for cmpSite upstream from our current choice even though 
                             # cmpSiteID is higher than us 
                             orderError += 1
+                            orderConflicts.append(cmpSiteID)
                     #get list of sites involved in the outcome of this sites snap choice
                     #this is all site IDs that have a snap choice that appears between the first instance of the 
                     #current site id and the last instance in the traversal 
@@ -280,7 +286,7 @@ def getSiteSnapAssignment (graph, debug = False):
                     for minDist in minDistOfInvolved.values():
                         distanceScore += minDist
                     
-                    rankedChoices.append((assignment, orderError, distanceScore, upstreamSitesIdx, nameMatch))
+                    rankedChoices.append((assignment, orderError, distanceScore, upstreamSitesIdx, nameMatch, orderConflicts))
 
                 minOrderError = sys.maxsize
                 bestScoreChoice = None
@@ -301,7 +307,18 @@ def getSiteSnapAssignment (graph, debug = False):
                         # AND either this choice is a name match or this isn't and the previous best isn't
                         if distanceScore < bestDistScore and (nameMatch or (not nameMatch and not bestScoreNameMatch)):
                             bestScoreChoice = choice
-                if bestScoreChoice[1] > 0:
+                
+                # for each conflict forced by this choice, add a conflict to the total list going 
+                # in both directions (a conflicts with b AND b conflicts with a)
+                for conflictingSite in bestScoreChoice[5]:
+                    conflictingCmp = Helpers.siteIDCompare(conflictingSite, siteID)
+
+                    if conflictingCmp > 0:
+                        siteConflicts.add((conflictingSite, siteID))
+                    else:
+                        siteConflicts.add((siteID, conflictingSite))
+
+                if bestScoreChoice[1] > 0 and debug is True:
                     print("adding a site with " + str(bestScoreChoice[1]) + " order error")
 
                 bestScoreAssignment = bestScoreChoice[0]
@@ -309,16 +326,59 @@ def getSiteSnapAssignment (graph, debug = False):
                 addAssignment(bestScoreAssignment)
                 resolvedSites.add(siteID)
 
-
+    #verify that all site IDs are accounted for
+    #this code should never really have to run
     accountedForSiteIDs = set()
     for assignment in assignments:
         accountedForSiteIDs.add(assignment.siteID)
     
     for siteID in graph.siteSnaps:
         if siteID not in accountedForSiteIDs:
-            print("missing site! adding post: " + str(siteID))
+            if debug is True:
+                print("missing site! adding in post: " + str(siteID))
             #add the most likely snap for this site
             assignments.append(graph.siteSnaps[siteID][0])
+
+    if warningLog is not None:
+        #keep track of which sites we think are causing the conflicts
+        atFaultSites = []
+
+        while len(siteConflicts) > 0:
+            #count which sites appear in the most number of conflicts
+            siteConflictCounts = dict((siteID, 0) for siteID in graph.siteSnaps)
+            mostConflicts = 0
+            mostConflictingSite = None
+
+            for conflict in siteConflicts:
+                #a conflict is between two sites
+                conflictA = conflict[0]
+                conflictB = conflict[1]
+
+                siteConflictCounts[conflictA] += 1 
+                siteConflictCounts[conflictB] += 1
+
+                if siteConflictCounts[conflictA] > mostConflicts:
+                    mostConflicts = siteConflictCounts[conflictA]
+                    mostConflictingSite = conflictA
+                
+                if siteConflictCounts[conflictB] > mostConflicts:
+                    mostConflicts = siteConflictCounts[conflictB]
+                    mostConflictingSite = conflictB
+            
+            #remove this conflict and keep track of it as a problem site
+            atFaultSites.append(mostConflictingSite)
+            siteConflictsCpy = siteConflicts.copy()
+            for conflict in siteConflictsCpy:
+                #a conflict is between two sites
+                conflictA = conflict[0]
+                conflictB = conflict[1]
+
+                if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
+                    siteConflicts.remove(conflict)
+
+        for faultySite in atFaultSites:
+            message = str(faultySite) + " may be the cause of a site conflict. Consider changing this site's ID"
+            warningLog.addWarning(WarningLog.SITE_ORDER_ERROR, message)
 
     return assignments
 

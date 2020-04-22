@@ -30,20 +30,23 @@ QUERY_ATTEMPTS = 10
 DATA_PADDING = 0.6
 TIMEOUT = 6
 
-def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
+def queryWithAttempts (url, attempts, timeout = 3, queryName="data", debug = False):
     attemptsUsed = 0
     success = False
     while (attemptsUsed < attempts):
         try:
             req = requests.get(url, timeout=timeout)
             success = True
-            print("queried " + queryName + " successfully!")
+            if debug is True:
+                print("queried " + queryName + " successfully!")
             return req
         except requests.exceptions.ReadTimeout:
             attemptsUsed += 1
-            print("failed to retrieve " + queryName + " on attempt " + str(attemptsUsed) + ". Trying again")
+            if debug is True:
+                print("failed to retrieve " + queryName + " on attempt " + str(attemptsUsed) + ". Trying again")
     if success == False:
-        print("failed to retrieve " + queryName + " on all attempts. Failing")
+        if debug is True:
+            print("failed to retrieve " + queryName + " on all attempts. Failing")
         return Failures.QUERY_FAILURE_CODE
 
 
@@ -81,7 +84,7 @@ def buildGeoJson (xmlStr):
                 geojson["features"].append(feature)
     return json.dumps(geojson)
 
-def getSiteIDsStartingWith (siteID, timeout = TIMEOUT):
+def getSiteIDsStartingWith (siteID, timeout = TIMEOUT, debug = False):
     
     similarSitesQuery = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + siteID + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=search_site_no%2Csite_tp_cd"
     result = queryWithAttempts (similarSitesQuery, QUERY_ATTEMPTS, timeout = timeout, queryName="similarSiteIds")
@@ -94,11 +97,12 @@ def getSiteIDsStartingWith (siteID, timeout = TIMEOUT):
         sitesDataSource = gdal.OpenEx(geoJsonResults)#, nOpenFlags=gdalconst.GA_Update)
         sitesLayer = sitesDataSource.GetLayer()
     except:
-        print("could not read query")
+        if debug is True:
+            print("could not read query")
         return Failures.QUERY_PARSE_FAILURE_CODE
     return (sitesLayer, sitesDataSource)  
 
-def loadSitesFromQuery (lat, lng, radiusKM = 5):
+def loadSitesFromQuery (lat, lng, radiusKM = 5, debug = False):
     approxRadiusInDeg = approxKmToDegrees(radiusKM)
     #northwest
     nwLat = lat + approxRadiusInDeg
@@ -119,10 +123,11 @@ def loadSitesFromQuery (lat, lng, radiusKM = 5):
         siteLayer = siteDataSource.GetLayer()
         return (siteLayer, siteDataSource)
     except:
-        print("could not read query")
+        if debug is True:
+            print("could not read query")
         return Failures.QUERY_PARSE_FAILURE_CODE
 
-def loadFromQuery(lat, lng, radiusKM = 5):
+def loadFromQuery(lat, lng, radiusKM = 5, debug = False):
 
     if radiusKM > MAX_SAFE_QUERY_DIST_KM:
         raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
@@ -133,13 +138,15 @@ def loadFromQuery(lat, lng, radiusKM = 5):
     req = queryWithAttempts(lineURL, QUERY_ATTEMPTS, queryName="lineData", timeout = TIMEOUT)
     
     if Failures.isFailureCode(req):
-        print("could not read query")
+        if debug is True:
+            print("could not read query")
         return req
     try:
         lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
         lineLayer = lineDataSource.GetLayer()
     except:
-        print("could not read query")
+        if debug is True:
+            print("could not read query")
         return Failures.QUERY_PARSE_FAILURE_CODE
     
     if lineLayer.GetFeatureCount() == 0:

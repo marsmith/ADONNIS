@@ -7,6 +7,9 @@ import Helpers
 from SiteIDManager import SiteIDManager
 import Failures
 import math
+import sys
+import json
+import WarningLog
 
 #how many queries will we try AFTER finding a single upstream/downstream site to find the other upstream/downstream site?
 MAX_PRIMARY_QUERIES = 30
@@ -20,7 +23,9 @@ MIN_SITE_DISTANCE = 0.1 #kilometers
 #withheld sites is a list of sites to be ignored while calculating a new site
 
 def getSiteID (lat, lng, withheldSites = [], debug = False):
-    streamGraph = StreamGraph(withheldSites = withheldSites, debug = debug)
+    warningLog = WarningLog.WarningLog(lat, lng)
+
+    streamGraph = StreamGraph(withheldSites = withheldSites, debug = debug, warningLog = warningLog)
     siteIDManager = SiteIDManager()
 
     #typically lat/long are switched to fit the x/y order paradigm 
@@ -28,9 +33,18 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     #get data around query point and construct a graph
     baseData = GDALData.loadFromQuery(lat, lng)
 
+    def getResults (siteID = "unknown", story = "See warning log"):
+        results = dict()
+        results["id"] = siteID
+        results["story"] = story
+        results["log"] = warningLog.getFormattedMessage()
+        return results
+
     if Failures.isFailureCode(baseData):
-        print ("could not get data")
-        return baseData
+        if debug is True:
+            print ("could not get data")
+        warningLog.addWarning(WarningLog.FATAL_ERROR, baseData)
+        return getResults()
 
     streamGraph.addGeom(baseData)
 
@@ -38,8 +52,10 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     snapablePoint = SnapablePoint(point = point, name = "", id = "")
     snapInfo = snapPoint(snapablePoint, baseData) #get the most likely snap
     if Failures.isFailureCode(snapInfo):
-        print ("could not snap")
-        return snapInfo
+        if debug is True:
+            print ("could not snap")
+        warningLog.addWarning(WarningLog.FATAL_ERROR, snapInfo)
+        return getResults()
 
     feature = snapInfo[0].feature
     objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
@@ -60,7 +76,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     #this allows us to stagger upstream and downstream searches
     #although this means repeating parts of the search multiple times, searching a already constructed
     #graph takes practically no time at all
-    navigator = StreamGraphNavigator(streamGraph, terminateSearchOnQuery = True)
+    navigator = StreamGraphNavigator(streamGraph, terminateSearchOnQuery = True, debug = debug)
 
     upstreamSite = None
     downstreamSite = None
@@ -95,6 +111,9 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             primaryQueries += 1
 
 
+    story = ""
+    newID = ""
+
     if upstreamSite is not None and downstreamSite is not None:
         #we have an upstream and downstream
 
@@ -117,12 +136,15 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         newDon = int(downstreamSiteIdDsn * (1 - newSitePercentage) + upstreamSiteIdDsn * newSitePercentage)
 
-        newSiteID = partCode + str(newDon)
+        newID = partCode + str(newDon)
+        story = "Found an upstream site (" + upstreamSiteID + ") and a downstream site (" + downstreamSiteID + ")"
+
         if debug is True:
             print ("found upstream is " + upstreamSiteID)
             print ("found downstream is " + downstreamSiteID)
             streamGraph.visualize(customPoints=[snappedPoint])
-        return newSiteID
+            SnapSites.visualize(baseData, [])
+        
     elif upstreamSite is not None:
         upstreamSiteID = upstreamSite[0]
         partCode = upstreamSiteID[:2]
@@ -135,14 +157,14 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         newSiteIDDSN = upstreamSiteDSN + siteIDOffset
         
-        newSiteID = partCode + str(newSiteIDDSN)
-
+        newID = partCode + str(newSiteIDDSN)
+        story = "Only found a upstream site (" + upstreamSiteID + "). Allowing space for " + siteIDOffset + "sites between upstream site and new site"
         
         if debug is True:
             print("found upstream, but not downstream")
             print("upstream siteID is " + str(upstreamSiteID))
             streamGraph.visualize(customPoints=[snappedPoint])
-        return newSiteID
+            SnapSites.visualize(baseData, [])
 
     elif downstreamSite is not None:
         downstreamSiteID = downstreamSite[0]
@@ -156,19 +178,20 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         newSiteIDDSN = downstreamSiteDSN - siteIDOffset
         
-        newSiteID = partCode + str(newSiteIDDSN)
-
+        newID = partCode + str(newSiteIDDSN)
+        story = "Only found a downstream site (" + downstreamSiteID + "). Allowing space for " + siteIDOffset + "sites between downstream site and new site"
         
         if debug is True:
             print("found downstream, but not upstream")
             print("downstream siteID is " + str(downstreamSiteID))
             streamGraph.visualize(customPoints=[snappedPoint])
-        return newSiteID
+            SnapSites.visualize(baseData, [])
     else:
         # get huge radius of sites:
         sitesInfo = GDALData.loadSitesFromQuery(lat, lng, 30)
         if Failures.isFailureCode(sitesInfo):
-            return sitesInfo
+            warningLog.addWarning(WarningLog.FATAL_ERROR, sitesInfo)
+            return getResults()
 
         siteLayer, siteDatasource = sitesInfo
         siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
@@ -225,13 +248,11 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         # we shorten the ID to get all of the site IDs including various 2 digit extensions already used
         newIDShortened = newID[:8]
 
-
-        
-
         #now check if this number exists already
         idsInfo = GDALData.getSiteIDsStartingWith(newIDShortened)
         if Failures.isFailureCode(idsInfo):
-            return idsInfo
+            warningLog.addWarning(WarningLog.FATAL_ERROR, idsInfo)
+            return getResults()
         siteLayer, siteDataSource = idsInfo
         foundGap = False
         existingNumbers = []
@@ -252,14 +273,39 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
                     newID = testNewID
                     foundGap = True
                     break
+        if not foundGap:
+            warningLog.addWarning(WarningLog.FATAL_ERROR, Failures.NO_SITEID_GAP_CODE)
+            return getResults()
 
+        story = "Could not find any sites on the network. Estimating based on " + oppositePairA[0] + " and " + oppositePairB[0] + "."
+        
         if debug:
             print("no sites found nearby. Estimating new ID based on nearby sites")
             print ("new estimate based on " + oppositePairA[0] + " and " + oppositePairB[0])
             print ("estimation is " + newID)
             streamGraph.visualize()
+            SnapSites.visualize(baseData, [])
 
-        if foundGap:
-            return newID
-        else:
-            return "could not find a gap in siteIDs"
+    return getResults(siteID = newID, story = story)  
+
+if __name__ == "__main__":
+
+    arguments = sys.argv[1]
+
+    lat,lng = arguments.split(",")
+
+    lat = float(lat)
+    lng = float(lng)
+
+    dictResults = getSiteID(lat, lng)
+
+    print (json.dumps(dictResults))
+
+    """ if Failures.isFailureCode(siteInfo):
+        res = {'Results': str(siteInfo), 'Story': "Could not produce story.", 'Log': ""}
+        results = json.dumps(res)
+        print(results)
+    else:
+        res = {'Results': str(siteInfo[0]), 'Story': str(siteInfo[1])}
+        results = json.dumps(res)
+        print(results) """
