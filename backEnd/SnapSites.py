@@ -387,6 +387,7 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
     if warningLog is not None:
         #keep track of which sites we think are causing the conflicts
         atFaultSites = []
+        atFaultPairs = []
 
         while len(siteConflicts) > 0:
             #count which sites appear in the most number of conflicts
@@ -410,8 +411,21 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
                     mostConflicts = siteConflictCounts[conflictB]
                     mostConflictingSite = conflictB
             
-            #remove this conflict and keep track of it as a problem site
-            atFaultSites.append((mostConflictingSite, mostConflicts))
+            #catch cases when sites conflict with eachother equally and fixing either would remove issues
+            
+            if mostConflicts == 1:
+                #find the conflict pair that caused this conflict
+                for conflict in siteConflicts:
+                    conflictA = conflict[0]
+                    conflictB = conflict[1]
+
+                    if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
+                        atFaultPairs.append((conflictA, conflictB))
+                        break
+            else:
+                #remove this conflict and keep track of it as a problem site
+                atFaultSites.append((mostConflictingSite, mostConflicts))
+
             siteConflictsCpy = siteConflicts.copy()
             for conflict in siteConflictsCpy:
                 #a conflict is between two sites
@@ -420,11 +434,17 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
 
                 if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
                     siteConflicts.remove(conflict)
-
+        warningLog.resetWarnings(WarningLog.SITE_ORDER_ERROR)
         for faultySite in atFaultSites:
             faultySiteID = faultySite[0]
             faultySiteConflictCount = faultySite[1]
             message = str(faultySiteID) + " conflicts with " + str(faultySiteConflictCount) + " other sites. Consider changing this site's ID"
+            warningLog.addWarning(WarningLog.SITE_ORDER_ERROR, message)
+
+        for faultyPair in atFaultPairs:
+            pairA = str(faultyPair[0])
+            pairB = str(faultyPair[1])
+            message = pairA + " conflicts with " + pairB + ". Consider changing the site ID of one of these two sites"
             warningLog.addWarning(WarningLog.SITE_ORDER_ERROR, message)
 
     return assignments

@@ -158,7 +158,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         newSiteIDDSN = upstreamSiteDSN + siteIDOffset
         
         newID = partCode + str(newSiteIDDSN)
-        story = "Only found a upstream site (" + upstreamSiteID + "). Allowing space for " + siteIDOffset + "sites between upstream site and new site"
+        story = "Only found a upstream site (" + upstreamSiteID + "). Allowing space for " + str(siteIDOffset) + " sites between upstream site and new site"
         
         if debug is True:
             print("found upstream, but not downstream")
@@ -179,7 +179,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         newSiteIDDSN = downstreamSiteDSN - siteIDOffset
         
         newID = partCode + str(newSiteIDDSN)
-        story = "Only found a downstream site (" + downstreamSiteID + "). Allowing space for " + siteIDOffset + "sites between downstream site and new site"
+        story = "Only found a downstream site (" + downstreamSiteID + "). Allowing space for " + str(siteIDOffset) + " sites between downstream site and new site"
         
         if debug is True:
             print("found downstream, but not upstream")

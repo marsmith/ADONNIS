@@ -10,11 +10,14 @@ class WarningLog (object):
 
     def __init__(self, lat, lng):
         self.basicInfo = "SiteID requested at " + str(lat) + ", " + str(lng)
-        self.warningInfo = {}
+        self.warningInfo = dict()
+
+    def resetWarnings (self, warningCode):
+        self.warningInfo[warningCode] = []
 
     def addWarning (self, warningCode, warningBody):
         if warningCode in self.warningInfo:
-            self.warningInfo[warningCode].append 
+            self.warningInfo[warningCode].append(warningBody)
         else:
             self.warningInfo[warningCode] = [warningBody]
     
