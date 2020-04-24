@@ -1,0 +1,447 @@
+/* Hide disabled options in select2 dropdowns */
+.select2-results__options .select2-results__option[aria-disabled=true] {
+  display: none;
+}
+
+#loading {
+  background: #e9e9e9;
+  /* position: absolute; */
+  height:200px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0.75;
+}
+
+#loading .load-text {
+  text-align: center;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%); 
+}
+
+.tooltip-body{
+  width: 400px;
+  white-space:normal;
+  z-index:9999 !important;
+}
+
+/*
+    ===========================
+    ===========================
+         Navigation Bar
+    ===========================
+    ===========================
+*/
+
+.top-menu-btn{
+  background-color: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-size: 12pt;
+  margin: 18px auto;
+  float: right;
+}
+.top-menu-btn:hover{
+  font-size: 12pt;
+  background-color: transparent;
+  border: none;
+  color: rgba(255,255,255,0.8)
+}
+.top-menu-btn:focus{
+  background-color: transparent;
+  border: none;
+  color: rgba(255,255,255,0.8);
+  font-size: 12pt;
+}
+.top-menu-btn:active{
+  color: rgba(255,255,255,1) !important;
+  background-color: transparent !important;
+  font-size: 12pt;
+  border: none;
+}
+
+.top-menu-brand {
+  padding: 14px 14px 10px;
+}
+
+.top-menu-brand > img {
+  height: 40px;
+}
+
+.top-menu-brand.dec-logo > img {
+  filter: invert(100%);
+}
+
+.app-name{
+  position: relative;
+  top:2px;
+  font-weight:300;
+}
+
+.app-name {
+position: relative;
+width: 100%;
+line-height: 70px;
+padding: 0 10px;
+font-size: 23px;
+color: #ffffff;
+margin: 0;
+z-index: 10;
+}
+
+.app-name-mobile{
+  position: relative;
+  top:-2px;
+  font-weight:300;
+}
+
+.app-name-mobile {
+display: none;
+position: relative;
+width: 100%;
+line-height: 72px;
+padding: 0 10px;
+font-size: 30px;
+color: #ffffff;
+margin: 0;
+z-index: 10;
+
+}
+
+
+/*
+  ===========================
+  ===========================
+       Map
+  ===========================
+  ===========================
+*/
+html, body, #mapDiv {
+padding: 0; 
+margin: 0;
+height: 100%;
+font-family: 'Lato', sans-serif;
+}
+
+body {
+padding-top: 72px;
+padding-left:470px;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 0px;
+}
+
+.openGraphingModule:hover {
+  cursor: pointer;
+}
+
+/*
+  ===========================
+  ===========================
+       Top menu
+  ===========================
+  ===========================
+*/
+
+#top-menu {
+position: fixed;
+top: 0;
+left: 0;
+right: 0;
+background-color: #1d1d2b;
+z-index: 9;
+}
+
+#top-menu > div:not(.logo) {
+float: left;
+}
+
+#mobile-main-menu {
+display: none;
+cursor: pointer;
+}
+
+#mobile-main-menu {
+padding: 24px 15px;
+color:white;
+}
+
+/************* END TOP MENU **************/
+
+
+
+/*
+  ===========================
+  ===========================
+       Main Menu
+  ===========================
+  ===========================
+*/
+
+#explanationPanel .card-body {
+  padding:0px;
+}
+
+.table .table {
+  background-color: #fff;
+}
+
+#paramSelector > span {
+  margin-bottom:6px;
+}
+
+select {
+  width:100%;
+}
+
+.datepicker {
+  border: solid #999 1px;
+}    
+
+#optionsPanel button {
+  margin-bottom:5px;
+  width: 100%;
+}
+
+#optionsPanel .card {
+  background-color: #ECEEF3;
+}
+
+.select2-selection__choice {
+  font-size:12px;
+}
+
+.select2-search__field {
+  width: auto !important; 
+}
+
+.select2-selection__choice {
+  font-size:12px;
+}
+
+#legend .table-expander {
+  cursor: pointer;
+}
+
+.table-sm{
+  font-size: 14px;
+}
+
+#legend .siteData {
+  cursor: pointer;
+}
+
+#legend .wmm-size-25.wmm-pin {
+  margin-top: 0px !important;
+}
+
+#layersPanel .card {
+  background-color: #ECEEF3;
+}
+
+#legend .card-text {
+  height: 40px;
+}
+
+.identification {
+font-size: 14px;
+letter-spacing: 1.1px;
+box-sizing: border-box;
+padding: 10px;
+display: block;
+text-align: center;
+opacity: .5;
+}
+
+#main-menu {
+  width: 470px;
+  height: calc(100% - 72px);
+  float: left;
+  /* background-color: #20202f; */
+  /* margin-top: 65px; */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  transition: left .5s ease;
+  background-color: #ECEEF3;
+  min-height: 0 !important;
+  z-index:1001;
+}
+
+.menu-content{
+	height:100%
+}
+.menu-content .scrollable-content{
+	display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+#main-menu .main-menu-container {
+  position: relative;
+  overflow-y: auto;
+  height: 100%;
+}
+
+#main-menu-footer {
+	position: unset;
+  height: auto;
+  overflow-y: auto;
+	box-sizing:border-box;
+	padding: 0 0 10px 0;
+}
+
+#main-menu .sidebar-panel {
+background-color: #ECEEF3;
+margin: 0 auto;
+border: none;
+}
+
+.card-header > svg {
+  float: right;
+}
+
+.card-header:after {
+  font-family: 'Font Awesome 5 Free';   
+  content: '\f068';
+  font-weight: 900;
+  display:none;
+}
+.card-header.collapsed:after {
+  font-family: "Font Awesome 5 Free";
+  content: "\f067"; 
+  font-weight: 900;
+  display:none;
+}
+  
+#main-menu .sidebar-panel .card-title {
+font-size: 10pt;
+text-transform: uppercase;
+font-weight: 700;
+letter-spacing: 1px;
+/* text-align: right; */
+}
+#main-menu .sidebar-panel .card-header {
+box-sizing: border-box;
+display: block;
+width: 100%;
+padding: 15px;
+color: #6F758E;
+background-color: #ECEEF3;
+}
+#main-menu .sidebar-panel .card-header:hover {
+cursor: pointer;
+background-color: rgba(255, 255, 255, 0.5);
+color: #000;
+}
+
+#main-menu .slick-btn {
+border: none;
+outline: none;
+border-radius: 0;
+font-size: 9pt;
+text-transform: uppercase;
+letter-spacing: 1px;
+box-sizing: border-box;
+padding: 5px;
+display: block;
+width: 100%;
+text-align: left;
+color: #6F758E;
+margin: 0 auto;
+border-left: 4px solid transparent;
+}
+#main-menu .slick-btn img {
+height: 25px;
+vertical-align: middle;
+display: inline-block;
+margin: 0 15px 0 0;
+border-radius: 0;
+border: none;
+}
+#main-menu .slick-btn br {
+display: none;
+}
+#main-menu .slick-btn:hover {
+border-color: #333;
+background-color: rgba(236, 238, 243, 0.5);
+}
+#main-menu .slick-btn:focus {
+background-color: #ECEEF3;
+border-color: #4574CC;
+}
+
+#main-menu .slick-btn-selection {
+background-color: rgba(117, 136, 184, 0.5);
+border-color: #4574CC !important;
+}
+
+.footer-links {
+  font-weight: 300;
+  letter-spacing: 1.5px;
+  box-sizing: border-box;
+  padding: 10px;
+  display: block;
+  text-align: center;
+  opacity: .5;
+  padding:3px;
+}
+
+.footer-links a {
+  display: inline-block;
+  box-sizing: border-box;
+  padding: 0 4px;
+  font-size: 8pt;  
+}
+
+.footer-icons {
+  padding: 10px;
+  letter-spacing: 6px;
+  text-align: center;
+  opacity: .5;
+}
+
+/************* END MAIN MENU **************/
+
+/************** Mobile friendly stuff *********/
+
+@media (max-width: 767px) {
+  #mobile-main-menu {
+    display: inline-block;
+  }
+
+  .isOpenMenu #main-menu {
+    left: 0;
+  }
+
+  .top-menu-brand {
+    display:none;
+  }
+
+  body {
+    padding-left:0px;
+  }
+
+  #main-menu {
+    left: -100%;
+    height: calc(100% - 72px);
+    width: 100%;
+  }
+
+  .app-name {
+    display: none;
+  }
+
+  .app-name-mobile {
+    display: inline;
+    font-size:medium;
+  }
+
+}

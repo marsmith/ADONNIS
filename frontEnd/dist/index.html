@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="author" content="Martyn Smith - USGS NY WSC">
+	<link rel="copyright" href="license.txt">
+    <title>NGWOS Data Portal</title>
+    <meta http-equiv="content-type" content="text/html; utf-8"/>
+    <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css?family=Lato" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script type="text/javascript" src="vendors.8d49ad8d57082d3356de.js"></script><script type="text/javascript" src="main.40a4194ad08bb4902e7f.js"></script></head>
+  <body>
+    
+    <div id="top-menu">
+        <div id="mobile-main-menu">
+            <span class="fa fa-bars" ></span>
+        </div>
+        <div class="title">
+            <a class='top-menu-brand d-none d-md-block float-left' href="https://www.usgs.gov"><img src="images/logo.png"></a>
+            
+            <span class="app-name">NGWOS Data Portal</span>
+            <span class="app-name-mobile">NGWOS Data Portal</span> 
+        </div>
+
+        <button id="aboutButton" class="btn btn-default top-menu-btn pull-right">
+            <i class="fa fa-info"></i><span class="d-none d-md-inline">&nbsp;&nbsp;About</span>
+        </button>
+    </div>
+
+    <div id="main-menu">
+        <div class="main-menu-container scrollable">
+            <div class="menu-content"> 
+                <div class="scrollable-content">
+
+                    <div class="accordion" id="accordion">
+                        <div class="card mb-0 sidebar-panel">
+
+                            <div class="card-header" data-toggle="collapse" data-parent="#accordion" href="#explanationPanel">
+                                <a class="card-title" >
+                                    NGWOS Monitoring Sites
+                                </a>
+                            </div>
+                            <div id="explanationPanel" class="card-body collapse show" data-parent="#accordion">
+                                <div class="card-body">
+                                    <div class="alert alert-info" role="alert">
+                                        Click a site name or constituent in the area below or a site on the map to launch the Data Retrieval and Graphing Module
+                                    </div>
+
+                                    <div class="row" id="loading">
+                                        <div class="col-6 mx-auto">
+                                            <div class="text-center">
+                                                <i class="fa fa-cog fa-spin fa-3x"></i>
+                                                <span class="mt-2">Loading NWIS Data...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                       
+                                    <table id="legend" class="table table-hover mb-0" style="display:none;">
+                                        <thead>
+                                            <tr>
+                                                <th>Icon</th>
+                                                <th>Site Name</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody ></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="card-header collapsed" data-toggle="collapse" data-parent="#accordion" href="#layersPanel">
+                                <a class="card-title" >
+                                    Map Layers
+                                </a>
+                            </div>
+                            <div id="layersPanel" class="card-body collapse" data-parent="#accordion">
+                                <!-- <button id="btnStreamSites" class="btn btn-default slick-btn equalize"><img class="basemapThumb" alt=""><br class="basemapThumb">Stream Gage Sites</button> -->
+
+                                <button id="btnNexRad" class="btn btn-default slick-btn weatherBtn equalize"><img class="basemapThumb" alt="" src="images/mesonet_nexrad.png"><br class="basemapThumb">Radar</button>
+                                <button id="btnPrecip" class="btn btn-default slick-btn weatherBtn equalize" ><img class="basemapThumb" alt="" src="images/mesonet_precip1hr.png"><br class="basemapThumb">Total Precipitation (Past Hour)</button>
+                                <button id="btnPrecipForecast1hr" class="btn btn-default slick-btn weatherBtn equalize" ><img class="basemapThumb" alt="" src="images/qpf-qpf006hr.png"><br class="basemapThumb">Precipitation Forecast (Next 6 hours)</button>
+                                <button id="btnCloudCoverVisible" class="btn btn-default slick-btn weatherBtn equalize"><img class="basemapThumb" alt="" src="images/mesonet_visible.png"><br class="basemapThumb">Cloud Cover (Visible)</button>
+                                <button id="btnDrought" class="btn btn-default slick-btn weatherBtn equalize"><img class="basemapThumb" alt="" src="images/drought-current.png"><br class="basemapThumb">Drought</button>
+                            </div>
+
+                            <div class="card-header collapsed" data-toggle="collapse" data-parent="#accordion" href="#basemapsPanel">
+                                <a class="card-title" >
+                                    Basemaps
+                                </a>
+                            </div>
+
+                            <div id="basemapsPanel" class="card-body collapse" data-parent="#accordion">
+                                <button id="btnStreets" class="btn btn-default slick-btn basemapBtn equalize"><img class="basemapThumb" alt="" src="images/streets.jpg"><br class="basemapThumb">Streets</button>
+                                <button id="btnSatellite" class="btn btn-default slick-btn basemapBtn equalize" ><img class="basemapThumb" alt="" src="images/imagery.jpg"><br class="basemapThumb">Imagery</button>
+                                <button id="btnImageryClarity" class="btn btn-default slick-btn basemapBtn equalize slick-btn-selection" ><img class="basemapThumb" alt="" src="images/imagery_clarity.jpg"><br class="basemapThumb">Imagery Clarity</button>
+                                <button id="btnTopo" class="btn btn-default slick-btn basemapBtn equalize"><img class="basemapThumb" alt="" src="images/topo.jpg"><br class="basemapThumb">Topo</button>
+                                <button id="btnTerrain" class="btn btn-default slick-btn basemapBtn equalize"><img class="basemapThumb" alt="" src="images/terrain.jpg"><br class="basemapThumb">Terrain</button>
+                                <button id="btnGray" class="btn btn-default slick-btn basemapBtn equalize " ><img class="basemapThumb" alt="" src="images/gray.jpg"><br class="basemapThumb">Gray</button>
+                                <button id="btnDarkGray" class="btn btn-default slick-btn basemapBtn equalize" ><img class="basemapThumb" alt="" src="images/darkgray.jpg"><br class="basemapThumb">DarkGray</button>
+                                <button id="btnNatGeo" class="btn btn-default slick-btn basemapBtn equalize"><img class="basemapThumb" alt="" src="images/natgeo.jpg"><br class="basemapThumb">NatGeo</button>
+                            </div>
+
+                        </div>
+                    </div>
+                    <div id="main-menu-footer">
+                        <div id="info" class="identification">Developed by USGS NY WSC</div>
+
+                        <div class="footer-links">
+                            <!-- footer nav links -->
+                            <a href="https://www.doi.gov/privacy">DOI Privacy Policy</a>
+                            <a href="https://www.usgs.gov/laws/policies_notices.html">Legal</a>
+                            <a href="https://www2.usgs.gov/laws/accessibility.html">Accessibility</a>
+                            <a href="https://www.usgs.gov/sitemap.html">Site Map</a>
+                            <a href="https://answers.usgs.gov/">Contact USGS</a>
+                            <!--/ footer nav links -->
+                        </div>
+
+                        <div class="footer-links">
+                            <!-- footer nav links -->
+                            <a href="https://www.doi.gov/">U.S. Department of the Interior</a>
+                            <a href="https://www.doioig.gov/">DOI Inspector General</a>
+                            <a href="https://www.whitehouse.gov/">White House</a>
+                            <a href="https://www.whitehouse.gov/omb/management/egov/">E-gov</a>
+                            <a href="https://www.doi.gov/pmb/eeo/no-fear-act">No Fear Act</a>
+                            <a href="https://www2.usgs.gov/foia">FOIA</a>
+                            <!--/ footer nav links -->
+                        </div>
+
+                        <!-- .footer-social-links -->
+                        <div class="footer-icons">
+                            <a href="https://twitter.com/usgs" target="_blank">
+                                <i class="fab fa-twitter-square"></i>
+                            </a>
+                            <a href="https://facebook.com/usgeologicalsurvey" target="_blank">
+                                <i class="fab fa-facebook-square"></i>
+                            </a>
+                            <a href="https://plus.google.com/112624925658443863798/posts" target="_blank">
+                                <i class="fab fa-google-plus-square"></i>
+                            </a>
+                            <a href="https://github.com/usgs" target="_blank">
+                                <i class="fab fa-github-square"></i>
+                            </a>
+                            <a href="https://flickr.com/usgeologicalsurvey" target="_blank">
+                                <i class="fab fa-flickr"></i>
+                            </a>
+                            <a href="http://youtube.com/usgs" target="_blank">
+                                <i class="fab fa-youtube-square"></i>
+                            </a>
+                            <a href="https://instagram.com/usgs" target="_blank">
+                                <i class="fab fa-instagram"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="graphModal" class="modal fade"  tabindex="-1" role="dialog" >
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Data Retrieval and Graphing Module</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="card">
+                        <div id="analysis" class="card-body">
+
+                            <h5 class="card-title">Select Station(s)</h5>
+                            <select class="appFilter" id="stationSelect" data-selectname="Select Station" multiple></select>
+
+                            <h5 class="card-title mt-4">Select Sublocation(s)</h5>
+                            <select class="appFilter" id="sublocationSelect" data-selectname="Select Sublocation" multiple></select>
+
+                            <h5 class="card-title mt-4">Select Parameter(s)</h5>
+                            <select class="appFilter" id="parameterSelect" data-selectname="Select Parameter" multiple></select>
+
+                            <h5 class="card-title mt-4">Select Time Period</h5>
+
+                            <div class="mt-2">
+                                <div class="mb-2 form-check">
+                                    <label class="form-check-label">
+                                        <input class="form-check-input" type="radio" name="timeSelect" id="timePeriodRadio" value="period" checked>
+                                        Choose Time Period
+                                    </label>
+                                </div>
+                                    
+                                <select class="" id="timePeriodSelect" data-selectname="SelectDatePeriod">
+                                    <option value="P1D">Past 1 Day</option>
+                                    <option value="P7D" selected="selected">Past 7 Days</option>
+                                    <option value="P30D">Past 30 Days</option>
+                                    <option value="P2M">Past 2 Months</option>
+                                    <option value="P6M">Past 6 Months</option>
+                                </select>
+
+                            </div>
+
+                            <div class="mt-2">OR</div>
+
+                            <div class="mt-2">
+                                <div class="form-check">
+                                    <label class="form-check-label">
+                                        <input class="form-check-input" type="radio" name="timeSelect" id="specificRadio" value="range" checked>
+                                        Choose Specific Date Range
+                                    </label>
+                                </div>
+                                    
+
+                                <input id="startDate" type="text" value="2018-04-16" class="datepicker">
+                                <span>Start Date</span>
+
+        
+                                <input id="endDate" type="text" value="2018-04-19" class="mt-1 datepicker">
+                                <span>End Date</span>
+    
+                            </div>
+            
+                        </div>
+                        <div class="card-footer text-center">
+                            <button id="showGraph" type="button" class="btn btn-success">Show Graph</button>
+                        </div>
+    
+                    </div> 
+                    
+                    <div class="row" id="graph-loading" style="display:none;">
+                        <div class="col-6 mx-auto">
+                            <div class="text-center">
+                                <i class="fa fa-cog fa-spin fa-3x"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="graphContainer">
+                    </div>
+
+                    <div id="heatmapContainer">
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="downloadData" class="btn btn-success">Download Data</button>
+                        
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div><!-- /.modal-content -->
+        </div> <!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    
+    <div id="aboutModal" class="modal fade"  tabindex="-1" role="dialog" >
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                    <h5 class="modal-title">NGWOS Data Portal</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div id="aboutModalBody" class="modal-body">
+                        <ul class="nav nav-tabs" id="aboutModalTabs" role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link active" id="aboutTab" href="#aboutTabPane" data-toggle="tab" role="tab"><i class="fa fa-question-circle"></i>&nbsp;About the application</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="disclaimerTab" href="#disclaimerTabPane" data-toggle="tab" role="tab"><i class="fa fa-exclamation-circle"></i>&nbsp;Disclaimer</a>
+                            </li>
+                        </ul>
+                        <div class="tab-content">
+                            <div role="tabpanel" class="tab-pane active" id="aboutTabPane"><br>
+
+                                <div class="alert alert-info" role="alert">
+                                    All data is provisional unless otherwise noted
+                                </div>
+
+                                <p>Need some text here</p>
+
+                                <p>Developed by <a href="https://www.usgs.gov/staff-profiles/martyn-smith">Martyn Smith</a> of the <a href="https://ny.water.usgs.gov">USGS New York Water Science Center</a>
+                                <p>Icons from <a href="https://github.com/USGS-WiM/marker-creator">Marker Creator</a> developed by<a href="https://wim.usgs.gov"> USGS Web Informatics and Mapping</a><br><br>
+                                <!-- Source code available <a href="https://github.com/marsmith/go2mapper">here.</a></p> -->
+                                <span id="appVersion"></span>
+                            </div>
+                            <div role="tabpanel" class="tab-pane" id="disclaimerTabPane"><br>
+                                <h4>USGS Software User Rights Notice</h4>
+                                <p>Software and related material (data and (or) documentation), contained in or furnished in connection with a software distribution, are made available by the U.S. Geological Survey (USGS) to be used in the public interest and in the advancement of science, subject to the following restrictions and understandings.</p>
+                                  
+                                <p>Because the software and related material are free and provided "as is," the authors, the USGS, and the United States Government have made no warranty, express or implied, as to accuracy or completeness and are not obligated to provide the user with any support, consulting, training or assistance of any kind with regard to the use, operation, and performance of this software nor to provide the user with any updates, revisions, new versions or "bug fixes".</p>
+                                  
+                                <p>The user assumes all risk for any damages whatsoever resulting from loss of use, data, or profits arising in connection with the access, use, quality, or performance of this software.</p>	
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div><!-- /.modal-content -->
+            </div> <!-- /.modal-dialog -->
+        </div><!-- /.modal -->
+
+    <div id="mapDiv">
+    </div>
+
+  </body>
+</html>
