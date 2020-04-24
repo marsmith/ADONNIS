@@ -119,8 +119,6 @@ def snapPoint(snapablePoint, baseData, graph = None):
         if len(stationIdentifier) > 0:
             if stationIdentifier in lineName:
                 nameMatch = True
-        
-        nameMatchFound = nameMatchFound or nameMatch
 
         for point in sortedPoints:
             pointIndex = point[2]
@@ -144,8 +142,15 @@ def snapPoint(snapablePoint, baseData, graph = None):
     sortedPossibleSnaps = sorted(possibleSnaps, key=lambda snap: snap.snapDistance)
     #limit the number of considered snaps to a fixed number
     consideredSnaps = sortedPossibleSnaps#sortedPossibleSnaps[:min(NUM_SNAPS, len(sortedPossibleSnaps))]
+    nameMatchFound = False
     for i, snap in reversed(list(enumerate(consideredSnaps))):
-        if snap.snapDistance > CUTOFF_DIST or (snap.nameMatch == False and nameMatchFound == True):
+        if snap.snapDistance > CUTOFF_DIST:
+            consideredSnaps.pop(i)
+        else:
+            nameMatchFound = nameMatchFound or snap.nameMatch
+    
+    for i, snap in reversed(list(enumerate(consideredSnaps))):
+        if snap.nameMatch == False and nameMatchFound == True:
             consideredSnaps.pop(i)
 
     return consideredSnaps

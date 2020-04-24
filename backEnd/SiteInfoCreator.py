@@ -174,8 +174,12 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         newSiteIDDSN = upstreamSiteDSN + siteIDOffset
 
-        upperBound = partCode + str(upstreamSiteDSN + siteIDOffset + 5)
-        lowerBound = partCode + str(upstreamSiteDSN + siteIDOffset - 5)
+        #allowed wiggle room in the new site. Depending on how much distance is between the found site
+        #we allow for a larger range in the final ID. Has to be at least 10% within the rule of min_site_distance
+        allowedError = math.floor(max(1, min(siteIDOffset / 10, 5)))
+
+        upperBound = partCode + str(upstreamSiteDSN + siteIDOffset + allowedError)
+        lowerBound = partCode + str(upstreamSiteDSN + siteIDOffset - allowedError)
         
         newID = partCode + str(newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
@@ -199,8 +203,10 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         newSiteIDDSN = downstreamSiteDSN - siteIDOffset
 
-        upperBound = partCode + str(downstreamSiteDSN - siteIDOffset + 5)
-        lowerBound = partCode + str(downstreamSiteDSN - siteIDOffset - 5)
+        allowedError = math.floor(max(1, min(siteIDOffset / 10, 5)))
+
+        upperBound = partCode + str(downstreamSiteDSN - siteIDOffset + allowedError)
+        lowerBound = partCode + str(downstreamSiteDSN - siteIDOffset - allowedError)
         
         newID = partCode + str(newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
