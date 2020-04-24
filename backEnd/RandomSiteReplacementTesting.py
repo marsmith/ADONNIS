@@ -174,7 +174,7 @@ def randomReplacementTesting (numTests):
     outputFile.close()
 
 
-def runTestList (fileName, outputName):
+def runTestList (fileName, outputName, numLines = 100):
     sitesPath = Path(__file__).parent.absolute() / SITE_DATA_PATH / fileName
     sitesString = sitesPath.read_text()
     lines = sitesString.split("\n")
@@ -182,28 +182,30 @@ def runTestList (fileName, outputName):
     outputPath = Path(__file__).parent.absolute() / SITE_DATA_PATH / outputName
     outputFile = open(outputPath, "a")
 
-    header = "original site, adjacent site above, adjacent site below, new site, difference, between bounds \n"
+    header = "original site, adjacent site above, adjacent site below, new site, difference, between bounds, log \n"
     outputFile.write(header)
     outputFile.close()
 
     startTime = time.time()
     numSuccesses = 0
 
-    for i in range(1, len(lines)):
+    for i in range(1, min(len(lines), numLines)):
         line = lines[i]
-        header = "siteID, lat, lng, upperBound, lowerBound \n"
+        #header = "siteID, lat, lng, upperBound, lowerBound \n"
         (siteID, lat, lng, upperBound, lowerBound) = line.split(", ")
-
+        print("testing #" + str(i))
         fullSiteID = Helpers.getFullID(siteID)
         upperID = Helpers.getFullID(upperBound)
         lowerID = Helpers.getFullID(lowerBound)
         output = ""
         generatedID = getSiteID(float(lat), float(lng), withheldSites = [siteID])
+        newID = generatedID["id"]
+        log = Helpers.flattenString(generatedID["log"])
         betweenBounds = "n"
         
         try:
             originalDownstreamNum = int(fullSiteID[2:])
-            generatedDownstreamNum = int(generatedID[2:])
+            generatedDownstreamNum = int(Helpers.getFullID(newID)[2:])
             upperDownstreamNum = int(upperID[2:])
             lowerDownstreamNum = int(lowerID[2:])
 
@@ -217,7 +219,7 @@ def runTestList (fileName, outputName):
             betweenBounds = "nan"
             difference = "nan"
         outputFile = open(outputPath, "a")
-        output = "'" + fullSiteID + ",'" + upperID + ",'" + lowerID + ",'" + generatedID + ",'" + str(difference) + "," + betweenBounds + "\n"
+        output = "'" + siteID + ",'" + upperID + ",'" + lowerID + ",'" + newID + ",'" + str(difference) + "," + betweenBounds + "," + str(log) + "\n"
         outputFile.write(output)
         outputFile.close()
 
@@ -232,6 +234,6 @@ def runTestList (fileName, outputName):
     outputFile.close()
 
 
-runTestList("testingSet01.csv", "testingSet01_1.csv")
+runTestList("testingSet01.csv", "testingSet01_2.csv", numLines = 100)
 #generateTestSiteIDList(100, "01", "_2")
 #randomReplacementTesting(30)

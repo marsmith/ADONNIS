@@ -110,6 +110,18 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         else:
             primaryQueries += 1
 
+    #add warnings from found sites
+    if upstreamSite is not None:
+        siteAssignment = upstreamSite[0]
+        for warningCode in siteAssignment.warnings:
+            message = siteAssignment.warnings[warningCode]
+            warningLog.addWarning(warningCode, message)
+    
+    if downstreamSite is not None:
+        siteAssignment = downstreamSite[0]
+        for warningCode in siteAssignment.warnings:
+            message = siteAssignment.warnings[warningCode]
+            warningLog.addWarning(warningCode, message)
 
     story = ""
     newID = ""
@@ -117,9 +129,13 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     if upstreamSite is not None and downstreamSite is not None:
         #we have an upstream and downstream
 
-        upstreamSiteID = upstreamSite[0]
-        downstreamSiteID = downstreamSite[0]
+        upstreamSiteID = upstreamSite[0].siteID
+        downstreamSiteID = downstreamSite[0].siteID
         partCode = upstreamSiteID[0:2]
+
+        if Helpers.siteIDCompare(downstreamSiteID, upstreamSiteID) < 0:
+            message = "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."
+            warningLog.addWarning(WarningLog.SITE_CONFLICT_INVOLVEMENT, message)
 
         fullUpstreamSiteID = Helpers.getFullID(upstreamSiteID)
         fullDownstreamSiteID = Helpers.getFullID(downstreamSiteID)
@@ -137,6 +153,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         newDon = int(downstreamSiteIdDsn * (1 - newSitePercentage) + upstreamSiteIdDsn * newSitePercentage)
 
         newID = partCode + str(newDon)
+        newID = beautifyID(newID, downstreamSiteID, upstreamSiteID, warningLog)
         story = "Found an upstream site (" + upstreamSiteID + ") and a downstream site (" + downstreamSiteID + ")"
 
         if debug is True:
@@ -146,7 +163,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             SnapSites.visualize(baseData, [])
         
     elif upstreamSite is not None:
-        upstreamSiteID = upstreamSite[0]
+        upstreamSiteID = upstreamSite[0].siteID
         partCode = upstreamSiteID[:2]
         fullUpstreamID = Helpers.getFullID(upstreamSiteID)
 
@@ -156,8 +173,12 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         siteIDOffset = math.ceil(upstreamSiteDistance / MIN_SITE_DISTANCE)
 
         newSiteIDDSN = upstreamSiteDSN + siteIDOffset
+
+        upperBound = partCode + str(upstreamSiteDSN + siteIDOffset + 5)
+        lowerBound = partCode + str(upstreamSiteDSN + siteIDOffset - 5)
         
         newID = partCode + str(newSiteIDDSN)
+        newID = beautifyID(newID, lowerBound, upperBound, warningLog)
         story = "Only found a upstream site (" + upstreamSiteID + "). Allowing space for " + str(siteIDOffset) + " sites between upstream site and new site"
         
         if debug is True:
@@ -167,7 +188,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             SnapSites.visualize(baseData, [])
 
     elif downstreamSite is not None:
-        downstreamSiteID = downstreamSite[0]
+        downstreamSiteID = downstreamSite[0].siteID
         partCode = downstreamSiteID[:2]
         fullDownstreamID = Helpers.getFullID(downstreamSiteID)
 
@@ -177,8 +198,13 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         siteIDOffset = math.ceil(downstreamSiteDistance / MIN_SITE_DISTANCE)
 
         newSiteIDDSN = downstreamSiteDSN - siteIDOffset
+
+        upperBound = partCode + str(downstreamSiteDSN - siteIDOffset + 5)
+        lowerBound = partCode + str(downstreamSiteDSN - siteIDOffset - 5)
         
         newID = partCode + str(newSiteIDDSN)
+        newID = beautifyID(newID, lowerBound, upperBound, warningLog)
+        
         story = "Only found a downstream site (" + downstreamSiteID + "). Allowing space for " + str(siteIDOffset) + " sites between downstream site and new site"
         
         if debug is True:
@@ -245,37 +271,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         newDsn = int(dsnA * (1 - newSitePercentage) + dsnB * newSitePercentage)
 
         newID = str(partCode) + str(newDsn)
-        # we shorten the ID to get all of the site IDs including various 2 digit extensions already used
-        newIDShortened = newID[:8]
-
-        #now check if this number exists already
-        idsInfo = GDALData.getSiteIDsStartingWith(newIDShortened)
-        if Failures.isFailureCode(idsInfo):
-            warningLog.addWarning(WarningLog.FATAL_ERROR, idsInfo)
-            return getResults()
-        siteLayer, siteDataSource = idsInfo
-        foundGap = False
-        existingNumbers = []
-        for site in siteLayer:
-            siteNumber = site.GetFieldAsString(siteNumberIndex)
-            existingNumbers.append(siteNumber)
-        
-        if len(existingNumbers) > 0:
-            #if the ID we want is taken, try all possible extensions until one is free
-            for i in range(0, 100):
-                testExtension = str(i)
-
-                if len(testExtension) == 1:
-                    testExtension = "0" + testExtension
-
-                testNewID = newIDShortened + testExtension
-                if testNewID not in existingNumbers:
-                    newID = testNewID
-                    foundGap = True
-                    break
-        if not foundGap:
-            warningLog.addWarning(WarningLog.FATAL_ERROR, Failures.NO_SITEID_GAP_CODE)
-            return getResults()
+        newID = beautifyID(newID, fullIDA, fullIDB, warningLog)
 
         story = "Could not find any sites on the network. Estimating based on " + oppositePairA[0] + " and " + oppositePairB[0] + "."
         
@@ -286,7 +282,60 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             streamGraph.visualize()
             SnapSites.visualize(baseData, [])
 
-    return getResults(siteID = newID, story = story)  
+    return getResults(siteID = newID, story = story) 
+
+def beautifyID (siteID, lowerBound, upperBound, warningLog):
+    siteID = str(siteID)
+    shortenedID = siteID[:7]
+    DSN = int(Helpers.getFullID(siteID)[2:])
+    partCode = siteID[:2]
+
+    lowerBoundDSN = int(Helpers.getFullID(lowerBound)[2:])
+    upperBoundDSN = int(Helpers.getFullID(upperBound)[2:])
+    
+    roundingPrecisions = [100, 50, 20, 10, 5, 2, 1]
+
+    #now check if this number exists already
+    idsInfo = GDALData.getSiteIDsStartingWith(shortenedID)
+    if Failures.isFailureCode(idsInfo):
+        warningLog.addWarning(WarningLog.GENERIC_FLAG, "Cannot verify if this site number already exists. Ensure this step is manually completed.")
+        return siteID
+    
+    siteLayer, siteDataSource = idsInfo
+    siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
+
+    existingNumbers = set()
+    for site in siteLayer:
+        siteNumber = site.GetFieldAsString(siteNumberIndex)
+        existingNumbers.add(siteNumber)
+    
+    for roundTo in roundingPrecisions:
+        roundedDSN = Helpers.roundTo(DSN, roundTo)
+        fullRounded = partCode + str(roundedDSN)
+        if fullRounded not in existingNumbers and Helpers.betweenBounds(roundedDSN, lowerBoundDSN, upperBoundDSN):
+            return Helpers.shortenID(fullRounded)
+
+    #if we haven't returned yet we have a problem.
+    idMinusExtension = siteID[:8]
+
+    #as a last ditch effort, try all extensions to find one that's unique
+    if len(existingNumbers) > 0:
+        #if the ID we want is taken, try all possible extensions until one is free
+        for i in range(0, 100):
+            testExtension = str(i)
+
+            if len(testExtension) == 1:
+                testExtension = "0" + testExtension
+
+            testNewID = idMinusExtension + testExtension
+
+            testNewDSN = int(testNewID[2:])
+
+            if testNewID not in existingNumbers and Helpers.betweenBounds(testNewDSN, lowerBoundDSN, upperBoundDSN):
+                return testNewID
+    
+    warningLog.addWarning(WarningLog.GENERIC_FLAG, "Cannot find gap in ID space for new ID. This ID already exists.")
+    return siteID    
 
 if __name__ == "__main__":
 

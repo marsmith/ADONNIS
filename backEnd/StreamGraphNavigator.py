@@ -145,11 +145,11 @@ class StreamGraphNavigator (object):
 
         foundSite = None
         if upstreamSites is not None and len(upstreamSites) > 0:
-            foundSite = upstreamSites[0] 
+            foundSite = upstreamSites[0] #get the first upstream site / distance tuple
 
         if foundSite is not None:#we found a site. Great! return it
             #return (siteID, distance upstream to site)
-            return (foundSite[0].siteID, foundSite[1])
+            return (foundSite[0], foundSite[1])
             #return (foundSite.siteID, summedDistance)
         else:#no site found upstream...
             #find the next major branch by backtracking
@@ -176,7 +176,7 @@ class StreamGraphNavigator (object):
         for site in segment.sites:
             if site.distDownstreamAlongSegment > downstreamPositionOnSegment:
                 foundSite = site
-                return (foundSite.siteID, site.distDownstreamAlongSegment - downstreamPositionOnSegment)
+                return (foundSite, site.distDownstreamAlongSegment - downstreamPositionOnSegment)
 
         queue = []
         queue.append(segment)
@@ -263,7 +263,7 @@ class StreamGraphNavigator (object):
             firstSegment = False
             
         if foundSite is not None:
-            return (foundSite.siteID, summedDistance)
+            return (foundSite, summedDistance)
         else:
             #we searched downstream and found no sites. If we terminated without error thus far it means we reached the end of the network
             return Failures.END_OF_BASIN_CODE
@@ -310,4 +310,3 @@ class StreamGraphNavigator (object):
             for i, segment in reversed(list(enumerate(openSegs))):
                 if openSegs.index(segment) != i:
                     openSegs.pop(i)
-

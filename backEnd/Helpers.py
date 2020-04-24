@@ -43,3 +43,29 @@ def normalize (x, y):
     mag = math.sqrt(x*x + y*y)
 
     return (x/mag, y/mag)
+
+def flattenString (string):
+    string = string.replace("\n", " ")
+    string = string.replace("\t", " ")
+    string = string.replace(",", " ")
+    return string
+
+
+def roundTo (num, m):
+    return math.floor(float(num)/m + 0.5) * m
+
+def betweenBounds (n, a, b):
+    upperBound = max(a, b)
+    lowerBound = min(a, b)
+
+    if n > lowerBound and n < upperBound:
+        return True
+    else:
+        return False
+
+def shortenID (siteID):
+    if len(siteID) > 8:
+        trailingDigits = siteID[-2:]
+        if trailingDigits == "00":
+            return siteID[:8]
+    return siteID

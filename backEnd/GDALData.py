@@ -40,7 +40,7 @@ def queryWithAttempts (url, attempts, timeout = 3, queryName="data", debug = Fal
             if debug is True:
                 print("queried " + queryName + " successfully!")
             return req
-        except requests.exceptions.ReadTimeout:
+        except:
             attemptsUsed += 1
             if debug is True:
                 print("failed to retrieve " + queryName + " on attempt " + str(attemptsUsed) + ". Trying again")

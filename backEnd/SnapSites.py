@@ -12,13 +12,15 @@ import WarningLog
 
 NUM_SNAPS = 6# how many possible locations that aren't the same as the nearest do we consider?
 CUTOFF_DIST = 0.004
+WARNING_DIST = 0.003
 POINTS_PER_LINE = 2
 adverbNameSeparators = [" at ", " above ", " near ", " below "]
 waterTypeNames = [" brook", " pond", " river", " lake", " stream", " outlet", " creek", " bk", " ck"]
 #a possible snap for a given point
-Snap = collections.namedtuple('Snap', 'feature snapDistance distAlongFeature nameMatch')
+Snap = collections.namedtuple('Snap', 'feature snapDistance distAlongFeature nameMatch warnings')
 # a point that can be snapped. Name and ID are used occasionally to aid in snapping
 SnapablePoint = collections.namedtuple('SnapablePoint', 'point name id')
+Flag = collections.namedtuple('Flag', 'message warningCode')
 
 
 #Gets a key string from the site name that could be used to help snap sites later 
@@ -81,6 +83,8 @@ def snapPoint(snapablePoint, baseData, graph = None):
     #for all segments, store the point on each segment nearest to the site's location
     possibleSnaps = [] #(point index, point distance, streamSegment index)
 
+    nameMatchFound = False
+
     #get nearest point in the stream segment
     for sortedLine in possibleLines:
         line = sortedLine[0]
@@ -115,6 +119,8 @@ def snapPoint(snapablePoint, baseData, graph = None):
         if len(stationIdentifier) > 0:
             if stationIdentifier in lineName:
                 nameMatch = True
+        
+        nameMatchFound = nameMatchFound or nameMatch
 
         for point in sortedPoints:
             pointIndex = point[2]
@@ -124,9 +130,12 @@ def snapPoint(snapablePoint, baseData, graph = None):
             trueDist = Helpers.dist(sitePoint[0], sitePoint[1], pointPosition[0], pointPosition[1])
 
             distAlongSeg = point[1]
-
-
-            snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch)
+    
+            warnings = dict()
+            if trueDist > WARNING_DIST:
+                message = str(siteId) + " was forced to snap to an above averagely far away stream. This could be a faulty snap."
+                warnings[WarningLog.GENERIC_FLAG] = message
+            snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch, warnings = warnings)
             possibleSnaps.append(snap)
 
     if len(possibleSnaps) == 0:
@@ -136,7 +145,7 @@ def snapPoint(snapablePoint, baseData, graph = None):
     #limit the number of considered snaps to a fixed number
     consideredSnaps = sortedPossibleSnaps#sortedPossibleSnaps[:min(NUM_SNAPS, len(sortedPossibleSnaps))]
     for i, snap in reversed(list(enumerate(consideredSnaps))):
-        if snap.snapDistance > CUTOFF_DIST:
+        if snap.snapDistance > CUTOFF_DIST or (snap.nameMatch == False and nameMatchFound == True):
             consideredSnaps.pop(i)
 
     return consideredSnaps
@@ -238,9 +247,6 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
             for orderedIdx, siteID in enumerate(uniqueOrderedIDs):
                 firstOccuranceIdx, lastOccuranceIdx = siteIndexRanges[siteID]
 
-                if siteID == "01499400":
-                    print("test")
-
                 #get a list of possible assignments for this ID
                 #Here, an choice is a tuple (assignment, index)
                 siteChoices = []
@@ -271,8 +277,6 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
 
                         #if the cmp site is resolved, we are looking to see if this site's choice
                         #conflicts with the choice ALREADY made for the cmp site
-
-
 
                         if cmpSiteID in resolvedSites:
                             #the third elem in the tuple is the ranked choice's upstream sites index
@@ -365,11 +369,7 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
         if bestRankedChoice[1] > 0 and debug is True:
             print("adding " + assignment.siteID + " with " + str(bestRankedChoice[1]) + " order error:")
             for conflictingSite in bestRankedChoice[5]:
-                print("\t conflicts with " + conflictingSite)
-
-            #bestScoreAssignment = bestScoreChoice[0]
-            # addAssignment(bestScoreAssignment)
-                
+                print("\t conflicts with " + conflictingSite)      
 
     #verify that all site IDs are accounted for
     #this code should never really have to run
@@ -384,10 +384,13 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
             #add the most likely snap for this site
             assignments.append(graph.siteSnaps[siteID][0])
 
+    #build warning log if we were passed one
     if warningLog is not None:
         #keep track of which sites we think are causing the conflicts
         atFaultSites = []
         atFaultPairs = []
+        #store all sites that may be involved in a conflict
+        allImplicatedSites = set()
 
         while len(siteConflicts) > 0:
             #count which sites appear in the most number of conflicts
@@ -421,10 +424,13 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
 
                     if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
                         atFaultPairs.append((conflictA, conflictB))
+                        allImplicatedSites.add(conflictA)
+                        allImplicatedSites.add(conflictB)
                         break
             else:
                 #remove this conflict and keep track of it as a problem site
                 atFaultSites.append((mostConflictingSite, mostConflicts))
+                allImplicatedSites.add(mostConflictingSite)
 
             siteConflictsCpy = siteConflicts.copy()
             for conflict in siteConflictsCpy:
@@ -434,7 +440,9 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
 
                 if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
                     siteConflicts.remove(conflict)
+        #reset warnings in this catagory so they don't build up
         warningLog.resetWarnings(WarningLog.SITE_ORDER_ERROR)
+        
         for faultySite in atFaultSites:
             faultySiteID = faultySite[0]
             faultySiteConflictCount = faultySite[1]
@@ -446,6 +454,13 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
             pairB = str(faultyPair[1])
             message = pairA + " conflicts with " + pairB + ". Consider changing the site ID of one of these two sites"
             warningLog.addWarning(WarningLog.SITE_ORDER_ERROR, message)
+
+        #finally, assign any warning to the site itself
+        for assignment in assignments:
+            assignmentID = assignment.siteID
+            if assignmentID in allImplicatedSites:
+                flagMessage = str(assignmentID) + " is involved in a site conflict. See log for conflict details."
+                assignment.warnings[WarningLog.SITE_CONFLICT_INVOLVEMENT] = flagMessage
 
     return assignments
 
