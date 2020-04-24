@@ -229,11 +229,34 @@ function off() {
 	counter = 0;
 }
 
-function callAjaxCalls(e) {
-	$.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7){
+function callAjaxCalls() {
+	/* $.when(ajaxHUCInfo(e), ajaxContrDrainageArea(e), ajaxTimeZoneCode(e), ajaxAltitude(e), ajaxCountryCode(e), ajaxCountyStateFIPS(e), ajaxNearbyPlace(e)).done(function(a1, a2, a3, a4, a5, a6, a7){
 		$.when(ajaxSiteName(), ajaxSiteID()).done(function(a8, a9){
 			//showFoundData();
 		});
+	}); */
+	ajaxSiteID()
+
+	
+
+
+
+	
+
+}
+
+function displayID () {
+
+	newID = collectedData.siteID;
+	story = collectedData.story;
+	map.closePopup();
+
+	var popup = L.popup({offset: L.point(0,-50)})
+	.setLatLng(collectedData.latlng)
+	.setContent('<p>Suggested ID is ' + newID + '</p> <button type="button" class="btn btn-primary" id="yesokay" style = "float:right;">Ok</button>')
+	.openOn(map);
+	$("#yesokay").click(function(){
+		map.closePopup();
 	});
 }
 
@@ -313,25 +336,29 @@ function ajaxSiteName () {
 
 function ajaxSiteID () {
 
-	on();
 	return $.ajax({
 		type : 'post',
 		url: "../php/siteID.php",
 		dataType: 'json',
 		data:
         {
-				'lat' : collectedData.coords.lat,
-				'lng' : collectedData.coords.lng
+				'lat' : collectedData.latlng.lat,
+				'lng' : collectedData.latlng.lng
         },
 		success: function(theResult1){
 			var siteIDJSON = JSON.parse(theResult1);
-			if (siteIDJSON && siteIDJSON.Results.length > 0) {
-				collectedData.siteID = siteIDJSON.Results;
+			if (siteIDJSON && siteIDJSON.id.length > 0) {
+				collectedData.siteID = siteIDJSON.id;
+				collectedData.story = siteIDJSON.story;
+				collectedData.log = siteIDJSON.log;
 			} else {
-				collectedData.siteID = "Needs revision.";
+				collectedData.siteID = "Could not connect to backend";
+				collectedData.story = "";
+				collectedData.log = "";
 			}
-			counter += 45;
-			console.log("Site ID", counter);
+			displayID();
+			//counter += 45;
+			//console.log("Site ID", counter);
 		}});
 }
 
@@ -401,8 +428,8 @@ function ajaxCountryCode (e) {
 		},
 		error: function(XMLHttpRequest, textStatus, errorThrown) {
 			if (confirm("Network error. Try again?")) {
-				counter = 0;
-				callAjaxCalls(e);
+				//counter = 0;
+				callAjaxCalls();
 			}
 		},
 		timeout: 10000 // sets timeout to 10 seconds
@@ -583,10 +610,11 @@ function snapToFeature (latlng, features) {
 		D.y = feature.geometry.paths[0][smallestDistFeatureIndex][0];
 	}
 
-	return [D.x, D.y];
+	return L.latLng(D.x, D.y);
 }
 
 function getSnappedPointThenRun (latlng) {
+	var rerequest = true;
 
 	if (currentQueriedStreams != null) {
 		currentQueryFeatures = currentQueriedStreams[0]
@@ -596,11 +624,14 @@ function getSnappedPointThenRun (latlng) {
 		if (latlng.distanceTo(currentQueryCenter) < currentQueryRad/2)
 		{
 			console.log("within previous");
+			rerequest = false;
 			getSnappedPointThenRunCallback(latlng, currentQueryFeatures);
 		}
 	} 
 
-	ajaxGetStreams(latlng, getSnappedPointThenRunCallback);
+	if (rerequest) {
+		ajaxGetStreams(latlng, getSnappedPointThenRunCallback);
+	}
 }
 
 function getSnappedPointThenRunCallback (latlng, features) {
@@ -619,11 +650,9 @@ function getSnappedPointThenRunCallback (latlng, features) {
 	});
 	$("#yesCorr").click(function(){
 		map.closePopup();
-		collectedData.coords = snappedLatlng;
-		collectedData.coords.x = snappedLatlng.lat;
-		collectedData.coords.y = snappedLatlng.lng;
+		collectedData.latlng = snappedLatlng;
 		//globFeature = feature;
-		callAjaxCalls(e);
+		callAjaxCalls();
 	}); 
 }
 
@@ -722,7 +751,7 @@ function ajaxNearbyPlace (e) {
 		error: function(XMLHttpRequest, textStatus, errorThrown) {
 			if (confirm("Network error. Try again?")) {
 				counter = 0;
-				callAjaxCalls(e);
+				callAjaxCalls();
 			}
 		},
 		timeout: 10000 // sets timeout to 10 seconds
