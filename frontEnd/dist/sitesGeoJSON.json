@@ -1,0 +1,208 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.69555555555556, 42.13305555555556 ]
+      },
+      "properties": {
+        "Station Name":"PLATTE KILL AT DUNRAVEN NY",
+        "Site ID":"01414000",
+        "photoURL": "https://ny.water.usgs.gov/images/StationPictures/01414000.jpg"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.574391, 41.920411 ]
+      },
+      "properties": {
+        "Station Name": "WEST BRANCH NEVERSINK RIVER AT CLARYVILLE NY",
+        "Site ID": "01434498",
+        "photoURL": "https://ny.water.usgs.gov/images/StationPictures/01434498.jpg"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.57475,	41.920944 ]
+      },
+      "properties": {
+        "Station Name": "Profiler1",
+        "Site ID": "01434498"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.574808,	41.920911	]
+      },
+      "properties": {
+        "Station Name": "Profiler2",
+        "Site ID": "01434498"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.574686, 41.920906	]
+      },
+      "properties": {
+        "Station Name": "Profiler3",
+        "Site ID": "01434498"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.57475, 41.920944 ]
+      },
+      "properties": {
+        "Station Name": "Piezometer2",
+        "Site ID": "01434498"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.574686, 41.920906 ]
+      },
+      "properties": {
+        "Station Name": "Piezometer3",
+        "Site ID": "01434498"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.574731, 41.920889 ]
+      },
+      "properties": {
+        "Station Name": "Met Station",
+        "Site ID": "01434498"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.574731, 41.920889 ]
+      },
+      "properties": {
+        "Station Name": "Side Channel",
+        "Site ID": "01434498"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.574697, 41.920908	]
+      },
+      "properties": {
+        "Station Name": "VWC.Pit1",
+        "Site ID": "01434498"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.574711, 41.920925 ]
+      },
+      "properties": {
+        "Station Name": "VWC.Pit2",
+        "Site ID": "01434498"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.58973333, 41.88991667 ]
+      },
+      "properties": {
+        "Station Name":"NEVERSINK RIVER NEAR CLARYVILLE NY",
+        "Site ID":"01435000",
+        "photoURL": "https://ny.water.usgs.gov/images/StationPictures/01435000.jpg"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.58988056, 41.88987222	]
+      },
+      "properties": {
+        "Station Name": "Piezometer3",
+        "Site ID": "01435000"
+      }
+    },
+
+    
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.58983611, 41.88994167	]
+      },
+      "properties": {
+        "Station Name": "Profiler1",
+        "Site ID": "01435000"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.58995278, 41.88987778	]
+      },
+      "properties": {
+        "Station Name": "Profiler3",
+        "Site ID": "01435000"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.58979722, 41.88993889	]
+      },
+      "properties": {
+        "Station Name": "VWC.Pit1",
+        "Site ID": "01435000"
+      }
+    },
+
+    {
+      "type": "Feature",
+      "geometry": {
+          "type": "Point",
+          "coordinates":  [ -74.58978611, 41.88995	]
+      },
+      "properties": {
+        "Station Name": "VWC.Pit2",
+        "Site ID": "01435000"
+      }
+    }
+  ]
+}
