@@ -72,7 +72,7 @@ function initializeMap() {
   Icon.Default.imagePath = './images/';
 
   //create map
-  theMap = map('mapDiv', { zoomControl: false, minZoom: 8, });
+  theMap = map('mapDiv', { zoomControl: false, minZoom: 8, preferCanvas: true});
 
   //add zoom control with your options
   control.zoom({ position: 'topright' }).addTo(theMap);
@@ -102,6 +102,32 @@ function initListeners() {
     }
   });
 
+  var lastZoom;
+  var tooltipThreshold = 13;
+  theMap.on('zoomend', function() {
+      var zoom = theMap.getZoom();
+      if (zoom < tooltipThreshold && (!lastZoom || lastZoom >= tooltipThreshold)) {
+        theMap.eachLayer(function(l) {
+              if (l.getTooltip()) {
+                  var tooltip = l.getTooltip();
+                  l.unbindTooltip().bindTooltip(tooltip, {
+                      permanent: false
+                  })
+              }
+          })
+      } else if (zoom >= tooltipThreshold && (!lastZoom || lastZoom < tooltipThreshold)) {
+        theMap.eachLayer(function(l) {
+              if (l.getTooltip()) {
+                  var tooltip = l.getTooltip();
+                  l.unbindTooltip().bindTooltip(tooltip, {
+                      permanent: true
+                  })
+              }
+          });
+      }
+      lastZoom = zoom;
+  })
+
 
   $('.basemapBtn').click(function () {
     $('.basemapBtn').removeClass('slick-btn-selection');
@@ -129,7 +155,7 @@ function queryNWISsites(bounds) {
 
   console.log('querying NWIS', bounds);
 
-  nwisSitesLayer.clearLayers();
+  //nwisSitesLayer.clearLayers();
 
   var reqUrl = NWISsiteServiceURL;
   var bbox = bounds.getSouthWest().lng.toFixed(7) + ',' + bounds.getSouthWest().lat.toFixed(7) + ',' + bounds.getNorthEast().lng.toFixed(7) + ',' + bounds.getNorthEast().lat.toFixed(7);
@@ -157,19 +183,31 @@ function queryNWISsites(bounds) {
         var lat = $(this).attr('lat');
         var lng = $(this).attr('lng');
 
-        var myIcon = L.divIcon({className: 'wmm-pin wmm-red wmm-icon-circle wmm-icon-white wmm-size-25'});
-        NWISmarkers[siteID] = L.marker([lat, lng], {icon: myIcon});
-        NWISmarkers[siteID].data = { siteName: siteName, siteCode: siteID };
+        if (siteID.length <= 10) {
 
-        nwisSitesLayer.addLayer(NWISmarkers[siteID]);
+          // var myIcon = L.divIcon({className: 'wmm-pin wmm-red wmm-icon-circle wmm-icon-white wmm-size-25'});
+          // var point = L.marker([lat, lng], {icon: myIcon});
 
+
+          var point = L.circle([lat, lng], {
+            color: 'red',
+            fillColor: '#f03',
+            fillOpacity: 0.5,
+            radius: 50
+          });
+
+          point.bindTooltip(siteID, {sticky: true});
+
+          if (!NWISmarkers[siteID]) {
+            NWISmarkers[siteID] = point;
+            NWISmarkers[siteID].data = { siteName: siteName, siteCode: siteID };
+            nwisSitesLayer.addLayer(NWISmarkers[siteID]);
+          }
+
+        }
       });
-
     }
   });
-
-
-
 }
 
 function setBasemap(baseMap) {
