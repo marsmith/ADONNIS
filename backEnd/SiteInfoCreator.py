@@ -37,13 +37,13 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         results = dict()
         results["id"] = siteID
         results["story"] = story
-        results["log"] = warningLog.getFormattedMessage()
+        results["log"] = warningLog.getJSON()
         return results
 
     if Failures.isFailureCode(baseData):
         if debug is True:
             print ("could not get data")
-        warningLog.addWarning(WarningLog.FATAL_ERROR, baseData)
+        warningLog.addWarning(WarningLog.HIGH_PRIORITY, baseData)
         return getResults()
 
     streamGraph.addGeom(baseData)
@@ -54,7 +54,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     if Failures.isFailureCode(snapInfo):
         if debug is True:
             print ("could not snap")
-        warningLog.addWarning(WarningLog.FATAL_ERROR, snapInfo)
+        warningLog.addWarning(WarningLog.HIGH_PRIORITY, snapInfo)
         return getResults()
 
     feature = snapInfo[0].feature
@@ -113,15 +113,20 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     #add warnings from found sites
     if upstreamSite is not None:
         siteAssignment = upstreamSite[0]
-        for warningCode in siteAssignment.warnings:
-            message = siteAssignment.warnings[warningCode]
-            warningLog.addWarning(warningCode, message)
+        for warning in siteAssignment.generalWarnings:
+            warningLog.addWarningTuple(warning)
+        for warning in siteAssignment.assignmentWarnings:
+            warningLog.addWarningTuple(warning)
     
     if downstreamSite is not None:
         siteAssignment = downstreamSite[0]
-        for warningCode in siteAssignment.warnings:
-            message = siteAssignment.warnings[warningCode]
-            warningLog.addWarning(warningCode, message)
+        for warning in siteAssignment.generalWarnings:
+            warningLog.addWarningTuple(warning)
+        for warning in siteAssignment.assignmentWarnings:
+            warningLog.addWarningTuple(warning)
+    
+    for warning in streamGraph.currentAssignmentWarnings:
+        warningLog.addWarningTuple(warning)
 
     story = ""
     newID = ""
@@ -135,7 +140,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         if Helpers.siteIDCompare(downstreamSiteID, upstreamSiteID) < 0:
             message = "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."
-            warningLog.addWarning(WarningLog.SITE_CONFLICT_INVOLVEMENT, message)
+            warningLog.addWarning(WarningLog.HIGH_PRIORITY, message)
 
         fullUpstreamSiteID = Helpers.getFullID(upstreamSiteID)
         fullDownstreamSiteID = Helpers.getFullID(downstreamSiteID)
@@ -222,7 +227,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         # get huge radius of sites:
         sitesInfo = GDALData.loadSitesFromQuery(lat, lng, 30)
         if Failures.isFailureCode(sitesInfo):
-            warningLog.addWarning(WarningLog.FATAL_ERROR, sitesInfo)
+            warningLog.addWarning(WarningLog.HIGH_PRIORITY, sitesInfo)
             return getResults()
 
         siteLayer, siteDatasource = sitesInfo
@@ -304,7 +309,7 @@ def beautifyID (siteID, lowerBound, upperBound, warningLog):
     #now check if this number exists already
     idsInfo = GDALData.getSiteIDsStartingWith(shortenedID)
     if Failures.isFailureCode(idsInfo):
-        warningLog.addWarning(WarningLog.GENERIC_FLAG, "Cannot verify if this site number already exists. Ensure this step is manually completed.")
+        warningLog.addWarning(WarningLog.LOW_PRIORITY, "Cannot verify if this site number already exists. Ensure this step is manually completed.")
         return siteID
     
     siteLayer, siteDataSource = idsInfo
@@ -340,7 +345,7 @@ def beautifyID (siteID, lowerBound, upperBound, warningLog):
             if testNewID not in existingNumbers and Helpers.betweenBounds(testNewDSN, lowerBoundDSN, upperBoundDSN):
                 return testNewID
     
-    warningLog.addWarning(WarningLog.GENERIC_FLAG, "Cannot find gap in ID space for new ID. This ID already exists.")
+    warningLog.addWarning(WarningLog.LOW_PRIORITY, "Cannot find gap in ID space for new ID. This ID already exists.")
     return siteID    
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstr
 
 #tuples used
 NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
-GraphSite = namedtuple('GraphSite', 'distDownstreamAlongSegment siteID segmentID snapDist nameMatch warnings')
+GraphSite = namedtuple('GraphSite', 'distDownstreamAlongSegment siteID segmentID snapDist nameMatch generalWarnings assignmentWarnings')
 GraphUpdate = namedtuple('GraphUpdate', 'fromSeg toSeg')#an update to the graph. 'from' is replaced with 'to' 
 
 #a stream node 
@@ -165,6 +165,7 @@ class StreamGraph (object):
         self.withheldSites = withheldSites
         self.debug = debug
         self.warningLog = warningLog
+        self.currentAssignmentWarnings = []
 
     def addGraphListener(self, listener):
         self.listeners.append(listener)
@@ -539,11 +540,16 @@ class StreamGraph (object):
             #we assume that the feature reference itself isn't stable once the GDAL object gets
             #removed by the garbage collector
             if len(snaps) > 0:
-                potentialGraphSites = [GraphSite(siteID = siteID, segmentID = snap.feature.GetFieldAsString(objectIDIndex), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, warnings = snap.warnings) for snap in snaps]
+                potentialGraphSites = [GraphSite(siteID = siteID, segmentID = snap.feature.GetFieldAsString(objectIDIndex), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, generalWarnings = snap.warnings, assignmentWarnings = []) for snap in snaps]
                 self.addSiteSnaps(siteID, potentialGraphSites)
 
         #refresh all site snaps given the new site data
         if self.debug:
             print("refreshing site snaps")
-        self.refreshSiteSnaps(getSiteSnapAssignment(self, debug = self.debug, warningLog = self.warningLog))
+        assignmentInfo = getSiteSnapAssignment(self, debug = self.debug)
+        assignments = assignmentInfo[0]
+        warnings = assignmentInfo[1]
+        self.refreshSiteSnaps(assignments)
+        #since we reload assignments, we reload warnings stored
+        self.currentAssignmentWarnings = warnings
         #self.cleanGraph()

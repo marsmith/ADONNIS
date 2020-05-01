@@ -129,10 +129,11 @@ def snapPoint(snapablePoint, baseData, graph = None):
 
             distAlongSeg = point[1]
     
-            warnings = dict()
+            warnings = []
             if trueDist > WARNING_DIST:
                 message = str(siteId) + " was forced to snap to an above averagely far away stream. This could be a faulty snap."
-                warnings[WarningLog.GENERIC_FLAG] = message
+                warning = WarningLog.Warning(priority = WarningLog.LOW_PRIORITY, message = message)
+                warnings.append(warning)
             snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch, warnings = warnings)
             possibleSnaps.append(snap)
 
@@ -155,7 +156,8 @@ def snapPoint(snapablePoint, baseData, graph = None):
 
     return consideredSnaps
 
-def getSiteSnapAssignment (graph, debug = False, warningLog = None):
+#get a list of assignments for a given graph and a list of warnings generated
+def getSiteSnapAssignment (graph, debug = False):
     #a copy of the current graph used to try different possible snap operations
     testingGraph = graph#copy.deepcopy(graph)#.clone()
     testingGraphNavigator = StreamGraphNavigator(testingGraph)
@@ -389,85 +391,87 @@ def getSiteSnapAssignment (graph, debug = False, warningLog = None):
             #add the most likely snap for this site
             assignments.append(graph.siteSnaps[siteID][0])
 
-    #build warning log if we were passed one
-    if warningLog is not None:
-        #keep track of which sites we think are causing the conflicts
-        atFaultSites = []
-        atFaultPairs = []
-        #store all sites that may be involved in a conflict
-        allImplicatedSites = set()
+    #keep track of which sites we think are causing the conflicts
+    atFaultSites = []
+    atFaultPairs = []
+    #store all sites that may be involved in a conflict
+    allImplicatedSites = set()
 
-        while len(siteConflicts) > 0:
-            #count which sites appear in the most number of conflicts
-            siteConflictCounts = dict((siteID, 0) for siteID in graph.siteSnaps)
-            mostConflicts = 0
-            mostConflictingSite = None
+    while len(siteConflicts) > 0:
+        #count which sites appear in the most number of conflicts
+        siteConflictCounts = dict((siteID, 0) for siteID in graph.siteSnaps)
+        mostConflicts = 0
+        mostConflictingSite = None
 
+        for conflict in siteConflicts:
+            #a conflict is between two sites
+            conflictA = conflict[0]
+            conflictB = conflict[1]
+
+            siteConflictCounts[conflictA] += 1 
+            siteConflictCounts[conflictB] += 1
+
+            if siteConflictCounts[conflictA] > mostConflicts:
+                mostConflicts = siteConflictCounts[conflictA]
+                mostConflictingSite = conflictA
+            
+            if siteConflictCounts[conflictB] > mostConflicts:
+                mostConflicts = siteConflictCounts[conflictB]
+                mostConflictingSite = conflictB
+        
+        #catch cases when sites conflict with eachother equally and fixing either would remove issues
+        
+        if mostConflicts == 1:
+            #find the conflict pair that caused this conflict
             for conflict in siteConflicts:
-                #a conflict is between two sites
-                conflictA = conflict[0]
-                conflictB = conflict[1]
-
-                siteConflictCounts[conflictA] += 1 
-                siteConflictCounts[conflictB] += 1
-
-                if siteConflictCounts[conflictA] > mostConflicts:
-                    mostConflicts = siteConflictCounts[conflictA]
-                    mostConflictingSite = conflictA
-                
-                if siteConflictCounts[conflictB] > mostConflicts:
-                    mostConflicts = siteConflictCounts[conflictB]
-                    mostConflictingSite = conflictB
-            
-            #catch cases when sites conflict with eachother equally and fixing either would remove issues
-            
-            if mostConflicts == 1:
-                #find the conflict pair that caused this conflict
-                for conflict in siteConflicts:
-                    conflictA = conflict[0]
-                    conflictB = conflict[1]
-
-                    if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
-                        atFaultPairs.append((conflictA, conflictB))
-                        allImplicatedSites.add(conflictA)
-                        allImplicatedSites.add(conflictB)
-                        break
-            else:
-                #remove this conflict and keep track of it as a problem site
-                atFaultSites.append((mostConflictingSite, mostConflicts))
-                allImplicatedSites.add(mostConflictingSite)
-
-            siteConflictsCpy = siteConflicts.copy()
-            for conflict in siteConflictsCpy:
-                #a conflict is between two sites
                 conflictA = conflict[0]
                 conflictB = conflict[1]
 
                 if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
-                    siteConflicts.remove(conflict)
-        #reset warnings in this catagory so they don't build up
-        warningLog.resetWarnings(WarningLog.SITE_ORDER_ERROR)
-        
-        for faultySite in atFaultSites:
-            faultySiteID = faultySite[0]
-            faultySiteConflictCount = faultySite[1]
-            message = str(faultySiteID) + " conflicts with " + str(faultySiteConflictCount) + " other sites. Consider changing this site's ID"
-            warningLog.addWarning(WarningLog.SITE_ORDER_ERROR, message)
+                    atFaultPairs.append((conflictA, conflictB))
+                    allImplicatedSites.add(conflictA)
+                    allImplicatedSites.add(conflictB)
+                    break
+        else:
+            #remove this conflict and keep track of it as a problem site
+            atFaultSites.append((mostConflictingSite, mostConflicts))
+            allImplicatedSites.add(mostConflictingSite)
 
-        for faultyPair in atFaultPairs:
-            pairA = str(faultyPair[0])
-            pairB = str(faultyPair[1])
-            message = pairA + " conflicts with " + pairB + ". Consider changing the site ID of one of these two sites"
-            warningLog.addWarning(WarningLog.SITE_ORDER_ERROR, message)
+        siteConflictsCpy = siteConflicts.copy()
+        for conflict in siteConflictsCpy:
+            #a conflict is between two sites
+            conflictA = conflict[0]
+            conflictB = conflict[1]
 
-        #finally, assign any warning to the site itself
-        for assignment in assignments:
-            assignmentID = assignment.siteID
-            if assignmentID in allImplicatedSites:
-                flagMessage = str(assignmentID) + " is involved in a site conflict. See log for conflict details."
-                assignment.warnings[WarningLog.SITE_CONFLICT_INVOLVEMENT] = flagMessage
+            if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
+                siteConflicts.remove(conflict)
+    #reset warnings in this catagory so they don't build up
 
-    return assignments
+    warnings = []
+    assignmentWarnings = []
+    
+    for faultySite in atFaultSites:
+        faultySiteID = faultySite[0]
+        faultySiteConflictCount = faultySite[1]
+        message = str(faultySiteID) + " conflicts with " + str(faultySiteConflictCount) + " other sites. Consider changing this site's ID"
+        warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message))
+
+    for faultyPair in atFaultPairs:
+        pairA = str(faultyPair[0])
+        pairB = str(faultyPair[1])
+        message = pairA + " conflicts with " + pairB + ". Consider changing the site ID of one of these two sites"
+        warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message))
+
+    #finally, assign any warning to the site itself
+    for assignment in assignments:
+        assignmentID = assignment.siteID
+        if assignmentID in allImplicatedSites:
+            message = str(assignmentID) + " is involved in a site conflict. See story/medium priority warnings for conflict details."
+            warning = WarningLog.Warning(WarningLog.HIGH_PRIORITY, message)
+            assignment.assignmentWarnings.clear()
+            assignment.assignmentWarnings.append(warning)
+
+    return (assignments, warnings)
 
 #Visualizes 
 def visualize (baseData, snapped):
