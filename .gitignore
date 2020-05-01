@@ -4,4 +4,4 @@ backEnd/StreamGraph.pyc
 .vscode/settings.json
 node_modules
 .vscode
-/frontend/dist/
+/frontend/dist
