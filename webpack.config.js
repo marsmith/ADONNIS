@@ -6,8 +6,8 @@ var CleanWebpackPlugin = require('clean-webpack-plugin');
 var CopyPlugin = require('copy-webpack-plugin');
 
 var PATHS = {
-    dist: path.join(__dirname, 'dist/'),
-    src: path.join(__dirname, 'src/')
+    dist: path.join(__dirname, './frontend/dist/'),
+    src: path.join(__dirname, './frontend/src/')
   };
 
 module.exports = {
