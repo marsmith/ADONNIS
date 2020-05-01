@@ -42,7 +42,7 @@
                             </div>
                             <div id="explanationPanel" class="card-body collapse show" data-parent="#accordion">
                                 <div class="card-body">
-                                    <div class="alert alert-info" role="alert">
+                                    <div class="alert alert-info" role="alert" id="initialAdvice">
                                         Click a point on the map to start the process
                                     </div>
 
@@ -55,8 +55,32 @@
                                         </div>
                                     </div>
 
-                       
-                                    show the click results here?
+                                    
+                                    <div class="alert alert-danger" id="highPriorityWarnings">
+                                        HIGH PRIORITY WARNINGS FOUND
+                                    </div>
+
+                                    <div class="alert alert-warning" id="mediumPriorityWarnings">
+                                        Medium priority warnings found
+                                    </div>
+
+                                    <div id="adonnisResults">
+                                        <h5>Site ID:</h5>
+
+                                        <div class="alert alert-info" role="alert" id="siteIdDisp">
+                                        </div>
+
+                                        <h5>Story:</h5>
+
+                                        <div class="alert alert-info" role="alert" id="storyDisp">
+                                        </div>
+
+                                        <h5>Warning Log:</h5>
+                                        
+                                        <div id="warningsDisp">
+
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

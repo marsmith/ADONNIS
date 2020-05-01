@@ -49,12 +49,25 @@ var MapX = '-74.58'; //set initial map longitude
 var MapY = '41.905'; //set initial map latitude
 var MapZoom = 8; //set initial map zoom
 var NWISsiteServiceURL = 'https://waterservices.usgs.gov/nwis/site/';
+
+var NHDstreamRadius = 2000;
 //END user config variables 
 
 //START global variables
 var theMap;
 var baseMapLayer, basemaplayerLabels;
 var nwisSitesLayer;
+
+var NHDlinesLayer;
+var isQueryingLines;
+var lastQueriedFeatures;
+var lastQueryLatlng;
+
+var cursor;
+var cursorIcon;
+var snappedCursorLatLng;
+
+var confirmPopup;
 //END global variables
 
 //instantiate map
@@ -87,8 +100,16 @@ function initializeMap() {
   //define layers
   nwisSitesLayer = featureGroup().addTo(theMap);
 
+  NHDlinesLayer = featureGroup().addTo(theMap);
+
   //hide laoding spinner
   $('#loading').hide();
+  $('#highPriorityWarnings').hide();
+  $('#mediumPriorityWarnings').hide();
+  $('#adonnisResults').hide();
+
+  cursorIcon = L.divIcon({className: 'wmm-pin wmm-altblue wmm-icon-triangle wmm-icon-white wmm-size-25'});
+
 }
 
 function initListeners() {
@@ -101,6 +122,13 @@ function initListeners() {
       queryNWISsites(theMap.getBounds());
     }
   });
+
+  theMap.on('click', function(e) {
+		var latlng = theMap.mouseEventToLatLng(e.originalEvent);
+    console.log("test");
+
+		moveCursor(latlng);
+	});
 
   var lastZoom;
   var tooltipThreshold = 13;
@@ -149,13 +177,261 @@ function initListeners() {
     //do something
   });
   /*  END EVENT HANDLERS */
+
+  
+}
+
+function moveCursor (latlng) {
+  if(lastQueriedFeatures != null && latlng.distanceTo(lastQueryLatlng) < NHDstreamRadius/2) {
+    var snappedLatLng = snapToFeature(latlng, lastQueriedFeatures);
+    if (cursor == null) {
+      cursor = L.marker(snappedLatLng, {icon: cursorIcon}).addTo(theMap);
+      cursor.bindPopup('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr" style = "float:right;">Yes</button>');
+      //confirmPopup = L.popup({offset: L.point(0,-50), closeOnClick: true, autoClose: true})
+      //.setContent(),
+      
+    }
+    else {
+      cursor.setLatLng(snappedLatLng);
+    }
+    moveAttentionToCursor();
+    cursor.openPopup();
+    snappedCursorLatLng = snappedLatLng;
+
+    $("#notCorr").click(function(){
+      cursor.closePopup();
+    });
+    $("#yesCorr").click(function(){
+      cursor.closePopup();
+      querySiteInfo(snappedCursorLatLng, displaySiteInfo);
+    });
+  }
+  else {
+    queryNHDStreams (latlng, function(){ moveCursor(latlng) });
+  }
+}
+
+function displaySiteInfo (siteInfo)
+{
+  $('#initialAdvice').hide();
+  $('#siteIdDisp').html(siteInfo["id"]);
+  $('#storyDisp').html(siteInfo["story"]);
+  $('#adonnisResults').show();
+
+  var log = siteInfo["log"];
+  var numMediumPriority = log["medium priority"].length;
+  var numHighPriority = log["high priority"].length;
+
+  //display warning banners
+  if (numMediumPriority > 0) {
+    $('#mediumPriorityWarnings').show();
+  }
+
+  if (numHighPriority > 0) {
+    $('#highPriorityWarnings').show();
+  }
+
+  var warningsHTML = "";
+
+  for (var warningBody of log["high priority"]) {
+    warningsHTML += '<div class="alert alert-danger">';
+    warningsHTML += warningBody;
+    warningsHTML += '</div>';
+  }
+
+  for (var warningBody of log["medium priority"]) {
+    warningsHTML += '<div class="alert alert-warning">';
+    warningsHTML += warningBody;
+    warningsHTML += '</div>';
+  }
+
+  $('#warningsDisp').html(warningsHTML);
+}
+
+function querySiteInfo (latLng, callback) {
+
+  $('#loading').show();
+
+	/* return $.ajax({
+		type : 'post',
+		url: "./siteID.php",
+		dataType: 'json',
+		data:
+        {
+				'lat' : latLng.lat,
+				'lng' : latLng.lng
+        },
+		success: function(theResult){
+			var resultsJSON = JSON.parse(theResult);
+			if (resultsJSON && resultsJSON.id.length > 0) {
+				callback(resultsJSON);
+			} else {
+				console.log("couldn't connect to backend")
+      }
+      $('#loading').hide();
+    },
+    error: function(){
+      $('#loading').hide();
+    },
+  }); */
+  $('#loading').hide();
+  callback({"id": "01362012", "story": "Found an upstream site (01362032) and a downstream site (0136200705)", "log": {"low priority": [], "medium priority": ["0136200705 conflicts with 7 other sites. Consider changing this site's ID", "01362005 conflicts with 6 other sites. Consider changing this site's ID", "01362008 conflicts with 01362004. Consider changing the site ID of one of these two sites", "01362032 conflicts with 01362030. Consider changing the site ID of one of these two sites"], "high priority": ["01362032 is involved in a site conflict. See story/medium priority warnings for conflict details.", "0136200705 is involved in a site conflict. See story/medium priority warnings for conflict details.", "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."]}});
+}
+
+//attempt to get streams in a radius around latlng. Send features to callback in format callback(results)
+function queryNHDStreams (latlng, callback) {
+  
+  console.log('querying NHD', NHDstreamRadius);
+	var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=" + NHDstreamRadius + "&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson";
+	
+	if (isQueryingLines == true) {
+		console.log("already querying");
+		return;
+	}
+	
+  isQueryingLines = true;
+  $('#loading').show();
+
+	return $.ajax({
+		url: queryUrl,
+		dataType: 'json',
+		timeout: 5000,
+		success: function(results){
+      console.log("query success")
+      isQueryingLines = false;
+      lastQueriedFeatures = results.features;
+      lastQueryLatlng = latlng
+      highlightFeature(lastQueriedFeatures);
+      $('#loading').hide();
+      callback()
+		},
+		error: function(){
+      isQueryingLines = false;
+      $('#loading').hide();
+		},
+	});
+}
+
+function getSpPoint(A,B,C){
+  var x1=A.x, y1=A.y, x2=B.x, y2=B.y, x3=C.x, y3=C.y;
+  var px = x2-x1, py = y2-y1, dAB = px*px + py*py;
+  var u = ((x3 - x1) * px + (y3 - y1) * py) / dAB;
+  var x = x1 + u * px, y = y1 + u * py;
+  return {x:x, y:y}; //this is D
+}
+
+function calcIsInsideLineSegment(line1, line2, pnt) {
+  var L2 = ( ((line2.x - line1.x) * (line2.x - line1.x)) + ((line2.y - line1.y) * (line2.y - line1.y)) );
+  if(L2 == 0) return false;
+  var r = ( ((pnt.x - line1.x) * (line2.x - line1.x)) + ((pnt.y - line1.y) * (line2.y - line1.y)) ) / L2;
+
+  return (0 <= r) && (r <= 1);
+}
+
+function moveAttentionToCursor ()
+{
+  if (theMap.getZoom() > 14) {
+    theMap.panTo(cursor.getLatLng());
+  }
+  else {
+    theMap.flyTo(cursor.getLatLng(), 14);
+  }
+}
+
+function highlightFeature (features) {
+	NHDlinesLayer.clearLayers();
+	for (var feature of features) {
+		var points = [];
+		for (const point of feature.geometry.paths[0]) {
+			points.push(new L.LatLng(point[1], point[0]));
+		}
+		var firstpolyline = new L.Polyline(points, {color: 'red', weight: 3, opacity: 0.5, smoothFactor: 1});
+		firstpolyline.addTo(NHDlinesLayer);
+	}
+}
+
+function snapToFeature (latlng, features) {
+	var smallestDistFeature = Number.MAX_VALUE;
+	var smallestDistFeatureIndex = -1;
+	var feature = null;
+	for (var feat of features) {
+		var smallestDist = "";
+		var smallestDistIndex;
+		for (var i = 0; i < feat.geometry.paths[0].length; i++) {
+      var geomPoint = L.latLng(feat.geometry.paths[0][i][1], feat.geometry.paths[0][i][0])
+			var dist = geomPoint.distanceTo(latlng);
+			if(dist < smallestDistFeature){
+				smallestDistFeature = dist;
+				smallestDistFeatureIndex = i;
+				feature = feat
+			}
+		}
+	}
+
+	if(smallestDistFeatureIndex == -1){
+		console.error("found no nearest feature returning [-1, -1]");
+		return [-1, -1];
+	}
+
+	//now find whether left or right of smallestDistIndex is closer
+
+	var leftDist = Number.MAX_VALUE;
+	var rightDist = Number.MAX_VALUE;
+	//left
+	if (smallestDistFeatureIndex != 0) {
+    var leftPoint = L.latLng(feature.geometry.paths[0][smallestDistFeatureIndex - 1][1], feature.geometry.paths[0][smallestDistFeatureIndex - 1][0]);
+		leftDist = latlng.distanceTo(leftPoint);
+	}
+
+	if (smallestDistFeatureIndex != feature.geometry.paths[0].length - 1) {
+    var rightPoint = L.latLng(feature.geometry.paths[0][smallestDistFeatureIndex + 1][1], feature.geometry.paths[0][smallestDistFeatureIndex + 1][0]);
+    rightDist = latlng.distanceTo(rightPoint);
+	}
+	var leftCoordOfLine;
+	var rightCoordOfLine;
+	if (leftDist < rightDist) {
+		leftCoordOfLine = feature.geometry.paths[0][smallestDistFeatureIndex - 1];
+		rightCoordOfLine = feature.geometry.paths[0][smallestDistFeatureIndex];
+	} else {
+		leftCoordOfLine = feature.geometry.paths[0][smallestDistFeatureIndex];
+		rightCoordOfLine = feature.geometry.paths[0][smallestDistFeatureIndex + 1];
+	}
+
+	//now calculate closest "nonreal" point on line
+	var A = {
+		x : leftCoordOfLine[1],
+		y : leftCoordOfLine[0]
+	};
+
+	var B = {
+		x : rightCoordOfLine[1],
+		y : rightCoordOfLine[0]
+	};
+
+	var C = {
+		x : latlng.lat,
+		y : latlng.lng
+	};
+
+	var D = getSpPoint(A,B,C);
+
+	//check if the projected point is in the line segment
+
+	var isInLineSegm = calcIsInsideLineSegment(A,B,D);
+
+	if (!isInLineSegm) {
+		D.x = feature.geometry.paths[0][smallestDistFeatureIndex][1];
+		D.y = feature.geometry.paths[0][smallestDistFeatureIndex][0];
+	}
+
+	return L.latLng(D.x, D.y);
 }
 
 function queryNWISsites(bounds) {
 
   console.log('querying NWIS', bounds);
 
-  //nwisSitesLayer.clearLayers();
+  nwisSitesLayer.clearLayers();
 
   var reqUrl = NWISsiteServiceURL;
   var bbox = bounds.getSouthWest().lng.toFixed(7) + ',' + bounds.getSouthWest().lat.toFixed(7) + ',' + bounds.getNorthEast().lng.toFixed(7) + ',' + bounds.getNorthEast().lat.toFixed(7);
