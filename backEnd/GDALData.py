@@ -22,6 +22,7 @@ MAX_SAFE_QUERY_DIST_KM = 7
 
 BaseData = namedtuple('BaseData', 'lineLayer lineDS, siteLayer siteDS dataBoundary')
 
+
 RESTRICTED_FCODES = [56600]
 
 QUERY_ATTEMPTS = 10 

@@ -107,6 +107,7 @@ function initializeMap() {
   $('#highPriorityWarnings').hide();
   $('#mediumPriorityWarnings').hide();
   $('#adonnisResults').hide();
+  $('#nhdFailure').hide();
 
   cursorIcon = L.divIcon({className: 'wmm-pin wmm-altblue wmm-icon-triangle wmm-icon-white wmm-size-25'});
 
@@ -125,7 +126,6 @@ function initListeners() {
 
   theMap.on('click', function(e) {
 		var latlng = theMap.mouseEventToLatLng(e.originalEvent);
-    console.log("test");
 
 		moveCursor(latlng);
 	});
@@ -153,6 +153,9 @@ function initListeners() {
               }
           });
       }
+      if (theMap.getZoom() < 10) {
+        nwisSitesLayer.clearLayers();
+      }
       lastZoom = zoom;
   })
 
@@ -174,14 +177,25 @@ function initListeners() {
   });
 
   nwisSitesLayer.on('click', function (e) {
-    //do something
+    
   });
   /*  END EVENT HANDLERS */
 
-  
+  $("#enterLatLng").click(function(){
+    var lat = $('#latitude').val();
+    var lng = $('#longitude').val();
+
+    var latf = parseFloat(lat);
+    var lngf = parseFloat(lng);
+    if (latf != NaN && lngf != NaN){
+      var latlng = L.latLng(latf, lngf);
+      moveCursor(latlng);
+    }
+  });
 }
 
 function moveCursor (latlng) {
+  $('#adonnisResults').hide();
   if(lastQueriedFeatures != null && latlng.distanceTo(lastQueryLatlng) < NHDstreamRadius/2) {
     var snappedLatLng = snapToFeature(latlng, lastQueriedFeatures);
     if (cursor == null) {
@@ -219,40 +233,49 @@ function displaySiteInfo (siteInfo)
   $('#adonnisResults').show();
 
   var log = siteInfo["log"];
+
+  var numLowPriority = log["low priority"].length;
   var numMediumPriority = log["medium priority"].length;
   var numHighPriority = log["high priority"].length;
+  var totalWarnings = numLowPriority + numMediumPriority + numHighPriority;
 
-  //display warning banners
-  if (numMediumPriority > 0) {
-    $('#mediumPriorityWarnings').show();
+  if (totalWarnings > 0) {
+    $('#warningSection').show();
+    //display warning banners
+    if (numMediumPriority > 0) {
+      $('#mediumPriorityWarnings').show();
+    }
+
+    if (numHighPriority > 0) {
+      $('#highPriorityWarnings').show();
+    }
+
+    var warningsHTML = "";
+
+    for (var warningBody of log["high priority"]) {
+      warningsHTML += '<div class="alert alert-danger">';
+      warningsHTML += warningBody;
+      warningsHTML += '</div>';
+    }
+
+    for (var warningBody of log["medium priority"]) {
+      warningsHTML += '<div class="alert alert-warning">';
+      warningsHTML += warningBody;
+      warningsHTML += '</div>';
+    }
+
+    $('#warnings').html(warningsHTML);
   }
-
-  if (numHighPriority > 0) {
-    $('#highPriorityWarnings').show();
+  else {
+    $('#warningSection').hide();
   }
-
-  var warningsHTML = "";
-
-  for (var warningBody of log["high priority"]) {
-    warningsHTML += '<div class="alert alert-danger">';
-    warningsHTML += warningBody;
-    warningsHTML += '</div>';
-  }
-
-  for (var warningBody of log["medium priority"]) {
-    warningsHTML += '<div class="alert alert-warning">';
-    warningsHTML += warningBody;
-    warningsHTML += '</div>';
-  }
-
-  $('#warningsDisp').html(warningsHTML);
 }
 
 function querySiteInfo (latLng, callback) {
 
   $('#loading').show();
-
-	/* return $.ajax({
+  console.log("attemping site info query");
+	return $.ajax({
 		type : 'post',
 		url: "./siteID.php",
 		dataType: 'json',
@@ -262,20 +285,22 @@ function querySiteInfo (latLng, callback) {
 				'lng' : latLng.lng
         },
 		success: function(theResult){
-			var resultsJSON = JSON.parse(theResult);
+      var resultsJSON = JSON.parse(theResult);
+      console.log(theResult);
 			if (resultsJSON && resultsJSON.id.length > 0) {
 				callback(resultsJSON);
 			} else {
-				console.log("couldn't connect to backend")
+				console.log("couldn't connect to backend");
       }
       $('#loading').hide();
     },
     error: function(){
+      console.log("failed query");
       $('#loading').hide();
     },
-  }); */
+  }); 
   $('#loading').hide();
-  callback({"id": "01362012", "story": "Found an upstream site (01362032) and a downstream site (0136200705)", "log": {"low priority": [], "medium priority": ["0136200705 conflicts with 7 other sites. Consider changing this site's ID", "01362005 conflicts with 6 other sites. Consider changing this site's ID", "01362008 conflicts with 01362004. Consider changing the site ID of one of these two sites", "01362032 conflicts with 01362030. Consider changing the site ID of one of these two sites"], "high priority": ["01362032 is involved in a site conflict. See story/medium priority warnings for conflict details.", "0136200705 is involved in a site conflict. See story/medium priority warnings for conflict details.", "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."]}});
+  //callback({"id": "01362012", "story": "Found an upstream site (01362032) and a downstream site (0136200705)", "log": {"low priority": [], "medium priority": ["0136200705 conflicts with 7 other sites. Consider changing this site's ID", "01362005 conflicts with 6 other sites. Consider changing this site's ID", "01362008 conflicts with 01362004. Consider changing the site ID of one of these two sites", "01362032 conflicts with 01362030. Consider changing the site ID of one of these two sites"], "high priority": ["01362032 is involved in a site conflict. See story/medium priority warnings for conflict details.", "0136200705 is involved in a site conflict. See story/medium priority warnings for conflict details.", "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."]}});
 }
 
 //attempt to get streams in a radius around latlng. Send features to callback in format callback(results)
@@ -303,11 +328,13 @@ function queryNHDStreams (latlng, callback) {
       lastQueryLatlng = latlng
       highlightFeature(lastQueriedFeatures);
       $('#loading').hide();
+      $('#nhdFailure').hide();
       callback()
 		},
 		error: function(){
       isQueryingLines = false;
       $('#loading').hide();
+      $('#nhdFailure').show();
 		},
 	});
 }
@@ -343,7 +370,7 @@ function highlightFeature (features) {
 	for (var feature of features) {
 		var points = [];
 		for (const point of feature.geometry.paths[0]) {
-			points.push(new L.LatLng(point[1], point[0]));
+			points.push(new L.latLng(point[1], point[0]));
 		}
 		var firstpolyline = new L.Polyline(points, {color: 'red', weight: 3, opacity: 0.5, smoothFactor: 1});
 		firstpolyline.addTo(NHDlinesLayer);

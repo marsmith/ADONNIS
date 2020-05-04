@@ -19,7 +19,6 @@ DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstr
 #tuples used
 NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
 GraphSite = namedtuple('GraphSite', 'distDownstreamAlongSegment siteID segmentID snapDist nameMatch generalWarnings assignmentWarnings')
-GraphUpdate = namedtuple('GraphUpdate', 'fromSeg toSeg')#an update to the graph. 'from' is replaced with 'to' 
 
 #a stream node 
 class StreamNode (object):
@@ -161,20 +160,10 @@ class StreamGraph (object):
         self.removedSegments = {}#cleaned segments. keep track to prevent duplicates. The dict values point to the segment that replaced this segment, if it exists
         self.siteSnaps = {}#list of sites that have already been added
         self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
-        self.listeners = []
         self.withheldSites = withheldSites
         self.debug = debug
         self.warningLog = warningLog
         self.currentAssignmentWarnings = []
-
-    def addGraphListener(self, listener):
-        self.listeners.append(listener)
-
-    #make sure that all listeners have a notify method
-    #notify listeners of a single update
-    def notifyListeners(self, update):
-        for listener in self.listeners:
-            listener.notify(update)
 
     #visualize the graph using matplotlib
     def visualize(self, showSegInfo = False, customPoints = []):
@@ -448,9 +437,6 @@ class StreamGraph (object):
 
             #remove the segment and nodes from the actual graph
             for neighbor in reversed(node.neighbors):
-                #update listeners about this simplification. The two removed segments now will be replaced
-                # with the simplified segment in any active searches
-                self.notifyListeners(GraphUpdate(fromSeg = neighbor.segment, toSeg=newSegment))
                 self.removeSegment(neighbor.segment, replacedBy = newSegment)
                 
             self.nodes.remove(node)

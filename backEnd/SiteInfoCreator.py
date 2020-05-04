@@ -11,17 +11,18 @@ import sys
 import json
 import WarningLog
 
-#how many queries will we try AFTER finding a single upstream/downstream site to find the other upstream/downstream site?
 MAX_PRIMARY_QUERIES = 30
+#how many queries will we try AFTER finding a single upstream/downstream site to find the other upstream/downstream site?
 MAX_SECONDARY_SITE_QUERIES = 5
 #what's the smallest reasonable distance between two sites
 #according to Gary Wall this is 500 feet 
 #rounding down to be safe, we get 100 meters 
 MIN_SITE_DISTANCE = 0.1 #kilometers 
 
+def getSiteName (lat, lng):
+    pass
 
 #withheld sites is a list of sites to be ignored while calculating a new site
-
 def getSiteID (lat, lng, withheldSites = [], debug = False):
     warningLog = WarningLog.WarningLog(lat, lng)
 
@@ -159,7 +160,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         newID = partCode + str(newDon)
         newID = beautifyID(newID, downstreamSiteID, upstreamSiteID, warningLog)
-        story = "Found an upstream site (" + upstreamSiteID + ") and a downstream site (" + downstreamSiteID + ")"
+        story = "Found an upstream site (" + upstreamSiteID + ") and a downstream site (" + downstreamSiteID + "). New site is the weighted average of these two sites."
 
         if debug is True:
             print ("found upstream is " + upstreamSiteID)
@@ -188,7 +189,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         
         newID = partCode + str(newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
-        story = "Only found a upstream site (" + upstreamSiteID + "). Allowing space for " + str(siteIDOffset) + " sites between upstream site and new site"
+        story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(siteIDOffset) + " sites between upstream site and new site"
         
         if debug is True:
             print("found upstream, but not downstream")
@@ -216,7 +217,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         newID = partCode + str(newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
         
-        story = "Only found a downstream site (" + downstreamSiteID + "). Allowing space for " + str(siteIDOffset) + " sites between downstream site and new site"
+        story = "Only found a downstream site (" + downstreamSiteID + "). New site is based on downstream site while allowing space for " + str(siteIDOffset) + " sites between downstream site and new site"
         
         if debug is True:
             print("found downstream, but not upstream")

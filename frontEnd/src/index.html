@@ -40,11 +40,29 @@
                                     ADONNIS
                                 </a>
                             </div>
+
+                            
                             <div id="explanationPanel" class="card-body collapse show" data-parent="#accordion">
                                 <div class="card-body">
                                     <div class="alert alert-info" role="alert" id="initialAdvice">
-                                        Click a point on the map to start the process
+                                        Click a point on the map or enter a lat/long to start the process
                                     </div>
+
+                                    <form>
+                                        <div class="row">
+                                          <div class="col">
+                                            <input type="text" class="form-control" placeholder="Latitude" id="latitude">
+                                          </div>
+                                          <div class="col">
+                                            <input type="text" class="form-control" placeholder="Longitude" id="longitude">
+                                          </div>
+                                          <div class="col">
+                                              <button class="btn btn-info" id="enterLatLng" type="button">
+                                                  Go!
+                                              </button>
+                                          </div>
+                                        </div>
+                                    </form>
 
                                     <div class="row" id="loading">
                                         <div class="col-6 mx-auto">
@@ -55,16 +73,21 @@
                                         </div>
                                     </div>
 
+                                    <br>
                                     
-                                    <div class="alert alert-danger" id="highPriorityWarnings">
-                                        HIGH PRIORITY WARNINGS FOUND
-                                    </div>
-
-                                    <div class="alert alert-warning" id="mediumPriorityWarnings">
-                                        Medium priority warnings found
+                                    <div class="alert alert-warning" id="nhdFailure">
+                                        Could not connect to NHD server. Please try again. 
                                     </div>
 
                                     <div id="adonnisResults">
+                                        <div class="alert alert-danger" id="highPriorityWarnings">
+                                            HIGH PRIORITY WARNINGS FOUND
+                                        </div>
+    
+                                        <div class="alert alert-warning" id="mediumPriorityWarnings">
+                                            Medium priority warnings found
+                                        </div>
+
                                         <h5>Site ID:</h5>
 
                                         <div class="alert alert-info" role="alert" id="siteIdDisp">
@@ -75,10 +98,15 @@
                                         <div class="alert alert-info" role="alert" id="storyDisp">
                                         </div>
 
-                                        <h5>Warning Log:</h5>
-                                        
-                                        <div id="warningsDisp">
+                                        <div id="warningSection">
+                                            <button class="btn btn-info btn-block" type="button" data-toggle="collapse" data-target="#warnings" aria-expanded="false" aria-controls="collapseExample">
+                                                Warning Log:
+                                            </button>
+                                            <div class="card alert-info">
+                                                <div class="collapse px-3" id="warnings">
 
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

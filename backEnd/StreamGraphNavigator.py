@@ -1,31 +1,14 @@
-#from StreamGraph import UPSTREAM, DOWNSTREAM
-from collections import namedtuple 
 import sys
 import Failures
-#a class that has various functionality to find / expand a StreamGraph
 
-
-StreamSearch = namedtuple('StreamSearch', 'id openSegments')
-
+#a class that has various functionality to navigate the graph of a stream graph. Will autoexpand the graph 
+#at edges when a search runs into the edge of the graph
 class StreamGraphNavigator (object):
 
     def __init__(self, streamGraph, terminateSearchOnQuery = False, debug = False):
         self.streamGraph = streamGraph
-        self.activeSearches = {}
-        self.nextSearchId = 0
         self.terminateSearchOnQuery = terminateSearchOnQuery
         self.debug = debug
-        streamGraph.addGraphListener(self)
-
-    #open a new search and get a new StreamSearch tuple
-    def openSearch(self):
-        openSegs = [] #list of segments pending action in our search
-        streamSearch = StreamSearch(id = self.nextSearchId, openSegments = openSegs)
-        self.activeSearches[streamSearch.id] = streamSearch
-        self.nextSearchId += 1
-        return streamSearch
-    def closeSearch(self, id):
-        del self.activeSearches[id]
 
     #navigate downstream until a path with lower streamlevel is found. This function returns the first segment
     #directly upstream from the junction of the main path and the tributary that 'segment' is on
@@ -295,18 +278,3 @@ class StreamGraphNavigator (object):
                         cumulativeError += 1
                     prevNumber = downStreamNumber 
         return cumulativeError
-
-    #update in progress stream searches based on a change to the graph
-    #If we don't do this step, as we expand the graph mid-search, the graph cleaning process will remove 
-    # segments we may be actively looking at. These removed segments no longer will have connections to our graph
-    # thus terminating the search early. 
-    def notify(self, update):
-        for search in self.activeSearches.values():
-            openSegs = search.openSegments
-            for i, segment in enumerate(openSegs):
-                if update.fromSeg is segment:
-                    openSegs[i] = update.toSeg
-            #remove duplicates
-            for i, segment in reversed(list(enumerate(openSegs))):
-                if openSegs.index(segment) != i:
-                    openSegs.pop(i)

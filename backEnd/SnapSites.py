@@ -20,7 +20,6 @@ waterTypeNames = [" brook", " pond", " river", " lake", " stream", " outlet", " 
 Snap = collections.namedtuple('Snap', 'feature snapDistance distAlongFeature nameMatch warnings')
 # a point that can be snapped. Name and ID are used occasionally to aid in snapping
 SnapablePoint = collections.namedtuple('SnapablePoint', 'point name id')
-Flag = collections.namedtuple('Flag', 'message warningCode')
 
 
 #Gets a key string from the site name that could be used to help snap sites later 
