@@ -1,6 +1,5 @@
 import sys
 import Failures
-
 #a class that has various functionality to navigate the graph of a stream graph. Will autoexpand the graph 
 #at edges when a search runs into the edge of the graph
 class StreamGraphNavigator (object):
@@ -12,7 +11,7 @@ class StreamGraphNavigator (object):
 
     #navigate downstream until a path with lower streamlevel is found. This function returns the first segment
     #directly upstream from the junction of the main path and the tributary that 'segment' is on
-    def findNextLowerStreamLevelPath (self, segment):
+    def findNextLowerStreamLevelPath (self, segment, expand=True):
         tribLevel = segment.streamLevel
 
         queue = []
@@ -24,14 +23,14 @@ class StreamGraphNavigator (object):
             if current.streamLevel < tribLevel:
                 #if we find a lower stream level it is downstream from the trib we started on
                 # so to find the next main stream path, we have to go up from this segment along the matching streamlevel neighbor
-                upstreamNeighbors = current.upStreamNode.getUpstreamNeighbors()#getCodedNeighbors(UPSTREAM)
+                upstreamNeighbors = current.upStreamNode.getUpstreamNeighbors()
                 for neighbor in upstreamNeighbors:
                     if neighbor.streamLevel == current.streamLevel:
                         nextMainPath = neighbor
                         break
             else:
                 downstreamPoint = current.downStreamNode.position
-                if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint):
+                if not self.streamGraph.pointWithinSafeDataBoundary (downstreamPoint) and expand:
                     graphExpansion = self.streamGraph.expandGraph(downstreamPoint[1], downstreamPoint[0])
                     
                     if Failures.isFailureCode(graphExpansion):
@@ -251,30 +250,18 @@ class StreamGraphNavigator (object):
             #we searched downstream and found no sites. If we terminated without error thus far it means we reached the end of the network
             return Failures.END_OF_BASIN_CODE
 
-    #get comulative error in site snaps 
-    #error is defined by number of times a site that is farther upstream
-    #is listed before a site that is farther downstream
-    #this error is attributed to bad snaps
-    def getGraphSiteIDError (self):
-        cumulativeError = 0
-        sinks = self.streamGraph.getSinks()
-        for sink in sinks:
-            upstreamPaths = sink.getUpstreamNeighbors()#getCodedNeighbors(UPSTREAM)
-            for path in upstreamPaths:
-                #collect all upstream sites without expanding the graph
-                #we do verification and error checking only on the part of the graph that has
-                #been expanded thus far
-                upstreamSites = self.collectSortedUpstreamSites(path, path.length, siteLimit = sys.maxsize, autoExpand = False)[0]
-                prevNumber = sys.maxsize
-                for site in upstreamSites:
-                    #we have to index this with [0] since collectSortedUpst.. returns a tuple like (siteID, distUpstream)
-                    siteID = site[0].siteID
-                    #normalize siteID to full 10 digits
-                    if len(siteID) < 10:
-                        siteID += "00"
-                    #get int representing the downstream address
-                    downStreamNumber = int(siteID[2:])
-                    if downStreamNumber > prevNumber:
-                        cumulativeError += 1
-                    prevNumber = downStreamNumber 
-        return cumulativeError
+
+    def getNamedTribMouths (self):
+        mouths = []
+        for segment in self.streamGraph.segments.values():
+            if segment.streamName == "":
+                continue
+            downstreamNeighbors = segment.downStreamNode.getDownstreamNeighbors()
+            isMouth = False
+            for neighbor in downstreamNeighbors:
+                if neighbor.streamLevel < segment.streamLevel:
+                    isMouth = True
+                    break
+            if isMouth:
+                mouths.append((segment.streamName, segment.downStreamNode.position))
+        return mouths

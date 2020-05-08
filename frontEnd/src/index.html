@@ -74,7 +74,7 @@
                                     </div>
 
                                     <br>
-                                    
+
                                     <div class="alert alert-warning" id="nhdFailure">
                                         Could not connect to NHD server. Please try again. 
                                     </div>
@@ -88,26 +88,49 @@
                                             Medium priority warnings found
                                         </div>
 
-                                        <h5>Site ID:</h5>
+                                        <!-- <h5>Site ID:</h5>
 
                                         <div class="alert alert-info" role="alert" id="siteIdDisp">
-                                        </div>
+                                        </div> -->
 
-                                        <h5>Story:</h5>
-
-                                        <div class="alert alert-info" role="alert" id="storyDisp">
-                                        </div>
-
-                                        <div id="warningSection">
-                                            <button class="btn btn-info btn-block" type="button" data-toggle="collapse" data-target="#warnings" aria-expanded="false" aria-controls="collapseExample">
-                                                Warning Log:
-                                            </button>
-                                            <div class="card alert-info">
-                                                <div class="collapse px-3" id="warnings">
-
-                                                </div>
+                                        <button class="btn btn-block btn-link card-title border dropdown-toggle text-reset" data-toggle="collapse" data-target="#siteIdDispCollapse" aria-expanded="true" aria-controls="siteIdDispCollapse">
+                                            Site ID
+                                        </button>
+                                        <div class="collapse show px-3" id="siteIdDispCollapse">
+                                            <div class="alert alert-info" role="alert" id="siteIdDisp">
                                             </div>
                                         </div>
+
+                                        <button class="btn btn-block btn-link card-title border dropdown-toggle text-reset" data-toggle="collapse" data-target="#storyDispCollapse" aria-expanded="true" aria-controls="storyDispCollapse">
+                                            Story
+                                        </button>
+                                        <div class="collapse show px-3" id="storyDispCollapse">
+                                            <div class="alert alert-info " role="alert" id="storyDisp">
+                                                
+                                            </div>
+                                        </div>
+                                        
+
+                                        <button class="btn btn-block btn-link card-title border dropdown-toggle text-reset" data-toggle="collapse" data-target="#namesDispCollapse" aria-expanded="true" aria-controls="namesDispCollapse">
+                                            Possible Names 
+                                        </button>
+                                        <div class="collapse px-3" id="namesDispCollapse">
+                                            <div id="namesDisp">
+
+                                            </div>
+                                        </div>
+
+                                        <button class="btn btn-block btn-link card-title border dropdown-toggle text-reset" data-toggle="collapse" data-target="#warningDispCollapse" aria-expanded="false" aria-controls="warningDispCollapse">
+                                            Warnings 
+                                        </button>
+                                        <div class="collapse px-3" id="warningDispCollapse">
+                                            <div id="warningsDisp">
+                                                <div class="alert alert-success">
+                                                    No warnings!
+                                                </div>
+                                            </div>
+                                        </div>                 
+  
                                     </div>
                                 </div>
                             </div>

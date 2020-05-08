@@ -10,22 +10,130 @@ import math
 import sys
 import json
 import WarningLog
+import collections
 
+#---query limits
 MAX_PRIMARY_QUERIES = 30
 #how many queries will we try AFTER finding a single upstream/downstream site to find the other upstream/downstream site?
 MAX_SECONDARY_SITE_QUERIES = 5
 #what's the smallest reasonable distance between two sites
 #according to Gary Wall this is 500 feet 
 #rounding down to be safe, we get 100 meters 
-MIN_SITE_DISTANCE = 0.1 #kilometers 
+MIN_SITE_DISTANCE = 0.1 #(kilometers)
 
-def getSiteName (lat, lng):
-    pass
+#---naming
+AT_DISTANCE = 1609.34 #(meters) a mile. Otherwise, name is "near"
+CONTEXT_DIST_LIMIT = 4000 #about 2.5 miles
+
+
+def getSiteNameContext (lat, lng, streamGraph, baseData):
+    context = {}
+    point = (lng, lat)
+    snapablePoint = SnapablePoint(point = point, name = "", id = "")
+    snapInfo = snapPoint(snapablePoint, baseData) #get the most likely snap
+
+    feature = snapInfo[0].feature
+    objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
+    segmentID = feature.GetFieldAsString(objectIDIndex)
+    distAlongSegment = snapInfo[0].distAlongFeature
+    #get the segment ID of the snapped segment
+    graphSegment = streamGraph.getCleanedSegment(segmentID)
+
+    navigator = StreamGraphNavigator(streamGraph)
+
+    downstreamSegment = navigator.findNextLowerStreamLevelPath(graphSegment, expand = False)
+    
+    streamName = graphSegment.streamName
+    if streamName == "":
+        if not Failures.isFailureCode(downstreamSegment) and downstreamSegment.streamName != "":
+            context["streamName"] = downstreamSegment.streamName + " tributary"
+        else:
+            context["streamName"] = "(INSERT STREAM NAME)"
+    else:
+        context["streamName"] = streamName
+    
+    placeInfo = GDALData.getNearestPlace(lat, lng)
+    if Failures.isFailureCode(placeInfo):
+        context["distanceToPlace"] = "-1"
+        context["state"] = "unknown"
+        context["placeName"] = "unknown"
+    else:
+        context["distanceToPlace"] = placeInfo["distanceToPlace"]
+        context["state"] = placeInfo["state"]
+        context["placeName"] = placeInfo["placeName"]
+    context["lat"] = lat
+    context["long"] = lng
+
+    contextualPlaces = []
+    
+    bridges = GDALData.getNearestBridges(lat, lng)
+    namedTribMouths = navigator.getNamedTribMouths()
+    
+    contextualPlaces.extend([{"name": context.name, "point":context.point, "distance":context.distance} for context in bridges])
+    contextualPlaces.extend([{"name": mouth[0], "point": mouth[1], "distance":Helpers.degDistance(mouth[1][0], mouth[1][1], lng, lat)} for mouth in namedTribMouths])
+
+    context["contextualPlaces"] = contextualPlaces
+
+    return context
+    
+
+def getSiteNameInfo (siteNameContext):
+    #beginning of name
+    beginning = siteNameContext["streamName"] + " "
+
+    #middle of the name. more choices here
+    middle = []
+
+    lat = siteNameContext["lat"]
+    lng = siteNameContext["long"]
+
+    middle.append ("")#capture base case when we don't want any middle context
+    sortedContextualPlaces = sorted(siteNameContext["contextualPlaces"], key=lambda context: context["distance"])
+    sortedContextualPlaces = sortedContextualPlaces[:min(3, len(sortedContextualPlaces))]
+    for contextPlace in sortedContextualPlaces:
+        name = contextPlace["name"]
+        distance = contextPlace["distance"]
+        point = contextPlace["point"]
+
+        if distance > CONTEXT_DIST_LIMIT:
+            continue
+
+        cardinalDirection = Helpers.getCardinalDirection(point, (lng, lat))
+
+        """ if distance < AT_DISTANCE:
+            middle.append("at " + name + " ")
+        else: """
+        middle.append("near " + name + " ")
+
+        #middle.append(cardinalDirection + " of " + name + " ")
+
+        distMiles = Helpers.metersToMiles(distance)
+
+        roundDist = Helpers.roundTo(distMiles, 0.1)
+        roungDistStr = str(roundDist)[:3]
+        if roundDist > 1 or roundDist < 1:
+            middle.append(roungDistStr + " miles " + cardinalDirection + " of " + name + " ")
+        else:
+            middle.append("1 mile " + cardinalDirection + " of " + name + " ")
+
+    #end of name
+    end = ""
+    if siteNameContext["distanceToPlace"] < AT_DISTANCE:
+        end = "at "
+    else:
+        end = "near "
+
+    end += siteNameContext["placeName"] + " " + siteNameContext["state"]
+
+    allNames = [(beginning + possibleMiddle + end).upper() for possibleMiddle in middle]
+
+    return {"suggestedNames":allNames, "context":siteNameContext}
+
 
 #withheld sites is a list of sites to be ignored while calculating a new site
 def getSiteID (lat, lng, withheldSites = [], debug = False):
     warningLog = WarningLog.WarningLog(lat, lng)
-
+    
     streamGraph = StreamGraph(withheldSites = withheldSites, debug = debug, warningLog = warningLog)
     siteIDManager = SiteIDManager()
 
@@ -34,11 +142,19 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     #get data around query point and construct a graph
     baseData = GDALData.loadFromQuery(lat, lng)
 
-    def getResults (siteID = "unknown", story = "See warning log"):
+    def getResults (siteID = "unknown", story = "See warning log", failed=False):
+        if not failed:
+            siteNameContext = getSiteNameContext(lat, lng, streamGraph, baseData)
+            nameResults = getSiteNameInfo(siteNameContext)
+        else:
+            nameResults = {"suggestedNames":["unknown"], "context":{}}
+
+
         results = dict()
         results["id"] = siteID
-        results["story"] = story
+        results["story"] = "Requested site info at " + str(lat)[:7] + ", " + str(lng)[:7] + ". " + story
         results["log"] = warningLog.getJSON()
+        results["nameInfo"] = nameResults
         return results
 
     if Failures.isFailureCode(baseData):
@@ -158,7 +274,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         newDon = int(downstreamSiteIdDsn * (1 - newSitePercentage) + upstreamSiteIdDsn * newSitePercentage)
 
-        newID = partCode + str(newDon)
+        newID = Helpers.buildFullID(partCode, newDon)
         newID = beautifyID(newID, downstreamSiteID, upstreamSiteID, warningLog)
         story = "Found an upstream site (" + upstreamSiteID + ") and a downstream site (" + downstreamSiteID + "). New site is the weighted average of these two sites."
 
@@ -184,10 +300,10 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         #we allow for a larger range in the final ID. Has to be at least 10% within the rule of min_site_distance
         allowedError = math.floor(max(1, min(siteIDOffset / 10, 5)))
 
-        upperBound = partCode + str(upstreamSiteDSN + siteIDOffset + allowedError)
-        lowerBound = partCode + str(upstreamSiteDSN + siteIDOffset - allowedError)
+        upperBound = Helpers.buildFullID(partCode, upstreamSiteDSN + siteIDOffset + allowedError)
+        lowerBound = Helpers.buildFullID(partCode, upstreamSiteDSN + siteIDOffset - allowedError)
         
-        newID = partCode + str(newSiteIDDSN)
+        newID = Helpers.buildFullID(partCode, newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
         story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(siteIDOffset) + " sites between upstream site and new site"
         
@@ -211,10 +327,10 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         allowedError = math.floor(max(1, min(siteIDOffset / 10, 5)))
 
-        upperBound = partCode + str(downstreamSiteDSN - siteIDOffset + allowedError)
-        lowerBound = partCode + str(downstreamSiteDSN - siteIDOffset - allowedError)
+        upperBound = Helpers.buildFullID(partCode, downstreamSiteDSN - siteIDOffset + allowedError)
+        lowerBound = Helpers.buildFullID(partCode, downstreamSiteDSN - siteIDOffset - allowedError)
         
-        newID = partCode + str(newSiteIDDSN)
+        newID = Helpers.buildFullID(partCode, newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
         
         story = "Only found a downstream site (" + downstreamSiteID + "). New site is based on downstream site while allowing space for " + str(siteIDOffset) + " sites between downstream site and new site"
@@ -282,7 +398,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         newDsn = int(dsnA * (1 - newSitePercentage) + dsnB * newSitePercentage)
 
-        newID = str(partCode) + str(newDsn)
+        newID = Helpers.buildFullID(partCode, newDsn)
         newID = beautifyID(newID, fullIDA, fullIDB, warningLog)
 
         story = "Could not find any sites on the network. Estimating based on " + oppositePairA[0] + " and " + oppositePairB[0] + "."
@@ -323,7 +439,7 @@ def beautifyID (siteID, lowerBound, upperBound, warningLog):
     
     for roundTo in roundingPrecisions:
         roundedDSN = Helpers.roundTo(DSN, roundTo)
-        fullRounded = partCode + str(roundedDSN)
+        fullRounded = Helpers.buildFullID(partCode, roundedDSN)
         if fullRounded not in existingNumbers and Helpers.betweenBounds(roundedDSN, lowerBoundDSN, upperBoundDSN):
             return Helpers.shortenID(fullRounded)
 

@@ -11,7 +11,7 @@ from collections import namedtuple
 import xml.etree.ElementTree as ET
 import json
 import math
-from Helpers import *
+import Helpers
 import sys
 from pathlib import Path
 import Failures
@@ -21,7 +21,7 @@ STREAM_PATH = "hu4"
 MAX_SAFE_QUERY_DIST_KM = 7
 
 BaseData = namedtuple('BaseData', 'lineLayer lineDS, siteLayer siteDS dataBoundary')
-
+PointOfContext = namedtuple('PointOfContext', 'distance point name')
 
 RESTRICTED_FCODES = [56600]
 
@@ -50,6 +50,65 @@ def queryWithAttempts (url, attempts, timeout = 3, queryName="data", debug = Fal
             print("failed to retrieve " + queryName + " on all attempts. Failing")
         return Failures.QUERY_FAILURE_CODE
 
+def getNearestPlace (lat, lng, timeout = 5):
+    locationsUrl = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/18/query?geometry=" + str(lng) +"," + str(lat) + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"
+    result = queryWithAttempts(locationsUrl, QUERY_ATTEMPTS, timeout = timeout, queryName="nearPlaces")
+    
+    if Failures.isFailureCode(result):
+        return result
+
+    try:
+        data = json.loads(result.text)
+    except:
+        return Failures.QUERY_PARSE_FAILURE_CODE
+
+    features = data["features"]
+
+    nearestFeatureDistance = sys.maxsize
+    nearestFeature = None
+    for feature in features:
+        attrib = feature["properties"]
+
+        point = feature["geometry"]["coordinates"][0]
+        distance = Helpers.fastMagDist(point[1], point[0], lat, lng)
+        if distance < nearestFeatureDistance:
+            nearestFeatureDistance = distance
+            nearestFeature = feature
+    
+    attrib = nearestFeature["properties"]
+    stateAlpha = attrib["state_alpha"]
+    placeName = attrib["gaz_name"]
+
+    nearestPoint = nearestFeature["geometry"]["coordinates"][0]
+    distance = Helpers.degDistance(nearestPoint[1], nearestPoint[0], lat, lng)
+
+    return {"distanceToPlace":distance, "placeName":placeName, "state":stateAlpha}
+    
+def getNearestBridges (lat, lng, timeout = 5):
+    locationsUrl = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/10/query?geometry=" + str(lng) +"," + str(lat) + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"
+    result = queryWithAttempts(locationsUrl, QUERY_ATTEMPTS, timeout = timeout, queryName="nearBridges")
+    
+    if Failures.isFailureCode(result):
+        return result
+
+    try:
+        data = json.loads(result.text)
+    except:
+        return Failures.QUERY_PARSE_FAILURE_CODE
+
+    features = data["features"]
+
+    bridges = []
+    for feature in features:
+        attrib = feature["properties"]
+
+        point = feature["geometry"]["coordinates"][0]
+
+        distance = Helpers.degDistance(point[1], point[0], lat, lng)
+        name = attrib["gaz_name"]
+        bridges.append(PointOfContext(point=point, distance=distance, name=name))
+    
+    return bridges
 
 #convert the xml results of a stream site query to geojson
 def buildGeoJson (xmlStr):
@@ -104,7 +163,7 @@ def getSiteIDsStartingWith (siteID, timeout = TIMEOUT, debug = False):
     return (sitesLayer, sitesDataSource)  
 
 def loadSitesFromQuery (lat, lng, radiusKM = 5, debug = False):
-    approxRadiusInDeg = approxKmToDegrees(radiusKM)
+    approxRadiusInDeg = Helpers.approxKmToDegrees(radiusKM)
     #northwest
     nwLat = lat + approxRadiusInDeg
     nwLng = lng + approxRadiusInDeg
@@ -165,7 +224,7 @@ def loadFromQuery(lat, lng, radiusKM = 5, debug = False):
     queryCenter.AddPoint(lng, lat)
 
     safeDataBoundaryRad = (radiusKM - DATA_PADDING)
-    safeDataBoundaryRad = approxKmToDegrees(safeDataBoundaryRad)
+    safeDataBoundaryRad = Helpers.approxKmToDegrees(safeDataBoundaryRad)
 
     safeDataBoundary = queryCenter.Buffer(safeDataBoundaryRad)
 
@@ -182,7 +241,7 @@ def loadFromData (lat, lng, radiusKM = 5):
     queryCenter = ogr.Geometry(ogr.wkbPoint)
     queryCenter.AddPoint(lat, lng)
 
-    degRadius = approxKmToDegrees(radiusKM)
+    degRadius = Helpers.approxKmToDegrees(radiusKM)
     #we want GDALData objects loaded from data to essentially act like queried data so we filter it around a query sized buffer
     dataBuffer = queryCenter.Buffer(radiusKM*1000)
 

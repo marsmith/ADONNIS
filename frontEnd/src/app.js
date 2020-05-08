@@ -50,7 +50,7 @@ var MapY = '41.905'; //set initial map latitude
 var MapZoom = 8; //set initial map zoom
 var NWISsiteServiceURL = 'https://waterservices.usgs.gov/nwis/site/';
 
-var NHDstreamRadius = 2000;
+var NHDstreamRadius = 3000;
 //END user config variables 
 
 //START global variables
@@ -227,11 +227,22 @@ function moveCursor (latlng) {
 
 function displaySiteInfo (siteInfo)
 {
+  $('#adonnisResults').show();
   $('#initialAdvice').hide();
+
   $('#siteIdDisp').html(siteInfo["id"]);
   $('#storyDisp').html(siteInfo["story"]);
-  $('#adonnisResults').show();
 
+  var names = siteInfo["nameInfo"]["suggestedNames"];
+  var namesHTML = ""
+  for (var name of names){
+    namesHTML += '<div class="alert alert-info" role="alert" id="namesDisp">';
+    namesHTML += name
+    namesHTML += '</div>';
+  }
+
+  $('#namesDisp').html(namesHTML);
+  
   var log = siteInfo["log"];
 
   var numLowPriority = log["low priority"].length;
@@ -264,7 +275,19 @@ function displaySiteInfo (siteInfo)
       warningsHTML += '</div>';
     }
 
-    $('#warnings').html(warningsHTML);
+    for (var warningBody of log["medium priority"]) {
+      warningsHTML += '<div class="alert alert-warning">';
+      warningsHTML += warningBody;
+      warningsHTML += '</div>';
+    }
+
+    for (var warningBody of log["low priority"]) {
+      warningsHTML += '<div class="alert alert-info">';
+      warningsHTML += warningBody;
+      warningsHTML += '</div>';
+    }
+
+    $('#warningsDisp').html(warningsHTML);
   }
   else {
     $('#warningSection').hide();
@@ -294,12 +317,12 @@ function querySiteInfo (latLng, callback) {
       }
       $('#loading').hide();
     },
-    error: function(){
-      console.log("failed query");
+    error: function(jqXH, text, errorThrown){
+      console.log("failed query: " + text + " error=" + errorThrown);
+      console.log(jqXH.responseText);
       $('#loading').hide();
     },
   }); 
-  $('#loading').hide();
   //callback({"id": "01362012", "story": "Found an upstream site (01362032) and a downstream site (0136200705)", "log": {"low priority": [], "medium priority": ["0136200705 conflicts with 7 other sites. Consider changing this site's ID", "01362005 conflicts with 6 other sites. Consider changing this site's ID", "01362008 conflicts with 01362004. Consider changing the site ID of one of these two sites", "01362032 conflicts with 01362030. Consider changing the site ID of one of these two sites"], "high priority": ["01362032 is involved in a site conflict. See story/medium priority warnings for conflict details.", "0136200705 is involved in a site conflict. See story/medium priority warnings for conflict details.", "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."]}});
 }
 
@@ -313,8 +336,8 @@ function queryNHDStreams (latlng, callback) {
 		console.log("already querying");
 		return;
 	}
-	
   isQueryingLines = true;
+
   $('#loading').show();
 
 	return $.ajax({
@@ -499,7 +522,9 @@ function queryNWISsites(bounds) {
             radius: 50
           });
 
-          point.bindTooltip(siteID, {sticky: true});
+
+          var tooltip = siteID + "<br>" + siteName;
+          point.bindTooltip(tooltip, {sticky: true});
 
           if (!NWISmarkers[siteID]) {
             NWISmarkers[siteID] = point;

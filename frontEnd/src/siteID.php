@@ -1,5 +1,7 @@
 <?php 
-                
+        
+set_time_limit (300);
+
 $lat = $_POST['lat'];
 $lng = $_POST['lng'];
 

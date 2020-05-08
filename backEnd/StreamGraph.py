@@ -4,7 +4,6 @@ from Helpers import *
 from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment
 import ogr
 import matplotlib.pyplot as plt
-import random
 import sys
 import copy
 import Failures
@@ -88,7 +87,7 @@ class StreamNode (object):
 
 #a segment connecting two points
 class StreamSegment (object):
-    def __init__(self, upStreamNode, downStreamNode, ID, length, streamLevel, arbolateSum):
+    def __init__(self, upStreamNode, downStreamNode, ID, length, streamLevel, arbolateSum, streamName):
         #streamSegments get 0 appended on the FID to ensure uniqueness
         self.upStreamNode = upStreamNode
         self.downStreamNode = downStreamNode
@@ -97,6 +96,7 @@ class StreamSegment (object):
         self.length = length
         self.streamLevel = streamLevel
         self.arbolateSum = arbolateSum
+        self.streamName = streamName
 
     #we assume that this site position is indeed on our segment. 
     #distAlongSegment = 0 would imply that the site is located at upStreamNode
@@ -270,8 +270,8 @@ class StreamGraph (object):
             self.removedSegments[segmentID] = replacedBy
     
     #add a segment to the graph
-    def addSegment (self, upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum):
-        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum)    
+    def addSegment (self, upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName):
+        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName)    
         #add the new segment to the dictionary
         self.segments[segmentID] = newSegment
         #from the perspective of the upstream node, this segment is downstream and vice versa
@@ -425,8 +425,9 @@ class StreamGraph (object):
             #since arbolate sum is distance upstream from the most downstream point of a segment, 
             #choosing arbolate sum of downstream segment is accurate for the collapsed segment
             newArbolateSum = downstreamSegment.arbolateSum
+            name = downstreamSegment.streamName
 
-            newSegment = self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength, newStreamLevel, newArbolateSum)    
+            newSegment = self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength, newStreamLevel, newArbolateSum, name)    
 
             #add the sites to the new segment
             for site in upstreamSegment.sites:
@@ -465,6 +466,8 @@ class StreamGraph (object):
         lineLayer = baseData.lineLayer
         objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
         lengthIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
+        nameIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
+
         fCodeIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("FCode")
         streamLevelIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("STREAMLEVE")
         arbolateSumIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("ARBOLATESU")
@@ -476,6 +479,7 @@ class StreamGraph (object):
             fCode = int(line.GetFieldAsString(fCodeIndex))
             streamLevel = int(line.GetFieldAsString(streamLevelIndex))
             arbolateSum = float(line.GetFieldAsString(arbolateSumIndex))
+            streamName = line.GetFieldAsString(nameIndex)
             if self.hasContainedSegment(segmentID) or fCode in RESTRICTED_FCODES:
                 continue
 
@@ -501,7 +505,7 @@ class StreamGraph (object):
             if downstreamNode == None:
                 downstreamNode = self.addNode(downstreamPt)
 
-            self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum)
+            self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName)
 
         siteLayer = baseData.siteLayer
         siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
