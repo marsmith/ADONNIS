@@ -1,10 +1,5 @@
 #Ian Scilipoti
 #Feb, 5th, 2020
-from osgeo import gdal
-from osgeo import ogr
-from osgeo import osr
-from osgeo import gdal_array
-from osgeo import gdalconst
 import requests
 import os
 from collections import namedtuple
@@ -20,8 +15,9 @@ import Failures
 STREAM_PATH = "hu4"
 MAX_SAFE_QUERY_DIST_KM = 7
 
-BaseData = namedtuple('BaseData', 'lineLayer lineDS, siteLayer siteDS dataBoundary')
+BaseData = namedtuple('BaseData', 'lineLayer siteLayer dataBoundary')
 PointOfContext = namedtuple('PointOfContext', 'distance point name')
+DataBoundary = namedtuple('DataBoundary', 'point radius')
 
 RESTRICTED_FCODES = [56600]
 
@@ -154,13 +150,32 @@ def getSiteIDsStartingWith (siteID, timeout = TIMEOUT, debug = False):
 
     geoJsonResults = buildGeoJson(result.text)
     try:
-        sitesDataSource = gdal.OpenEx(geoJsonResults)#, nOpenFlags=gdalconst.GA_Update)
-        sitesLayer = sitesDataSource.GetLayer()
+        sitesLayer = json.reads(geoJsonResults)["features"]
     except:
         if debug is True:
             print("could not read query")
         return Failures.QUERY_PARSE_FAILURE_CODE
-    return (sitesLayer, sitesDataSource)  
+    return (sitesLayer)  
+
+def getSiteIDsSimilarTo (siteID, totalToReturn):
+    collectedIDs = []
+    minimumSitesAdjacent = totalToReturn/2
+
+    def addSite (toAdd):
+        if toAdd not in collectedIDs:
+            collectedIDs.append(toAdd)
+            collectedIDs = sorted(collectedIDs, key=lambda site: int(Helpers.getFullID(site)))
+
+    def collectedEnough ():
+        inputIndex = collectedIDs.index(siteID)
+        if len(collectedIDs) - inputIndex > minimumSitesAdjacent and inputIndex > minimumSitesAdjacent:
+            return True
+        else:
+            return False
+    
+    #while(collectedEnough is False):
+
+
 
 def loadSitesFromQuery (lat, lng, radiusKM = 5, debug = False):
     approxRadiusInDeg = Helpers.approxKmToDegrees(radiusKM)
@@ -179,9 +194,8 @@ def loadSitesFromQuery (lat, lng, radiusKM = 5, debug = False):
     xmlSites = req.text#this query returns an xml. Have to conver to geoJson
     geoJsonSites = buildGeoJson(xmlSites)
     try:
-        siteDataSource = gdal.OpenEx(geoJsonSites)#, nOpenFlags=gdalconst.GA_Update)
-        siteLayer = siteDataSource.GetLayer()
-        return (siteLayer, siteDataSource)
+        jsonSites = json.loads(geoJsonSites)
+        return jsonSites["features"]
     except:
         if debug is True:
             print("could not read query")
@@ -202,57 +216,22 @@ def loadFromQuery(lat, lng, radiusKM = 5, debug = False):
             print("could not read query")
         return req
     try:
-        lineDataSource = gdal.OpenEx(req.text)#, nOpenFlags=gdalconst.GA_Update)
-        lineLayer = lineDataSource.GetLayer()
+        lineLayer = json.loads(req.text)["features"]
     except:
         if debug is True:
             print("could not read query")
         return Failures.QUERY_PARSE_FAILURE_CODE
     
-    if lineLayer.GetFeatureCount() == 0:
+    if len(lineLayer) == 0:
         return Failures.EMPTY_QUERY_CODE
 
     sites = loadSitesFromQuery(lat, lng, radiusKM)
     
     if Failures.isFailureCode(sites):
         return sites
-    siteLayer = sites[0]
-    siteDataSource = sites[1]
-
-    queryCenter = ogr.Geometry(ogr.wkbPoint)#up stream point - wkb point is the code for point based geometry
     
-    queryCenter.AddPoint(lng, lat)
+    dataBoundary = DataBoundary(point=(lng, lat), radius = Helpers.approxKmToDegrees(radiusKM - DATA_PADDING))
 
-    safeDataBoundaryRad = (radiusKM - DATA_PADDING)
-    safeDataBoundaryRad = Helpers.approxKmToDegrees(safeDataBoundaryRad)
-
-    safeDataBoundary = queryCenter.Buffer(safeDataBoundaryRad)
-
-    data = BaseData(lineLayer = lineLayer, lineDS = lineDataSource, siteLayer = siteLayer, siteDS = siteDataSource, dataBoundary = safeDataBoundary)
+    data = BaseData(lineLayer = lineLayer, siteLayer = sites, dataBoundary = dataBoundary)
 
     return data
-
-
-#for now just loads linedata from local since line data is usually much slower
-def loadFromData (lat, lng, radiusKM = 5):
-    linesPath = Path(__file__).parent.absolute() / STREAM_PATH / "hu4.shp"
-
-
-    queryCenter = ogr.Geometry(ogr.wkbPoint)
-    queryCenter.AddPoint(lat, lng)
-
-    degRadius = Helpers.approxKmToDegrees(radiusKM)
-    #we want GDALData objects loaded from data to essentially act like queried data so we filter it around a query sized buffer
-    dataBuffer = queryCenter.Buffer(radiusKM*1000)
-
-    lineDataSource = ogr.Open(linesPath)
-    lineLayer = lineDataSource.GetLayer() 
-    lineLayer.SetSpatialFilter(dataBuffer)
-
-    sites = loadSitesFromQuery(lat, lng, radiusKM)
-    if Failures.isFailureCode(sites):
-        return sites
-    siteLayer = sites[0]
-    siteDataSource = sites[1]
-
-    return BaseData(lineLayer = lineLayer, lineDS = lineDataSource, siteLayer = siteLayer, siteDS = siteDataSource, dataBoundary = dataBuffer)

@@ -1,7 +1,7 @@
 import unittest
 from StreamGraph import StreamGraph
 from StreamGraphNavigator import StreamGraphNavigator
-from osgeo import ogr
+from GDALData import DataBoundary
 
 class GraphNavigatorTests (unittest.TestCase):
 
@@ -34,10 +34,9 @@ class GraphNavigatorTests (unittest.TestCase):
         segment1 = streamGraph.addSegment (node1, node2, "1", 1, 2, 1)#trib of segment2 path
         segment2 = streamGraph.addSegment (node3, node2, "2", 1, 1, 1)
         streamGraph.addSite ("site1", "2", 0.2)
-        safeDataArtificial = ogr.Geometry(ogr.wkbPoint)
-        safeDataArtificial.AddPoint(0,0)
+        dataBoundary = DataBoundary(point = (0,0), radius=10)
 
-        streamGraph.safeDataBoundary.append(safeDataArtificial.Buffer(10))
+        streamGraph.safeDataBoundary.append(dataBoundary)
 
         navigator = StreamGraphNavigator(streamGraph)
         

@@ -1,4 +1,3 @@
-from osgeo import gdalconst
 from StreamGraph import *
 from StreamGraphNavigator import *
 from SiteInfoCreator import getSiteID
@@ -15,13 +14,12 @@ while True:
     if idReplacement == "y":
         inputSite = input("enter a site to replace: ")
 
-        (siteLayer, dataSource) = getSiteIDsStartingWith(inputSite)
-        featureCount = siteLayer.GetFeatureCount()
-        siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
+        siteLayer = getSiteIDsStartingWith(inputSite)
+        featureCount = len(siteLayer)
         if featureCount >= 1:
             print("found site")
             for site in siteLayer:
-                queriedID = site.GetFieldAsString(siteNumberIndex)
+                queriedID = site["properties"]["site_no"]
                 if queriedID == inputSite:
                     point = site.GetGeometryRef().GetPoint()
                     lat = point[1]
@@ -53,4 +51,4 @@ while True:
     else:
         print ("site:\n " + results["id"])
         print ("story:\n " + results["story"])
-        print ("log:\n " + results["log"])
+        print ("log:\n " + json.dumps(results["log"]))

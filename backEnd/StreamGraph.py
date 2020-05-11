@@ -2,10 +2,8 @@ from collections import namedtuple
 from GDALData import RESTRICTED_FCODES, BaseData, loadFromQuery
 from Helpers import *
 from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment
-import ogr
 import matplotlib.pyplot as plt
 import sys
-import copy
 import Failures
 
 #constants for neighbor relationships
@@ -155,7 +153,7 @@ class StreamGraph (object):
     def __init__(self, withheldSites = [], debug = False, warningLog = None):
         self.segments = {}
         self.nodes = []
-        self.safeDataBoundary = [] #gdal geometry objects. Points inside should have all neighboring segments stored
+        self.safeDataBoundary = [] #list of regions we consider safe from edge effects of query radius
 
         self.removedSegments = {}#cleaned segments. keep track to prevent duplicates. The dict values point to the segment that replaced this segment, if it exists
         self.siteSnaps = {}#list of sites that have already been added
@@ -229,21 +227,6 @@ class StreamGraph (object):
             x.append(sink.position[0])
             y.append(sink.position[1])
         plt.scatter(x,y, color='green')
-
-        #display safe boundary polygon
-        for j, geom in enumerate(self.safeDataBoundary):
-            for ring in geom:
-                numPoints = ring.GetPointCount()
-                x = []
-                y = []
-                for i in range(0, numPoints):
-                    point = ring.GetPoint(i)
-                    x.append(point[0])
-                    y.append(point[1])
-                if j == 0:
-                    plt.plot(x,y, lineWidth=1.5, color='green')
-                else:
-                    plt.plot(x,y, lineWidth=1, color='red')
 
         plt.show()
 
@@ -327,10 +310,9 @@ class StreamGraph (object):
     
     #checks if a point is within a safe distance from the center of some query
     def pointWithinSafeDataBoundary (self, point):
-        pointGeo = ogr.Geometry(ogr.wkbPoint)
-        pointGeo.AddPoint(point[0], point[1])
-        for geo in self.safeDataBoundary:
-            if pointGeo.Within(geo):
+        for boundary in self.safeDataBoundary:
+            #square radius since fastMagDistance is the same as a regular distance except there is no sqrt applied
+            if fastMagDist(point[0], point[1], boundary.point[0], boundary.point[1]) < boundary.radius*boundary.radius:
                 return True
         return False
 
@@ -464,30 +446,27 @@ class StreamGraph (object):
     #guaranteedNetLineIndex a streamline feature that is definitely on the network we are interested in
     def addGeom(self, baseData):
         lineLayer = baseData.lineLayer
-        objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
-        lengthIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
-        nameIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
-
-        fCodeIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("FCode")
-        streamLevelIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("STREAMLEVE")
-        arbolateSumIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("ARBOLATESU")
 
         for line in lineLayer:
+            lineProps = line["properties"]
             #don't add duplicates
-            segmentID = line.GetFieldAsString(objectIDIndex)
-            length = float(line.GetFieldAsString(lengthIndex))
-            fCode = int(line.GetFieldAsString(fCodeIndex))
-            streamLevel = int(line.GetFieldAsString(streamLevelIndex))
-            arbolateSum = float(line.GetFieldAsString(arbolateSumIndex))
-            streamName = line.GetFieldAsString(nameIndex)
+            segmentID = str(lineProps["OBJECTID"])
+            length = float(lineProps["LENGTHKM"])
+            fCode = int(lineProps["FCODE"])
+            streamLevel = int(lineProps["STREAMLEVE"])
+            arbolateSum = float(lineProps["ARBOLATESU"])
+            streamName = lineProps["GNIS_NAME"]
+            if streamName == None:
+                streamName = ""
+
             if self.hasContainedSegment(segmentID) or fCode in RESTRICTED_FCODES:
                 continue
 
-            geom = line.GetGeometryRef()
+            geom = line["geometry"]["coordinates"]
 
-            upstreamPt = geom.GetPoint(0)
-            numPoints = geom.GetPointCount()
-            downstreamPt = geom.GetPoint(numPoints-1)
+            upstreamPt = geom[0]
+            numPoints = len(geom)
+            downstreamPt = geom[numPoints-1]
 
             upstreamNode = None
             downstreamNode = None
@@ -508,18 +487,17 @@ class StreamGraph (object):
             self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName)
 
         siteLayer = baseData.siteLayer
-        siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
-        siteNameIndex = siteLayer.GetLayerDefn().GetFieldIndex("station_nm")
 
         self.safeDataBoundary.append(baseData.dataBoundary)
         self.removeLoops()
         
-        testCount = siteLayer.GetFeatureCount()
         #for each site, get a list of potential snaps and store them
         for site in siteLayer:
-            siteID = site.GetFieldAsString(siteNumberIndex)
-            siteName = site.GetFieldAsString(siteNameIndex)
-            pt = site.GetGeometryRef().GetPoint(0)
+            siteProps = site["properties"]
+            siteID = siteProps["site_no"]
+            siteName = siteProps["station_nm"]
+
+            pt = site["geometry"]["coordinates"]
             #don't try to add sites that aren't within the safe data boundary
             if not self.pointWithinSafeDataBoundary(pt):
                 continue
@@ -530,7 +508,7 @@ class StreamGraph (object):
             #we assume that the feature reference itself isn't stable once the GDAL object gets
             #removed by the garbage collector
             if len(snaps) > 0:
-                potentialGraphSites = [GraphSite(siteID = siteID, segmentID = snap.feature.GetFieldAsString(objectIDIndex), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, generalWarnings = snap.warnings, assignmentWarnings = []) for snap in snaps]
+                potentialGraphSites = [GraphSite(siteID = siteID, segmentID = str(snap.feature["properties"]["OBJECTID"]), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, generalWarnings = snap.warnings, assignmentWarnings = []) for snap in snaps]
                 self.addSiteSnaps(siteID, potentialGraphSites)
 
         #refresh all site snaps given the new site data

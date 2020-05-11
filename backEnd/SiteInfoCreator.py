@@ -33,8 +33,9 @@ def getSiteNameContext (lat, lng, streamGraph, baseData):
     snapInfo = snapPoint(snapablePoint, baseData) #get the most likely snap
 
     feature = snapInfo[0].feature
-    objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
-    segmentID = feature.GetFieldAsString(objectIDIndex)
+    
+    segmentID = str(feature["properties"]["OBJECTID"])
+
     distAlongSegment = snapInfo[0].distAlongFeature
     #get the segment ID of the snapped segment
     graphSegment = streamGraph.getCleanedSegment(segmentID)
@@ -142,6 +143,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     #get data around query point and construct a graph
     baseData = GDALData.loadFromQuery(lat, lng)
 
+    #create the json that gets resturned
     def getResults (siteID = "unknown", story = "See warning log", failed=False):
         if not failed:
             siteNameContext = getSiteNameContext(lat, lng, streamGraph, baseData)
@@ -175,8 +177,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         return getResults()
 
     feature = snapInfo[0].feature
-    objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
-    segmentID = feature.GetFieldAsString(objectIDIndex)
+    segmentID = str(feature["properties"]["OBJECTID"])
     distAlongSegment = snapInfo[0].distAlongFeature
     #get the segment ID of the snapped segment
     graphSegment = streamGraph.getCleanedSegment(segmentID)
@@ -347,14 +348,11 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         if Failures.isFailureCode(sitesInfo):
             warningLog.addWarning(WarningLog.HIGH_PRIORITY, sitesInfo)
             return getResults()
-
-        siteLayer, siteDatasource = sitesInfo
-        siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
         
         sites = []
-        for site in siteLayer:
-            siteNumber = site.GetFieldAsString(siteNumberIndex)
-            sitePoint = site.GetGeometryRef().GetPoint(0)
+        for site in sitesInfo:
+            siteNumber = site["properties"]["site_no"]
+            sitePoint = site["geometry"]["coordinates"]
             fastDistance = Helpers.fastMagDist(sitePoint[0], sitePoint[1], point[0], point[1])
             sites.append((siteNumber, sitePoint, fastDistance))
         
@@ -430,12 +428,11 @@ def beautifyID (siteID, lowerBound, upperBound, warningLog):
         warningLog.addWarning(WarningLog.LOW_PRIORITY, "Cannot verify if this site number already exists. Ensure this step is manually completed.")
         return siteID
     
-    siteLayer, siteDataSource = idsInfo
-    siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
+    siteLayer = idsInfo
 
     existingNumbers = set()
     for site in siteLayer:
-        siteNumber = site.GetFieldAsString(siteNumberIndex)
+        siteNumber = site["proprties"]["site_no"]
         existingNumbers.add(siteNumber)
     
     for roundTo in roundingPrecisions:

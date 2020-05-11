@@ -6,7 +6,6 @@ import sys
 import collections
 from StreamGraphNavigator import StreamGraphNavigator
 import copy
-import itertools
 import Failures
 import WarningLog
 
@@ -38,12 +37,8 @@ def getSiteStreamNameIdentifier (siteName):
     return lowerCase[0:endIndex]
 
 def snapPoint(snapablePoint, baseData, graph = None):
-    lineNameIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("GNIS_NAME")
-    lengthIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("LENGTHKM")
-    objectIDIndex = baseData.lineLayer.GetLayerDefn().GetFieldIndex("OBJECTID")
 
     lineLayer = baseData.lineLayer
-    lineLayer.ResetReading()
 
     sitePoint = snapablePoint.point
     siteName = snapablePoint.name
@@ -56,9 +51,9 @@ def snapPoint(snapablePoint, baseData, graph = None):
     samplesPerKM = 10
     sortedLines = []
     for line in lineLayer:
-        lineGeom = line.GetGeometryRef()
-        numPoints = lineGeom.GetPointCount()
-        lineLength = float(line.GetFieldAsString(lengthIndex))
+        lineGeom = line["geometry"]["coordinates"]
+        numPoints = len(lineGeom)
+        lineLength = float(line["properties"]["LENGTHKM"])
         numSamples = max(2, int(min(samplesPerKM * lineLength, numPoints)))
 
         minDist = sys.float_info.max
@@ -67,7 +62,7 @@ def snapPoint(snapablePoint, baseData, graph = None):
             #get index of geometry point.
             #attempt to space all points evenly
             geoIndex = int((i / (numSamples-1)) * (numPoints-1))
-            point = lineGeom.GetPoint(geoIndex)
+            point = lineGeom[geoIndex]
             dist = Helpers.fastMagDist(point[0], point[1], sitePoint[0], sitePoint[1])
 
             if dist < minDist:
@@ -87,18 +82,22 @@ def snapPoint(snapablePoint, baseData, graph = None):
     #get nearest point in the stream segment
     for sortedLine in possibleLines:
         line = sortedLine[0]
-        lineGeom = line.GetGeometryRef()
-        numPoints = lineGeom.GetPointCount()
-        lineLength = float(line.GetFieldAsString(lengthIndex))
-        objectID = line.GetFieldAsString(objectIDIndex)
-        lineName = line.GetFieldAsString(lineNameIndex).lower()
+        lineGeom = line["geometry"]["coordinates"]
+        numPoints = len(lineGeom)
+        lineLength = float(line["properties"]["LENGTHKM"])
+        objectID = line["properties"]["OBJECTID"]
+        lineName = line["properties"]["GNIS_NAME"]
+        if lineName == None:
+            lineName = ""
+        else:
+            lineName = lineName.lower()
 
         points = []
 
         distAlongSegment = 0
         #collect all points and their respective distances
         for i in range(0, numPoints):
-            point = lineGeom.GetPoint(i)
+            point = lineGeom[i]
             #we make assumption that each point in the geo is equally spaced
             geomSegmentLen = lineLength / numPoints
             #get a fast approx dist            
@@ -121,7 +120,7 @@ def snapPoint(snapablePoint, baseData, graph = None):
 
         for point in sortedPoints:
             pointIndex = point[2]
-            pointPosition = lineGeom.GetPoint(pointIndex)
+            pointPosition = lineGeom[pointIndex]
 
             #calculate the true distance
             trueDist = Helpers.dist(sitePoint[0], sitePoint[1], pointPosition[0], pointPosition[1])
@@ -476,46 +475,32 @@ def getSiteSnapAssignment (graph, debug = False):
 def visualize (baseData, snapped):
     siteLayer = baseData.siteLayer
     lineLayer = baseData.lineLayer
-    
-    """ siteLayer.ResetReading()
-    feat = siteLayer.GetNextFeature()
-    testBuff = feat.GetGeometryRef().Buffer(3000)
-    lineLayer.SetSpatialFilter(testBuff) """
 
-    lx = []
-    ly = []
-
-    lineLayer.ResetReading()
     for line in lineLayer:
         
-        geom = line.GetGeometryRef()
-        numPoints = geom.GetPointCount()
+        geom = line["geometry"]["coordinates"]
+        numPoints = len(geom)
         x = []
         y = []
         for i in range(0, numPoints):
-            p = geom.GetPoint(i)
+            p = geom[i]
             x.append(p[0])
             y.append(p[1])
 
-        p1 = geom.GetPoint(0)
-        lx.append(p1[0])
-        ly.append(p1[1])
 
         plt.plot(x, y, linewidth=1, color='blue')
 
     #display line endpoints
     #plt.scatter(lx,ly, color='black')
-    siteNumberIndex = siteLayer.GetLayerDefn().GetFieldIndex("site_no")
-    siteLayer.ResetReading()
     x = []
     y = []
     for site in siteLayer:
-        idNum = site.GetFieldAsString(siteNumberIndex)
-        geom = site.GetGeometryRef()
-        x.append(geom.GetPoint(0)[0])
-        y.append(geom.GetPoint(0)[1])
+        idNum = site["properties"]["site_no"]
+        geom = site["geometry"]["coordinates"]
+        x.append(geom[0])
+        y.append(geom[1])
 
-        plt.text(geom.GetPoint(0)[0], geom.GetPoint(0)[1], idNum, color='red')
+        plt.text(geom[0], geom[1], idNum, color='red')
     plt.scatter(x,y, color='red')
 
     x = []

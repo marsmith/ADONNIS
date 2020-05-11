@@ -11,6 +11,7 @@ import StreamGraphNavigator
 import Helpers
 import time
 import Failures
+import json
 
 SITE_DATA_PATH = Path("testData")
 
@@ -200,7 +201,7 @@ def runTestList (fileName, outputName, numLines = 100):
         output = ""
         generatedID = getSiteID(float(lat), float(lng), withheldSites = [siteID])
         newID = generatedID["id"]
-        log = Helpers.flattenString(generatedID["log"])
+        log = json.dumps(generatedID["log"])
         betweenBounds = "n"
         
         try:
@@ -234,6 +235,6 @@ def runTestList (fileName, outputName, numLines = 100):
     outputFile.close()
 
 
-runTestList("testingSet01.csv", "testingSet01_2.csv", numLines = 100)
+runTestList("testingSet01.csv", "testingSet01_2.csv", numLines = 30)
 #generateTestSiteIDList(100, "01", "_2")
 #randomReplacementTesting(30)
