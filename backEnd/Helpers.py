@@ -65,6 +65,15 @@ def siteIDCompare (a, b):
 
     return aDSN - bDSN
 
+def getSiteIDOffset (a, b):
+    fullA = getFullID(a)
+    fullB = getFullID(b)
+
+    aDSN = int(fullA[2:])
+    bDSN = int(fullB[2:])
+
+    return abs(aDSN - bDSN)
+
 def buildFullID (partCode, DNSwithExtension):
     #we expect the DNS with extension to be at least 8 digits
     #but, if the leading numbers of the DSN are 0s then this will be fewer digits when converted to an int
@@ -72,8 +81,6 @@ def buildFullID (partCode, DNSwithExtension):
     missingLeadingZeros = 8 - len(str(intDSN))
 
     return str(partCode) + missingLeadingZeros*"0" + str(intDSN)
-
-
 
 def dot (x1, y1, x2, y2):
     return x1*x2 + y1*y2

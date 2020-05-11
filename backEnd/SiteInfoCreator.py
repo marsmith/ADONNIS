@@ -305,7 +305,8 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         
         newID = Helpers.buildFullID(partCode, newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
-        story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(siteIDOffset) + " sites between upstream site and new site"
+        offsetAfterBeautify = Helpers.getSiteIDOffset(newID, fullUpstreamID)
+        story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(offsetAfterBeautify) + " sites between upstream site and new site"
         
         if debug is True:
             print("found upstream, but not downstream")
@@ -332,8 +333,8 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         
         newID = Helpers.buildFullID(partCode, newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
-        
-        story = "Only found a downstream site (" + downstreamSiteID + "). New site is based on downstream site while allowing space for " + str(siteIDOffset) + " sites between downstream site and new site"
+        offsetAfterBeautify = Helpers.getSiteIDOffset(newID, fullDownstreamID)
+        story = "Only found a downstream site (" + downstreamSiteID + "). New site is based on downstream site while allowing space for " + str(offsetAfterBeautify) + " sites between downstream site and new site"
         
         if debug is True:
             print("found downstream, but not upstream")
@@ -462,7 +463,7 @@ def beautifyID (siteID, lowerBound, upperBound, warningLog):
             if testNewID not in existingNumbers and Helpers.betweenBounds(testNewDSN, lowerBoundDSN, upperBoundDSN):
                 return testNewID
     
-    warningLog.addWarning(WarningLog.LOW_PRIORITY, "Cannot find gap in ID space for new ID. This ID already exists.")
+    warningLog.addWarning(WarningLog.MED_PRIORITY, "Failed to find gap in ID space for new ID. This ID already exists.")
     return siteID    
 
 if __name__ == "__main__":
