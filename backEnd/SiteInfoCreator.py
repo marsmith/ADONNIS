@@ -143,6 +143,10 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     #get data around query point and construct a graph
     baseData = GDALData.loadFromQuery(lat, lng)
 
+    story = ""
+    newID = ""
+    huc = ""
+
     #create the json that gets resturned
     def getResults (siteID = "unknown", story = "See warning log", failed=False):
         if not failed:
@@ -157,13 +161,16 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         results["story"] = "Requested site info at " + str(lat)[:7] + ", " + str(lng)[:7] + ". " + story
         results["log"] = warningLog.getJSON()
         results["nameInfo"] = nameResults
+        print("before nearby")
+        results["adjacentIDs"] = siteIDManager.getXNeighborIDs(siteID, huc, 5)
+        print("after query")
         return results
 
     if Failures.isFailureCode(baseData):
         if debug is True:
             print ("could not get data")
         warningLog.addWarning(WarningLog.HIGH_PRIORITY, baseData)
-        return getResults()
+        return getResults(failed = True)
 
     streamGraph.addGeom(baseData)
 
@@ -174,7 +181,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         if debug is True:
             print ("could not snap")
         warningLog.addWarning(WarningLog.HIGH_PRIORITY, snapInfo)
-        return getResults()
+        return getResults(failed = True)
 
     feature = snapInfo[0].feature
     segmentID = str(feature["properties"]["OBJECTID"])
@@ -227,14 +234,16 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             secondaryQueries += 1
         else:
             primaryQueries += 1
-
-    #add warnings from found sites
+    
+    #add warnings from found sites, collect HUC
     if upstreamSite is not None:
         siteAssignment = upstreamSite[0]
         for warning in siteAssignment.generalWarnings:
             warningLog.addWarningTuple(warning)
         for warning in siteAssignment.assignmentWarnings:
             warningLog.addWarningTuple(warning)
+
+        huc = siteAssignment.huc
     
     if downstreamSite is not None:
         siteAssignment = downstreamSite[0]
@@ -242,13 +251,15 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             warningLog.addWarningTuple(warning)
         for warning in siteAssignment.assignmentWarnings:
             warningLog.addWarningTuple(warning)
+
+        huc = siteAssignment.huc
     
     for warning in streamGraph.currentAssignmentWarnings:
         warningLog.addWarningTuple(warning)
 
-    story = ""
-    newID = ""
-
+    #handle all combinations of having an upstream site and/or a downstream site (also having neither)
+    
+    #~~~~~~~~~~~~~~~~~~~UPSTREAM AND DOWNSTREAM SITES FOUND CASE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     if upstreamSite is not None and downstreamSite is not None:
         #we have an upstream and downstream
 
@@ -284,21 +295,33 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             print ("found downstream is " + downstreamSiteID)
             streamGraph.visualize(customPoints=[snappedPoint])
             SnapSites.visualize(baseData, [])
-        
+
+    #~~~~~~~~~~~~~~~~~~~UPSTREAM SITE FOUND ONLY CASE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    
     elif upstreamSite is not None:
         upstreamSiteID = upstreamSite[0].siteID
         partCode = upstreamSiteID[:2]
         fullUpstreamID = Helpers.getFullID(upstreamSiteID)
 
+        foundSiteNeighbors = siteIDManager.getNeighborIDs(upstreamSiteID, huc)
+        if Failures.isFailureCode(foundSiteNeighbors):
+            nextSequentialDownstreamSite = None
+        else:
+            nextSequentialDownstreamSite = foundSiteNeighbors[1]
+
         upstreamSiteDSN = int(fullUpstreamID[2:])
         upstreamSiteDistance = upstreamSite[1]
 
+        #calculate offset. If we have a sequential downstream use that as a bound
         siteIDOffset = math.ceil(upstreamSiteDistance / MIN_SITE_DISTANCE)
-
+        if nextSequentialDownstreamSite is not None:
+            #if we have the sequential downstream bound, don't let the new site get added any closer than halfway between
+            siteIDOffset = min(siteIDOffset, Helpers.getSiteIDOffset(upstreamSiteID, nextSequentialDownstreamSite)/2)
+        
         newSiteIDDSN = upstreamSiteDSN + siteIDOffset
 
         #allowed wiggle room in the new site. Depending on how much distance is between the found site
         #we allow for a larger range in the final ID. Has to be at least 10% within the rule of min_site_distance
+        #at most 5 digits up or down. At least, 0
         allowedError = math.floor(max(1, min(siteIDOffset / 10, 5)))
 
         upperBound = Helpers.buildFullID(partCode, upstreamSiteDSN + siteIDOffset + allowedError)
@@ -307,23 +330,40 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         newID = Helpers.buildFullID(partCode, newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
         offsetAfterBeautify = Helpers.getSiteIDOffset(newID, fullUpstreamID)
-        story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(offsetAfterBeautify) + " sites between upstream site and new site"
         
-        if debug is True:
-            print("found upstream, but not downstream")
-            print("upstream siteID is " + str(upstreamSiteID))
-            streamGraph.visualize(customPoints=[snappedPoint])
-            SnapSites.visualize(baseData, [])
+        if nextSequentialDownstreamSite is None:
+            story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(offsetAfterBeautify) + " sites between upstream site and new site"
+            warningLog.addWarning(WarningLog.HIGH_PRIORITY, "No downstream bound on result. Needs verification!")
+        else:
+            story = "Found an upstream site (" + upstreamSiteID + "). Based on list of all sites, assume that (" + nextSequentialDownstreamSite + ") is the nearest downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
+            warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, downstream bound is based on list of sequential sites and may not be the true downstream bound. This could result in site clustering.")
 
+        if debug is True:
+                print("found upstream, but not downstream")
+                print("upstream siteID is " + str(upstreamSiteID))
+                streamGraph.visualize(customPoints=[snappedPoint])
+                SnapSites.visualize(baseData, [])
+    
+    #~~~~~~~~~~~~~~~~~~~DOWNSTREAM SITE ONLY CASE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     elif downstreamSite is not None:
         downstreamSiteID = downstreamSite[0].siteID
         partCode = downstreamSiteID[:2]
         fullDownstreamID = Helpers.getFullID(downstreamSiteID)
 
+        foundSiteNeighbors = siteIDManager.getNeighborIDs(downstreamSiteID, huc)
+        if Failures.isFailureCode(foundSiteNeighbors):
+            nextSequentialUpstreamSite = None
+        else:
+            nextSequentialUpstreamSite = foundSiteNeighbors[0]
+
         downstreamSiteDSN = int(fullDownstreamID[2:])
         downstreamSiteDistance = downstreamSite[1]
 
         siteIDOffset = math.ceil(downstreamSiteDistance / MIN_SITE_DISTANCE)
+
+        if nextSequentialUpstreamSite is not None:
+            #if we have the sequential upstream bound, don't let the new site get added any closer than halfway between
+            siteIDOffset = min(siteIDOffset, Helpers.getSiteIDOffset(upstreamSiteID, nextSequentialUpstreamSite)/2)
 
         newSiteIDDSN = downstreamSiteDSN - siteIDOffset
 
@@ -335,28 +375,39 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         newID = Helpers.buildFullID(partCode, newSiteIDDSN)
         newID = beautifyID(newID, lowerBound, upperBound, warningLog)
         offsetAfterBeautify = Helpers.getSiteIDOffset(newID, fullDownstreamID)
-        story = "Only found a downstream site (" + downstreamSiteID + "). New site is based on downstream site while allowing space for " + str(offsetAfterBeautify) + " sites between downstream site and new site"
+        
+        if nextSequentialUpstreamSite is None:
+            story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(offsetAfterBeautify) + " sites between upstream site and new site"
+            warningLog.addWarning(WarningLog.HIGH_PRIORITY, "No upstream bound on result. Needs verification!")
+        else:
+            story = "Found an upstream site (" + upstreamSiteID + "). Based on list of all sites, assume that (" + nextSequentialUpstreamSite + ") is the nearest downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
+            warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, upstream bound is based on list of sequential sites and may not be the true upstream bound. This could result in site clustering.")
         
         if debug is True:
             print("found downstream, but not upstream")
             print("downstream siteID is " + str(downstreamSiteID))
             streamGraph.visualize(customPoints=[snappedPoint])
             SnapSites.visualize(baseData, [])
+    
+    #~~~~~~~~~~~~~~~~~~~NO SITES FOUND CASE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     else:
         # get huge radius of sites:
         sitesInfo = GDALData.loadSitesFromQuery(lat, lng, 30)
         if Failures.isFailureCode(sitesInfo):
             warningLog.addWarning(WarningLog.HIGH_PRIORITY, sitesInfo)
-            return getResults()
+            return getResults(failed = True)
         
         sites = []
         for site in sitesInfo:
             siteNumber = site["properties"]["site_no"]
+            siteHUC = site["properties"]["huc_cd"]
             sitePoint = site["geometry"]["coordinates"]
             fastDistance = Helpers.fastMagDist(sitePoint[0], sitePoint[1], point[0], point[1])
-            sites.append((siteNumber, sitePoint, fastDistance))
+            sites.append((siteNumber, sitePoint, fastDistance, siteHUC))
         
         sortedSites = sorted(sites, key=lambda site: site[2])
+
+        huc = sortedSites[0][3]
 
         oppositePairA = None
         oppositePairB = None

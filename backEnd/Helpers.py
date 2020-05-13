@@ -33,10 +33,11 @@ def fastMagDist (x1, y1, x2, y2):
     return (x2 - x1)**2 + (y2 - y1)**2
 
 def getFullID (id):
-    newID = id + ""
-    if len(id) < 10:
-        newID += "00"
-    return newID
+    newID = str(id)
+
+    missingDigits = 10-len(newID)
+
+    return newID + "0" * missingDigits
 
 #from point1 to point2
 def getCardinalDirection (point1, point2):

@@ -15,7 +15,7 @@ DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstr
 
 #tuples used
 NeighborRelationship = namedtuple('NeighborRelationship', 'segment relationship')
-GraphSite = namedtuple('GraphSite', 'distDownstreamAlongSegment siteID segmentID snapDist nameMatch generalWarnings assignmentWarnings')
+GraphSite = namedtuple('GraphSite', 'distDownstreamAlongSegment siteID huc segmentID snapDist nameMatch generalWarnings assignmentWarnings')
 
 #a stream node 
 class StreamNode (object):
@@ -496,6 +496,7 @@ class StreamGraph (object):
             siteProps = site["properties"]
             siteID = siteProps["site_no"]
             siteName = siteProps["station_nm"]
+            huc = siteProps["huc_cd"]
 
             pt = site["geometry"]["coordinates"]
             #don't try to add sites that aren't within the safe data boundary
@@ -508,7 +509,7 @@ class StreamGraph (object):
             #we assume that the feature reference itself isn't stable once the GDAL object gets
             #removed by the garbage collector
             if len(snaps) > 0:
-                potentialGraphSites = [GraphSite(siteID = siteID, segmentID = str(snap.feature["properties"]["OBJECTID"]), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, generalWarnings = snap.warnings, assignmentWarnings = []) for snap in snaps]
+                potentialGraphSites = [GraphSite(siteID = siteID, huc = huc, segmentID = str(snap.feature["properties"]["OBJECTID"]), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, generalWarnings = snap.warnings, assignmentWarnings = []) for snap in snaps]
                 self.addSiteSnaps(siteID, potentialGraphSites)
 
         #refresh all site snaps given the new site data

@@ -122,6 +122,7 @@ def buildGeoJson (xmlStr):
             siteType = site.find('site_tp_cd').text
             siteLat = float(site.find('dec_lat_va').text)
             siteLng = float(site.find('dec_long_va').text)
+            hucCode = site.find('huc_cd').text
 
             #make sure this is a stream not a well. Well sites have 14 digits
             if siteType == "ST" and len(siteNo) < 13:
@@ -134,15 +135,15 @@ def buildGeoJson (xmlStr):
                     },
                     "properties": {
                         "site_no":siteNo,
-                        "station_nm":stationNm
+                        "station_nm":stationNm,
+                        "huc_cd":hucCode
                     }
                 }
                 geojson["features"].append(feature)
     return json.dumps(geojson)
 
 def getSiteIDsStartingWith (siteID, timeout = TIMEOUT, debug = False):
-    
-    similarSitesQuery = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + siteID + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=search_site_no%2Csite_tp_cd"
+    similarSitesQuery = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + siteID + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&column_name=huc_cd&list_of_search_criteria=search_site_no%2Csite_tp_cd"
     result = queryWithAttempts (similarSitesQuery, QUERY_ATTEMPTS, timeout = timeout, queryName="similarSiteIds")
     
     if Failures.isFailureCode(result):
@@ -157,25 +158,35 @@ def getSiteIDsStartingWith (siteID, timeout = TIMEOUT, debug = False):
         return Failures.QUERY_PARSE_FAILURE_CODE
     return (sitesLayer)  
 
-def getSiteIDsSimilarTo (siteID, totalToReturn):
-    collectedIDs = []
-    minimumSitesAdjacent = totalToReturn/2
+def loadPartCodeSites (code):
+    siteURL = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + code + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=search_site_no%2Csite_tp_cd"
+    req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
+    allSites = []
+    try:
+        root = ET.fromstring(req.text)
+        for site in root:
+            siteNo = site.find('site_no').text
+            allSites.append(siteNo)
+    except:
+        return Failures.QUERY_PARSE_FAILURE_CODE
+    return allSites
 
-    def addSite (toAdd):
-        if toAdd not in collectedIDs:
-            collectedIDs.append(toAdd)
-            collectedIDs = sorted(collectedIDs, key=lambda site: int(Helpers.getFullID(site)))
+def loadHUCSites (code):
+    siteURL = "https://waterservices.usgs.gov/nwis/site/?format=mapper&huc=" + code + "&siteType=ST&siteStatus=all"
+    req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
+    returnList = []
+    try:
+        root = ET.fromstring(req.text)
+        allSites = root.find('sites')
+        for site in allSites:
+            siteID = site.attrib['sno']
 
-    def collectedEnough ():
-        inputIndex = collectedIDs.index(siteID)
-        if len(collectedIDs) - inputIndex > minimumSitesAdjacent and inputIndex > minimumSitesAdjacent:
-            return True
-        else:
-            return False
-    
-    #while(collectedEnough is False):
+            if len(siteID) <= 10:
+                returnList.append(siteID)
 
-
+    except:
+        return Failures.QUERY_PARSE_FAILURE_CODE
+    return returnList
 
 def loadSitesFromQuery (lat, lng, radiusKM = 5, debug = False):
     approxRadiusInDeg = Helpers.approxKmToDegrees(radiusKM)
@@ -186,7 +197,7 @@ def loadSitesFromQuery (lat, lng, radiusKM = 5, debug = False):
     seLat = lat - approxRadiusInDeg
     seLng = lng - approxRadiusInDeg
 
-    siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
+    siteURL = "https://waterdata.usgs.gov/nwis/inventory?nw_longitude_va=" + str(nwLng) + "&nw_latitude_va=" + str(nwLat) + "&se_longitude_va=" + str(seLng) + "&se_latitude_va=" + str(seLat) + "&coordinate_format=decimal_degrees&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=huc_cd&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=lat_long_bounding_box"
     req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
     if Failures.isFailureCode(req):
         return req
