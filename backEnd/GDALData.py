@@ -151,7 +151,7 @@ def getSiteIDsStartingWith (siteID, timeout = TIMEOUT, debug = False):
 
     geoJsonResults = buildGeoJson(result.text)
     try:
-        sitesLayer = json.reads(geoJsonResults)["features"]
+        sitesLayer = json.loads(geoJsonResults)["features"]
     except:
         if debug is True:
             print("could not read query")

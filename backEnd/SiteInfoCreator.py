@@ -152,6 +152,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         if not failed:
             siteNameContext = getSiteNameContext(lat, lng, streamGraph, baseData)
             nameResults = getSiteNameInfo(siteNameContext)
+            nameResults["context"] = [] #don't need this feature now
         else:
             nameResults = {"suggestedNames":["unknown"], "context":{}}
 
@@ -161,9 +162,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         results["story"] = "Requested site info at " + str(lat)[:7] + ", " + str(lng)[:7] + ". " + story
         results["log"] = warningLog.getJSON()
         results["nameInfo"] = nameResults
-        print("before nearby")
         results["adjacentIDs"] = siteIDManager.getXNeighborIDs(siteID, huc, 5)
-        print("after query")
         return results
 
     if Failures.isFailureCode(baseData):
@@ -476,14 +475,14 @@ def beautifyID (siteID, lowerBound, upperBound, warningLog):
     #now check if this number exists already
     idsInfo = GDALData.getSiteIDsStartingWith(shortenedID)
     if Failures.isFailureCode(idsInfo):
-        warningLog.addWarning(WarningLog.LOW_PRIORITY, "Cannot verify if this site number already exists. Ensure this step is manually completed.")
+        warningLog.addWarning(WarningLog.LOW_PRIORITY, "Cannot verify if this site number already exists(" + idsInfo + "). Ensure this step is manually completed.")
         return siteID
     
     siteLayer = idsInfo
 
     existingNumbers = set()
     for site in siteLayer:
-        siteNumber = site["proprties"]["site_no"]
+        siteNumber = site["properties"]["site_no"]
         existingNumbers.add(siteNumber)
     
     for roundTo in roundingPrecisions:
