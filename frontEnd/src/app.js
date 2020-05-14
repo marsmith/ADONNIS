@@ -50,7 +50,7 @@ var MapY = '41.905'; //set initial map latitude
 var MapZoom = 8; //set initial map zoom
 var NWISsiteServiceURL = 'https://waterservices.usgs.gov/nwis/site/';
 
-var NHDstreamRadius = 3000;
+var NHDstreamRadius = 1000;
 //END user config variables 
 
 //START global variables
@@ -309,11 +309,11 @@ function querySiteInfo (latLng, callback) {
         },
 		success: function(theResult){
       var resultsJSON = JSON.parse(theResult);
-      console.log(theResult);
+      console.log("result is: " + theResult);
 			if (resultsJSON && resultsJSON.id.length > 0) {
 				callback(resultsJSON);
 			} else {
-				console.log("couldn't connect to backend");
+				console.log("couldn't read results");
       }
       $('#loading').hide();
     },
@@ -330,6 +330,7 @@ function querySiteInfo (latLng, callback) {
 function queryNHDStreams (latlng, callback) {
   
   console.log('querying NHD', NHDstreamRadius);
+  //var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE%2C+FCODE%2C+OBJECTID%2C+ARBOLATESU&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=" + NHDstreamRadius + "&units=esriSRUnit_Meter&returnGeometry=true&f=pjson";
 	var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=" + NHDstreamRadius + "&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson";
 	
 	if (isQueryingLines == true) {
@@ -343,7 +344,7 @@ function queryNHDStreams (latlng, callback) {
 	return $.ajax({
 		url: queryUrl,
 		dataType: 'json',
-		timeout: 5000,
+		timeout: 2000,
 		success: function(results){
       console.log("query success")
       isQueryingLines = false;
@@ -354,7 +355,10 @@ function queryNHDStreams (latlng, callback) {
       $('#nhdFailure').hide();
       callback()
 		},
-		error: function(){
+		error: function(jqXH, text, errorThrown){
+      console.log("failed query: " + text + " error=" + errorThrown);
+      console.log(jqXH.responseText);
+
       isQueryingLines = false;
       $('#loading').hide();
       $('#nhdFailure').show();
@@ -395,7 +399,7 @@ function highlightFeature (features) {
 		for (const point of feature.geometry.paths[0]) {
 			points.push(new L.latLng(point[1], point[0]));
 		}
-		var firstpolyline = new L.Polyline(points, {color: 'red', weight: 3, opacity: 0.5, smoothFactor: 1});
+		var firstpolyline = new L.Polyline(points, {color: 'blue', weight: 3, opacity: 0.5, smoothFactor: 1});
 		firstpolyline.addTo(NHDlinesLayer);
 	}
 }

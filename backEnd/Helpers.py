@@ -101,6 +101,13 @@ def flattenString (string):
 def roundTo (num, m):
     return math.floor(float(num)/m + 0.5) * m
 
+def getFloatTruncated (number, numDigits):
+    numString = str(number)
+    decimalIndex = numString.index(".")
+    return numString[0:min(len(numString), decimalIndex + numDigits)]
+
+
+
 def betweenBounds (n, a, b):
     upperBound = max(a, b)
     lowerBound = min(a, b)

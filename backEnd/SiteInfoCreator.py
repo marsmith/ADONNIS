@@ -159,7 +159,10 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         results = dict()
         results["id"] = siteID
-        results["story"] = "Requested site info at " + str(lat)[:7] + ", " + str(lng)[:7] + ". " + story
+
+        snapLatFormatted = Helpers.getFloatTruncated(lat, 4)
+        snapLngFormatted = Helpers.getFloatTruncated(lng, 4)
+        results["story"] = "Requested site info at " + str(snapLatFormatted) + ", " + str(snapLngFormatted) + ". " + story
         results["log"] = warningLog.getJSON()
         results["nameInfo"] = nameResults
         results["adjacentIDs"] = siteIDManager.getXNeighborIDs(siteID, huc, 5)

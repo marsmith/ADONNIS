@@ -10,9 +10,7 @@ The motivation for the ADONNIS Project was to improve the process of creating ne
   
   #### Required Packages
   - Python 3.6
-  - Numpy
-  - GDAL 2.4.4
-  - Shapely 
+  - GDAL 2.4.4 (for legacy)
   - MatPlotLib
   
   
