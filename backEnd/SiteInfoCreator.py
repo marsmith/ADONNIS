@@ -198,7 +198,6 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         results["story"] = "Requested site info at " + str(snapLatFormatted) + ", " + str(snapLngFormatted) + ". " + story
         results["log"] = warningLog.getJSON()
         results["nameInfo"] = nameResults
-        results["adjacentIDs"] = siteIDManager.getXNeighborIDs(siteID, huc, 5)
         return results
 
     if Failures.isFailureCode(baseData):
