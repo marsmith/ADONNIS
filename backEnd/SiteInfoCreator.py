@@ -42,12 +42,12 @@ def getSiteNameContext (lat, lng, streamGraph, baseData):
 
     navigator = StreamGraphNavigator(streamGraph)
 
-    downstreamSegment = navigator.findNextLowerStreamLevelPath(graphSegment, expand = False)
+    downstreamSegment = navigator.findNextLowerStreamLevelPath(graphSegment, downStreamPositionOnSegment=distAlongSegment, expand = False)
     
     streamName = graphSegment.streamName
     if streamName == "":
-        if not Failures.isFailureCode(downstreamSegment) and downstreamSegment.streamName != "":
-            context["streamName"] = downstreamSegment.streamName + " tributary"
+        if not Failures.isFailureCode(downstreamSegment) and downstreamSegment[0].streamName != "":
+            context["streamName"] = downstreamSegment[0].streamName + " tributary"
         else:
             context["streamName"] = "(INSERT STREAM NAME)"
     else:
@@ -75,13 +75,44 @@ def getSiteNameContext (lat, lng, streamGraph, baseData):
 
     context["contextualPlaces"] = contextualPlaces
 
-    return context
-    
+    upstreamDistance = graphSegment.arbolateSum - (graphSegment.length - distAlongSegment)
+    #check if we are at a stream mouth     
+    upstreamDistMiles = Helpers.metersToMiles(upstreamDistance * 1000)
+    if upstreamDistMiles < 1:
+        context["source"] = "at source"
+    elif upstreamDistMiles < 3:
+        context["source"] = "near source"
+    else:
+        context["source"] = ""
 
+    if Failures.isFailureCode(downstreamSegment):
+        context["mouth"] = ""
+    else:
+        downstreamDistMiles = Helpers.metersToMiles(downstreamSegment[1]*1000)
+        #make sure that the mouth distance is less than upstream dist
+        #before assigning descriptor. Otherwise, we could have near mouth and near source as option 
+        #on the same site
+        if downstreamDistMiles > upstreamDistMiles:
+            context["mouth"] = ""
+        else:
+            #likewise, if downstream is closer, don't use "at source" type descriptors
+            context["source"] = ""
+            if downstreamDistMiles < 1:
+                context["mouth"] = "at mouth"
+            elif downstreamDistMiles < 3:
+                context["mouth"] = "near mouth"
+            else:
+                context["mouth"] = ""
+
+    return context
+           
 def getSiteNameInfo (siteNameContext):
     #beginning of name
-    beginning = siteNameContext["streamName"] + " "
-
+    beginning = [siteNameContext["streamName"] + " "]
+    if len(siteNameContext["mouth"]) > 0:
+        beginning.append(siteNameContext["streamName"] + " " + siteNameContext["mouth"] + " ")
+    if len(siteNameContext["source"]) > 0:
+        beginning.append(siteNameContext["streamName"] + " " + siteNameContext["source"] + " ")
     #middle of the name. more choices here
     middle = []
 
@@ -125,8 +156,10 @@ def getSiteNameInfo (siteNameContext):
         end = "near "
 
     end += siteNameContext["placeName"] + " " + siteNameContext["state"]
-
-    allNames = [(beginning + possibleMiddle + end).upper() for possibleMiddle in middle]
+    allNames = []
+    for mid in middle:
+        for beg in beginning:
+            allNames.append((beg + mid + end).upper())
 
     return {"suggestedNames":allNames, "context":siteNameContext}
 

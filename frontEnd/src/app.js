@@ -50,7 +50,7 @@ var MapY = '41.905'; //set initial map latitude
 var MapZoom = 8; //set initial map zoom
 var NWISsiteServiceURL = 'https://waterservices.usgs.gov/nwis/site/';
 
-var NHDstreamRadius = 1000;
+var NHDstreamRadius = 3000;
 //END user config variables 
 
 //START global variables
@@ -196,6 +196,9 @@ function initListeners() {
 
 function moveCursor (latlng) {
   $('#adonnisResults').hide();
+  $('#latitude').val(latlng.lat);
+  $('#longitude').val(latlng.lng);
+  
   if(lastQueriedFeatures != null && latlng.distanceTo(lastQueryLatlng) < NHDstreamRadius/2) {
     var snappedLatLng = snapToFeature(latlng, lastQueriedFeatures);
     if (cursor == null) {

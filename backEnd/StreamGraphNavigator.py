@@ -11,8 +11,11 @@ class StreamGraphNavigator (object):
 
     #navigate downstream until a path with lower streamlevel is found. This function returns the first segment
     #directly upstream from the junction of the main path and the tributary that 'segment' is on
-    def findNextLowerStreamLevelPath (self, segment, expand=True):
+    def findNextLowerStreamLevelPath (self, segment, downStreamPositionOnSegment = 0, expand=True):
         tribLevel = segment.streamLevel
+
+        dist = -downStreamPositionOnSegment #when we sum dist up, we must subtract
+        #this from the first segment's length
 
         queue = []
         queue.append(segment)
@@ -20,6 +23,7 @@ class StreamGraphNavigator (object):
         nextMainPath = None
         while len(queue) > 0:
             current = queue.pop(0)
+            dist += current.length
             if current.streamLevel < tribLevel:
                 #if we find a lower stream level it is downstream from the trib we started on
                 # so to find the next main stream path, we have to go up from this segment along the matching streamlevel neighbor
@@ -42,7 +46,7 @@ class StreamGraphNavigator (object):
                 queue.extend(nextSegments)
         
         if nextMainPath is not None:
-            return nextMainPath
+            return (nextMainPath, dist)
         else:
             return Failures.END_OF_BASIN_CODE
 
@@ -145,7 +149,7 @@ class StreamGraphNavigator (object):
                 #recursively call this function again starting at the first node of the next mainstream branch
                 #the next mainstream branch should be the continuation of our trib in ID space
                 #self.streamGraph.visualize()
-                newSearch = self.getNextUpstreamSite(nextUpstreamSegment, nextUpstreamSegment.length)
+                newSearch = self.getNextUpstreamSite(nextUpstreamSegment[0], nextUpstreamSegment[0].length)
                 if Failures.isFailureCode(newSearch):
                     return newSearch
                 else:#we found a site in the new search!
