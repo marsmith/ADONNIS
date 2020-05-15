@@ -72,7 +72,6 @@ class SiteIDManager (object):
             return True
         except:
             return False
-            print("could not load data for this partCode")
     
     def loadHucWeb (self, code):
         if code in self.ids:

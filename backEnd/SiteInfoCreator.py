@@ -189,7 +189,6 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         else:
             nameResults = {"suggestedNames":["unknown"], "context":{}}
 
-
         results = dict()
         results["id"] = siteID
 
