@@ -1,7 +1,6 @@
 import random
 from GDALData import loadFromQuery
 import json
-from pathlib import Path
 import os
 from SiteInfoCreator import getSiteID
 from SiteIDManager import SiteIDManager
