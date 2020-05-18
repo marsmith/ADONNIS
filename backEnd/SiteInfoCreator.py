@@ -30,7 +30,10 @@ def getSiteNameContext (lat, lng, streamGraph, baseData):
     context = {}
     point = (lng, lat)
     snapablePoint = SnapablePoint(point = point, name = "", id = "")
-    snapInfo = snapPoint(snapablePoint, baseData) #get the most likely snap
+    snapInfo = snapPoint(snapablePoint, baseData, snapCutoff = 1) #get the most likely snap
+
+    if Failures.isFailureCode(snapInfo):
+        return snapInfo
 
     feature = snapInfo[0].feature
     
@@ -165,10 +168,10 @@ def getSiteNameInfo (siteNameContext):
 
 
 #withheld sites is a list of sites to be ignored while calculating a new site
-def getSiteID (lat, lng, withheldSites = [], debug = False):
+def getSiteID (lat, lng, withheldSites = []):
     warningLog = WarningLog.WarningLog(lat, lng)
     
-    streamGraph = StreamGraph(withheldSites = withheldSites, debug = debug, warningLog = warningLog)
+    streamGraph = StreamGraph(withheldSites = withheldSites, warningLog = warningLog)
     siteIDManager = SiteIDManager()
 
     #typically lat/long are switched to fit the x/y order paradigm 
@@ -184,8 +187,12 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     def getResults (siteID = "unknown", story = "See warning log", failed=False):
         if not failed:
             siteNameContext = getSiteNameContext(lat, lng, streamGraph, baseData)
-            nameResults = getSiteNameInfo(siteNameContext)
-            nameResults["context"] = [] #don't need this feature now
+
+            if Failures.isFailureCode(siteNameContext):
+                nameResults = {"suggestedNames":["unknown"], "context":{}}
+            else:
+                nameResults = getSiteNameInfo(siteNameContext)
+                nameResults["context"] = [] #don't need this feature now
         else:
             nameResults = {"suggestedNames":["unknown"], "context":{}}
 
@@ -200,7 +207,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         return results
 
     if Failures.isFailureCode(baseData):
-        if debug is True:
+        if __debug__:
             print ("could not get data")
         warningLog.addWarning(WarningLog.HIGH_PRIORITY, baseData)
         return getResults(failed = True)
@@ -209,9 +216,9 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
     #snap query point to a segment
     snapablePoint = SnapablePoint(point = point, name = "", id = "")
-    snapInfo = snapPoint(snapablePoint, baseData) #get the most likely snap
+    snapInfo = snapPoint(snapablePoint, baseData, snapCutoff = 1) #get the most likely snap
     if Failures.isFailureCode(snapInfo):
-        if debug is True:
+        if __debug__:
             print ("could not snap")
         warningLog.addWarning(WarningLog.HIGH_PRIORITY, snapInfo)
         return getResults(failed = True)
@@ -224,7 +231,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
     snappedPoint = streamGraph.segments[segmentID].getPointOnSegment(distAlongSegment)
 
-    if debug:
+    if __debug__:
         SnapSites.visualize(baseData, [])
         streamGraph.visualize(customPoints=[snappedPoint], showSegInfo = True)
         streamGraph.visualize(customPoints=[snappedPoint], showSegInfo = False)
@@ -234,7 +241,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
     #this allows us to stagger upstream and downstream searches
     #although this means repeating parts of the search multiple times, searching a already constructed
     #graph takes practically no time at all
-    navigator = StreamGraphNavigator(streamGraph, terminateSearchOnQuery = True, debug = debug)
+    navigator = StreamGraphNavigator(streamGraph, terminateSearchOnQuery = True)
 
     upstreamSite = None
     downstreamSite = None
@@ -323,7 +330,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
         newID = beautifyID(newID, downstreamSiteID, upstreamSiteID, warningLog)
         story = "Found an upstream site (" + upstreamSiteID + ") and a downstream site (" + downstreamSiteID + "). New site is the weighted average of these two sites."
 
-        if debug is True:
+        if __debug__:
             print ("found upstream is " + upstreamSiteID)
             print ("found downstream is " + downstreamSiteID)
             streamGraph.visualize(customPoints=[snappedPoint])
@@ -371,7 +378,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             story = "Found an upstream site (" + upstreamSiteID + "). Based on list of all sites, assume that (" + nextSequentialDownstreamSite + ") is the nearest downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
             warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, downstream bound is based on list of sequential sites and may not be the true downstream bound. This could result in site clustering.")
 
-        if debug is True:
+        if __debug__:
                 print("found upstream, but not downstream")
                 print("upstream siteID is " + str(upstreamSiteID))
                 streamGraph.visualize(customPoints=[snappedPoint])
@@ -416,7 +423,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
             story = "Found an upstream site (" + upstreamSiteID + "). Based on list of all sites, assume that (" + nextSequentialUpstreamSite + ") is the nearest downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
             warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, upstream bound is based on list of sequential sites and may not be the true upstream bound. This could result in site clustering.")
         
-        if debug is True:
+        if  __debug__:
             print("found downstream, but not upstream")
             print("downstream siteID is " + str(downstreamSiteID))
             streamGraph.visualize(customPoints=[snappedPoint])
@@ -486,7 +493,7 @@ def getSiteID (lat, lng, withheldSites = [], debug = False):
 
         story = "Could not find any sites on the network. Estimating based on " + oppositePairA[0] + " and " + oppositePairB[0] + "."
         
-        if debug:
+        if __debug__:
             print("no sites found nearby. Estimating new ID based on nearby sites")
             print ("new estimate based on " + oppositePairA[0] + " and " + oppositePairB[0])
             print ("estimation is " + newID)

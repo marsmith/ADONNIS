@@ -1,5 +1,4 @@
 import GDALData
-import matplotlib.pyplot as plt
 import Helpers
 import math
 import sys
@@ -8,6 +7,9 @@ from StreamGraphNavigator import StreamGraphNavigator
 import copy
 import Failures
 import WarningLog
+
+if __debug__:
+    import matplotlib.pyplot as plt
 
 NUM_SNAPS = 6# how many possible locations that aren't the same as the nearest do we consider?
 CUTOFF_DIST = 0.004
@@ -36,7 +38,7 @@ def getSiteStreamNameIdentifier (siteName):
         return ""
     return lowerCase[0:endIndex]
 
-def snapPoint(snapablePoint, baseData, graph = None):
+def snapPoint(snapablePoint, baseData, graph = None, snapCutoff = CUTOFF_DIST):
 
     lineLayer = baseData.lineLayer
 
@@ -135,15 +137,14 @@ def snapPoint(snapablePoint, baseData, graph = None):
             snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch, warnings = warnings)
             possibleSnaps.append(snap)
 
-    if len(possibleSnaps) == 0:
-        return Failures.SNAP_FAILURE_CODE
+    
 
     sortedPossibleSnaps = sorted(possibleSnaps, key=lambda snap: snap.snapDistance)
     #limit the number of considered snaps to a fixed number
     consideredSnaps = sortedPossibleSnaps#sortedPossibleSnaps[:min(NUM_SNAPS, len(sortedPossibleSnaps))]
     nameMatchFound = False
     for i, snap in reversed(list(enumerate(consideredSnaps))):
-        if snap.snapDistance > CUTOFF_DIST:
+        if snap.snapDistance > snapCutoff:
             consideredSnaps.pop(i)
         else:
             nameMatchFound = nameMatchFound or snap.nameMatch
@@ -152,10 +153,13 @@ def snapPoint(snapablePoint, baseData, graph = None):
         if snap.nameMatch == False and nameMatchFound == True:
             consideredSnaps.pop(i)
 
+    if len(consideredSnaps) == 0:
+        return Failures.SNAP_FAILURE_CODE
+
     return consideredSnaps
 
 #get a list of assignments for a given graph and a list of warnings generated
-def getSiteSnapAssignment (graph, debug = False):
+def getSiteSnapAssignment (graph):
     #a copy of the current graph used to try different possible snap operations
     testingGraph = graph#copy.deepcopy(graph)#.clone()
     testingGraphNavigator = StreamGraphNavigator(testingGraph)
@@ -166,9 +170,6 @@ def getSiteSnapAssignment (graph, debug = False):
 
     #assign all possible snaps of each site to the graph
     testingGraph.refreshSiteSnaps(allSnaps)
-
-    if debug:
-        testingGraph.visualize()
 
     assignments = []
     allRankedChoices = {}
@@ -184,14 +185,14 @@ def getSiteSnapAssignment (graph, debug = False):
                 if siteAssignment.snapDist < assignment.snapDist:
                     #then replace
                     assignments[i] = siteAssignment
-                elif debug is True:
+                elif __debug__:
                     print("tried to add a second assignment")
                 #at this point, we've either replaced, or not since our current assignment is worse
                 return
         #if we reach this line then we don't have an assignment for this ID yet. Add one
         assignments.append(siteAssignment)
 
-    def getSiteIndexRange (siteID, sites, debug = False):
+    def getSiteIndexRange (siteID, sites):
         firstIndex = -1
         lastIndex = -1
 
@@ -371,7 +372,7 @@ def getSiteSnapAssignment (graph, debug = False):
             else:
                 siteConflicts.add((assignment.siteID, conflictingSite))
 
-        if bestRankedChoice[1] > 0 and debug is True:
+        if bestRankedChoice[1] > 0 and __debug__:
             print("adding " + assignment.siteID + " with " + str(bestRankedChoice[1]) + " order error:")
             for conflictingSite in bestRankedChoice[5]:
                 print("\t conflicts with " + conflictingSite)      
@@ -384,7 +385,7 @@ def getSiteSnapAssignment (graph, debug = False):
     
     for siteID in graph.siteSnaps:
         if siteID not in accountedForSiteIDs:
-            if debug is True:
+            if __debug__:
                 print("missing site! adding in post: " + str(siteID))
             #add the most likely snap for this site
             assignments.append(graph.siteSnaps[siteID][0])
@@ -471,47 +472,46 @@ def getSiteSnapAssignment (graph, debug = False):
 
     return (assignments, warnings)
 
-#Visualizes 
-def visualize (baseData, snapped):
-    siteLayer = baseData.siteLayer
-    lineLayer = baseData.lineLayer
+if __debug__:
+    #Visualizes 
+    def visualize (baseData, snapped):
+        siteLayer = baseData.siteLayer
+        lineLayer = baseData.lineLayer
 
-    for line in lineLayer:
-        
-        geom = line["geometry"]["coordinates"]
-        numPoints = len(geom)
+        for line in lineLayer:
+            
+            geom = line["geometry"]["coordinates"]
+            numPoints = len(geom)
+            x = []
+            y = []
+            for i in range(0, numPoints):
+                p = geom[i]
+                x.append(p[0])
+                y.append(p[1])
+
+
+            plt.plot(x, y, linewidth=1, color='blue')
+
+        #display line endpoints
+        #plt.scatter(lx,ly, color='black')
         x = []
         y = []
-        for i in range(0, numPoints):
-            p = geom[i]
-            x.append(p[0])
-            y.append(p[1])
+        for site in siteLayer:
+            idNum = site["properties"]["site_no"]
+            geom = site["geometry"]["coordinates"]
+            x.append(geom[0])
+            y.append(geom[1])
 
+            plt.text(geom[0], geom[1], idNum, color='red')
+        plt.scatter(x,y, color='red')
 
-        plt.plot(x, y, linewidth=1, color='blue')
+        x = []
+        y = []
+        for snap in snapped:
+            site = snap[0]
+            snapLoc = snap[1]
+            x.append(snapLoc[0])
+            y.append(snapLoc[1])
+        plt.scatter(x,y, color='green')
 
-    #display line endpoints
-    #plt.scatter(lx,ly, color='black')
-    x = []
-    y = []
-    for site in siteLayer:
-        idNum = site["properties"]["site_no"]
-        geom = site["geometry"]["coordinates"]
-        x.append(geom[0])
-        y.append(geom[1])
-
-        plt.text(geom[0], geom[1], idNum, color='red')
-    plt.scatter(x,y, color='red')
-
-    x = []
-    y = []
-    for snap in snapped:
-        site = snap[0]
-        snapLoc = snap[1]
-        x.append(snapLoc[0])
-        y.append(snapLoc[1])
-    plt.scatter(x,y, color='green')
-
-    plt.show()
-
-
+        plt.show()

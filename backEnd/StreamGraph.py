@@ -2,9 +2,11 @@ from collections import namedtuple
 from GDALData import RESTRICTED_FCODES, BaseData, loadFromQuery
 from Helpers import *
 from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment
-import matplotlib.pyplot as plt
 import sys
 import Failures
+
+if __debug__:
+    import matplotlib.pyplot as plt
 
 #constants for neighbor relationships
 UNKNOWN = 0         #000
@@ -150,7 +152,7 @@ class StreamSegment (object):
 
 class StreamGraph (object):
 
-    def __init__(self, withheldSites = [], debug = False, warningLog = None):
+    def __init__(self, withheldSites = [], warningLog = None):
         self.segments = {}
         self.nodes = []
         self.safeDataBoundary = [] #list of regions we consider safe from edge effects of query radius
@@ -159,84 +161,83 @@ class StreamGraph (object):
         self.siteSnaps = {}#list of sites that have already been added
         self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
         self.withheldSites = withheldSites
-        self.debug = debug
         self.warningLog = warningLog
         self.currentAssignmentWarnings = []
+    if __debug__:
+        #visualize the graph using matplotlib
+        def visualize(self, showSegInfo = False, customPoints = []):
+            sitesX = []
+            sitesY = []
+            for streamSeg in self.segments.values():
+                startPt = streamSeg.upStreamNode.position
+                endPt = streamSeg.downStreamNode.position
 
-    #visualize the graph using matplotlib
-    def visualize(self, showSegInfo = False, customPoints = []):
-        sitesX = []
-        sitesY = []
-        for streamSeg in self.segments.values():
-            startPt = streamSeg.upStreamNode.position
-            endPt = streamSeg.downStreamNode.position
+                x = [startPt[0], endPt[0]]
+                y = [startPt[1], endPt[1]]
+                dx = endPt[0] - startPt[0]
+                dy = endPt[1] - startPt[1]
+                plt.arrow(startPt[0], startPt[1], dx, dy, width=0.000001, head_width = 0.00001, color='blue', length_includes_head=True)
 
-            x = [startPt[0], endPt[0]]
-            y = [startPt[1], endPt[1]]
-            dx = endPt[0] - startPt[0]
-            dy = endPt[1] - startPt[1]
-            plt.arrow(startPt[0], startPt[1], dx, dy, width=0.000001, head_width = 0.00001, color='blue', length_includes_head=True)
+                plt.plot(x,y, lineWidth=0.5, color='blue')
 
-            plt.plot(x,y, lineWidth=0.5, color='blue')
+                midPoint = (startPt[0]/2 + endPt[0]/2, startPt[1]/2 + endPt[1]/2)
 
-            midPoint = (startPt[0]/2 + endPt[0]/2, startPt[1]/2 + endPt[1]/2)
+                #plt.text(midPoint[0], midPoint[1], streamSeg.streamLevel, fontsize = 8)
+                #plt.text(midPoint[0], midPoint[1]-100, streamSeg.arbolateSum, fontsize = 8)
 
-            #plt.text(midPoint[0], midPoint[1], streamSeg.streamLevel, fontsize = 8)
-            #plt.text(midPoint[0], midPoint[1]-100, streamSeg.arbolateSum, fontsize = 8)
+                for i, sites in enumerate(streamSeg.sites):
+                    percentAlongSegment = sites.distDownstreamAlongSegment / streamSeg.length
+                    percentAlongSegmentInverse = 1 - percentAlongSegment
 
-            for i, sites in enumerate(streamSeg.sites):
-                percentAlongSegment = sites.distDownstreamAlongSegment / streamSeg.length
-                percentAlongSegmentInverse = 1 - percentAlongSegment
+                    position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
+                    sitesX.append(position[0])
+                    sitesY.append(position[1])
+                    plt.text(position[0], position[1] + 0.00001 * i, sites.siteID, fontsize = 8, color = 'red')
 
-                position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
-                sitesX.append(position[0])
-                sitesY.append(position[1])
-                plt.text(position[0], position[1] + 0.00001 * i, sites.siteID, fontsize = 8, color = 'red')
+                segmentInfo = streamSeg.streamLevel
+                if showSegInfo is True:
+                    segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel) + "\n" + str(streamSeg.arbolateSum)
+                plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
+            
+            """ x = []
+            y = []
+            for streamNode in self.nodes:
+                x.append(streamNode.position[0])
+                y.append(streamNode.position[1])
+                #plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
+            plt.scatter(x,y, color='green') """
 
-            segmentInfo = streamSeg.streamLevel
-            if showSegInfo is True:
-                segmentInfo = str(streamSeg.segmentID) + "\n" + str(round(streamSeg.length, 2)) + "\n" + str(streamSeg.streamLevel) + "\n" + str(streamSeg.arbolateSum)
-            plt.text(midPoint[0], midPoint[1], segmentInfo, fontsize = 8)
-        
-        """ x = []
-        y = []
-        for streamNode in self.nodes:
-            x.append(streamNode.position[0])
-            y.append(streamNode.position[1])
-            #plt.text(streamNode.position[0], streamNode.position[1], streamNode.instanceID, fontsize = 8)
-        plt.scatter(x,y, color='green') """
-
-        plt.scatter(sitesX, sitesY, color='red')
+            plt.scatter(sitesX, sitesY, color='red')
 
 
-        x = []
-        y = []
+            x = []
+            y = []
 
-        for pt in customPoints:
-            x.append(pt[0])
-            y.append(pt[1])
-            plt.text(pt[0], pt[1], "CUSTOM PT", fontsize=10, color = 'black')
+            for pt in customPoints:
+                x.append(pt[0])
+                y.append(pt[1])
+                plt.text(pt[0], pt[1], "CUSTOM PT", fontsize=10, color = 'black')
 
-        plt.scatter(x,y, color='black')
+            plt.scatter(x,y, color='black')
 
-        x = []
-        y = []
+            x = []
+            y = []
 
-        sinks = self.getSinks()
-        for sink in sinks:
-            x.append(sink.position[0])
-            y.append(sink.position[1])
-        plt.scatter(x,y, color='green')
+            sinks = self.getSinks()
+            for sink in sinks:
+                x.append(sink.position[0])
+                y.append(sink.position[1])
+            plt.scatter(x,y, color='green')
 
-        plt.show()
+            plt.show()
 
     #expand the graph at x,y with queried data. Return true if successful
     def expandGraph (self, lat, lng):
-        if self.debug:
+        if __debug__:
             print ("Expanding graph!")
         baseData = loadFromQuery(lat, lng)    
         if Failures.isFailureCode(baseData):
-            if self.debug:
+            if __debug__:
                 print ("could not expand graph")
             return baseData
         self.addGeom(baseData)
@@ -513,9 +514,9 @@ class StreamGraph (object):
                 self.addSiteSnaps(siteID, potentialGraphSites)
 
         #refresh all site snaps given the new site data
-        if self.debug:
+        if __debug__:
             print("refreshing site snaps")
-        assignmentInfo = getSiteSnapAssignment(self, debug = self.debug)
+        assignmentInfo = getSiteSnapAssignment(self)
         assignments = assignmentInfo[0]
         warnings = assignmentInfo[1]
         self.refreshSiteSnaps(assignments)

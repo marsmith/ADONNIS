@@ -4,10 +4,9 @@ import Failures
 #at edges when a search runs into the edge of the graph
 class StreamGraphNavigator (object):
 
-    def __init__(self, streamGraph, terminateSearchOnQuery = False, debug = False):
+    def __init__(self, streamGraph, terminateSearchOnQuery = False):
         self.streamGraph = streamGraph
         self.terminateSearchOnQuery = terminateSearchOnQuery
-        self.debug = debug
 
     #navigate downstream until a path with lower streamlevel is found. This function returns the first segment
     #directly upstream from the junction of the main path and the tributary that 'segment' is on
@@ -144,11 +143,10 @@ class StreamGraphNavigator (object):
             if Failures.isFailureCode(nextUpstreamSegment):
                 return nextUpstreamSegment
             else:#we found a mainstream branch!
-                if self.debug:
+                if __debug__:
                     print ("successful backtrack. Found next main branch")
                 #recursively call this function again starting at the first node of the next mainstream branch
                 #the next mainstream branch should be the continuation of our trib in ID space
-                #self.streamGraph.visualize()
                 newSearch = self.getNextUpstreamSite(nextUpstreamSegment[0], nextUpstreamSegment[0].length)
                 if Failures.isFailureCode(newSearch):
                     return newSearch

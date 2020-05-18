@@ -38,13 +38,9 @@ while True:
         lat = float(latLng[0])
         lng = float(latLng[1])
 
-    debug = False
-
     arguments = sys.argv
-    if len(arguments) > 1:
-        debug = arguments[1] == "y"
 
-    results = getSiteID(lat, lng, withheldSites = excludedList, debug = debug)
+    results = getSiteID(lat, lng, withheldSites = excludedList)
 
     if results is None:
         print("failed")
