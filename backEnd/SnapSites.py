@@ -1,4 +1,5 @@
 import GDALData
+import matplotlib.pyplot as plt
 import Helpers
 import math
 import sys

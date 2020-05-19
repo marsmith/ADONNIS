@@ -1,3 +1,5 @@
+#!/usr/bin/python3.6
+
 from StreamGraphNavigator import StreamGraphNavigator
 from StreamGraph import StreamGraph
 from SnapSites import snapPoint, SnapablePoint

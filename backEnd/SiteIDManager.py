@@ -3,7 +3,7 @@ import GDALData
 import Failures
 
 
-SITE_INFO_PATH = Path("siteInfo")
+#SITE_INFO_PATH = Path("siteInfo")
 # this should be replaced mostly with a sql database at some point.. 
 class SiteIDManager (object):
 
@@ -57,7 +57,7 @@ class SiteIDManager (object):
 
         return self.ids[hucCode][minIndex:upperIndex]  
 
-    def loadPartCode (self, code):
+    """ def loadPartCode (self, code):
         sitesPath = Path(__file__).parent.absolute() / SITE_INFO_PATH / (str(code) + ".txt")
         try:
             sitesString = sitesPath.read_text()
@@ -81,5 +81,5 @@ class SiteIDManager (object):
 
         self.ids[code] = sorted(ids, key=lambda id: Helpers.getFullID(id))
 
-        return True
+        return True """
         
