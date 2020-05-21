@@ -4,13 +4,15 @@
 
 // copyright:   2018 Martyn Smith - USGS NY WSC
 
-// authors:  Martyn J. Smith - USGS NY WSC
+// authors:   Martyn J. Smith - USGS NY WSC
+//            Ian G. Scilipoti - USGS NY WSC
 
 // purpose:  USGS NY WSC Web App Template
 
 // updates:
 // 08.07.2018 - MJS - Created
 // 04.24.2020 - MJS - Updates/modularized
+// 05.19.2020 - IGS - added ADONNIS features
 
 //CSS imports
 import 'bootstrap/dist/css/bootstrap.css';
@@ -51,12 +53,16 @@ var MapZoom = 8; //set initial map zoom
 var NWISsiteServiceURL = 'https://waterservices.usgs.gov/nwis/site/';
 
 var NHDstreamRadius = 3000;
+var siteDisplayZoomLevel = 12;
 //END user config variables 
 
 //START global variables
 var theMap;
 var baseMapLayer, basemaplayerLabels;
+
 var nwisSitesLayer;
+var NWISmarkers;
+var highlightedSites;
 
 var NHDlinesLayer;
 var isQueryingLines;
@@ -65,9 +71,10 @@ var lastQueryLatlng;
 
 var cursor;
 var cursorIcon;
+var siteIcon;
 var snappedCursorLatLng;
 
-var confirmPopup;
+var idNumLinkClass = "idNum"
 //END global variables
 
 //instantiate map
@@ -109,8 +116,10 @@ function initializeMap() {
   $('#adonnisResults').hide();
   $('#nhdFailure').hide();
 
-  cursorIcon = L.divIcon({className: 'wmm-pin wmm-altblue wmm-icon-triangle wmm-icon-white wmm-size-25'});
-
+  cursorIcon = L.divIcon({className: 'wmm-pin wmm-yellow wmm-icon-diamond wmm-icon-blue wmm-size-25'});
+  siteIcon = L.divIcon({className: 'wmm-pin wmm-altblue wmm-icon-diamond wmm-icon-blue wmm-size-25'});
+  NWISmarkers = {};
+  highlightedSites = new set();
 }
 
 function initListeners() {
@@ -119,7 +128,7 @@ function initListeners() {
   theMap.on('zoomend dragend', function() {
 
     //only query if zoom is reasonable
-    if (theMap.getZoom() >= 10) {
+    if (theMap.getZoom() >= siteDisplayZoomLevel) {
       queryNWISsites(theMap.getBounds());
     }
   });
@@ -153,7 +162,7 @@ function initListeners() {
               }
           });
       }
-      if (theMap.getZoom() < 10) {
+      if (theMap.getZoom() < siteDisplayZoomLevel) {
         nwisSitesLayer.clearLayers();
       }
       lastZoom = zoom;
@@ -179,8 +188,7 @@ function initListeners() {
   nwisSitesLayer.on('click', function (e) {
     
   });
-  /*  END EVENT HANDLERS */
-
+  
   $("#enterLatLng").click(function(){
     var lat = $('#latitude').val();
     var lng = $('#longitude').val();
@@ -192,9 +200,17 @@ function initListeners() {
       moveCursor(latlng);
     }
   });
+
+  $("#adonnisResults").on("click", "[class='" + idNumLinkClass + "']", function(event){
+    var siteID = $( this ).text();
+    goToSite(siteID);
+  });
+
+  /*  END EVENT HANDLERS */
 }
 
 function moveCursor (latlng) {
+  
   $('#adonnisResults').hide();
   $('#latitude').val(latlng.lat);
   $('#longitude').val(latlng.lng);
@@ -203,10 +219,7 @@ function moveCursor (latlng) {
     var snappedLatLng = snapToFeature(latlng, lastQueriedFeatures);
     if (cursor == null) {
       cursor = L.marker(snappedLatLng, {icon: cursorIcon}).addTo(theMap);
-      cursor.bindPopup('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr" style = "float:right;">Yes</button>');
-      //confirmPopup = L.popup({offset: L.point(0,-50), closeOnClick: true, autoClose: true})
-      //.setContent(),
-      
+      cursor.bindPopup('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr" style = "float:right;">Yes</button>', {offset: L.point(0,-20)});      
     }
     else {
       cursor.setLatLng(snappedLatLng);
@@ -233,13 +246,13 @@ function displaySiteInfo (siteInfo)
   $('#adonnisResults').show();
   $('#initialAdvice').hide();
 
-  $('#siteIdDisp').html(siteInfo["id"]);
-  $('#storyDisp').html(siteInfo["story"]);
+  $('#siteIdDisp').html(fillIDHTML(siteInfo["id"]));
+  $('#storyDisp').html(fillIDHTML(siteInfo["story"]));
 
   var names = siteInfo["nameInfo"]["suggestedNames"];
   var namesHTML = ""
   for (var name of names){
-    namesHTML += '<div class="alert alert-info" role="alert" id="namesDisp">';
+    namesHTML += '<div class="alert alert-success" role="alert" id="namesDisp">';
     namesHTML += name
     namesHTML += '</div>';
   }
@@ -268,25 +281,25 @@ function displaySiteInfo (siteInfo)
 
     for (var warningBody of log["high priority"]) {
       warningsHTML += '<div class="alert alert-danger">';
-      warningsHTML += warningBody;
+      warningsHTML += fillIDHTML(warningBody);
       warningsHTML += '</div>';
     }
 
     for (var warningBody of log["medium priority"]) {
       warningsHTML += '<div class="alert alert-warning">';
-      warningsHTML += warningBody;
+      warningsHTML += fillIDHTML(warningBody);
       warningsHTML += '</div>';
     }
 
     for (var warningBody of log["medium priority"]) {
       warningsHTML += '<div class="alert alert-warning">';
-      warningsHTML += warningBody;
+      warningsHTML += fillIDHTML(warningBody);
       warningsHTML += '</div>';
     }
 
     for (var warningBody of log["low priority"]) {
       warningsHTML += '<div class="alert alert-info">';
-      warningsHTML += warningBody;
+      warningsHTML += fillIDHTML(warningBody);
       warningsHTML += '</div>';
     }
 
@@ -330,7 +343,7 @@ function querySiteInfo (latLng, callback) {
 }
 
 //attempt to get streams in a radius around latlng. Send features to callback in format callback(results)
-function queryNHDStreams (latlng, callback) {
+function queryNHDStreams (latlng, callback, ) {
   
   console.log('querying NHD', NHDstreamRadius);
   //var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE%2C+FCODE%2C+OBJECTID%2C+ARBOLATESU&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=" + NHDstreamRadius + "&units=esriSRUnit_Meter&returnGeometry=true&f=pjson";
@@ -347,7 +360,7 @@ function queryNHDStreams (latlng, callback) {
 	return $.ajax({
 		url: queryUrl,
 		dataType: 'json',
-		timeout: 2000,
+		timeout: 5000,
 		success: function(results){
       console.log("query success")
       isQueryingLines = false;
@@ -361,9 +374,12 @@ function queryNHDStreams (latlng, callback) {
 		error: function(jqXH, text, errorThrown){
       console.log("failed query: " + text + " error=" + errorThrown);
       console.log(jqXH.responseText);
+      
 
+      
       isQueryingLines = false;
-      $('#loading').hide();
+      
+      $('#loading').hide(); 
       $('#nhdFailure').show();
 		},
 	});
@@ -484,23 +500,23 @@ function snapToFeature (latlng, features) {
 	return L.latLng(D.x, D.y);
 }
 
-function queryNWISsites(bounds) {
-
-  console.log('querying NWIS', bounds);
-
-  nwisSitesLayer.clearLayers();
-
+//get a site and call callback when query is complete
+function queryNWISsiteCallback (siteID, callback) {
+  if (NWISmarkers[siteID]) {
+    callback();
+    return;
+  }
+  console.log('querying NWIS', siteID);
+  
   var reqUrl = NWISsiteServiceURL;
-  var bbox = bounds.getSouthWest().lng.toFixed(7) + ',' + bounds.getSouthWest().lat.toFixed(7) + ',' + bounds.getNorthEast().lng.toFixed(7) + ',' + bounds.getNorthEast().lat.toFixed(7);
   var siteTypeList = 'OC,OC-CO,ES,LK,ST,ST-CA,ST-DCH,ST-TS,AT,WE,SP';
 
   var requestData = {
     'format': 'mapper',
-    'bbox': bbox,
+    'sites': siteID,
     'siteType': siteTypeList,
     'siteStatus': 'all'
   }
-  var NWISmarkers = {};
 
   $.ajax({
     url:reqUrl, 
@@ -518,31 +534,94 @@ function queryNWISsites(bounds) {
 
         if (siteID.length <= 10) {
 
-          // var myIcon = L.divIcon({className: 'wmm-pin wmm-red wmm-icon-circle wmm-icon-white wmm-size-25'});
-          // var point = L.marker([lat, lng], {icon: myIcon});
+          if (!NWISmarkers[siteID]) {
+            NWISmarkers[siteID] = {"siteName":siteName, "siteID":siteID, "latlng":L.latLng(lat, lng)}
+          }
+        }
+      });
+      callback();
+    }
+  });
+}
 
+function queryNWISsites(bounds) {
+  console.log('querying NWIS', bounds);
 
-          var point = L.circle([lat, lng], {
+  nwisSitesLayer.clearLayers();
+  
+  var reqUrl = NWISsiteServiceURL;
+  var bbox = bounds.getSouthWest().lng.toFixed(7) + ',' + bounds.getSouthWest().lat.toFixed(7) + ',' + bounds.getNorthEast().lng.toFixed(7) + ',' + bounds.getNorthEast().lat.toFixed(7);
+  var siteTypeList = 'OC,OC-CO,ES,LK,ST,ST-CA,ST-DCH,ST-TS,AT,WE,SP';
+
+  var requestData = {
+    'format': 'mapper',
+    'bbox': bbox,
+    'siteType': siteTypeList,
+    'siteStatus': 'all'
+  }
+
+  $.ajax({
+    url:reqUrl, 
+    dataType: 'xml',
+    data:  requestData, 
+    type: 'GET',
+    success: function(xml) {
+
+      $(xml).find('site').each(function () {
+
+        var siteID = $(this).attr('sno');
+        var siteName = $(this).attr('sna');
+        var lat = $(this).attr('lat');
+        var lng = $(this).attr('lng');
+
+        if (siteID.length <= 10) {
+
+          var siteMarker = L.marker([lat, lng], {icon: siteIcon, draggable:false});
+
+          /* var point = L.circle([lat, lng], {
             color: 'red',
             fillColor: '#f03',
             fillOpacity: 0.5,
             radius: 50
-          });
-
+          }); */
 
           var tooltip = siteID + "<br>" + siteName;
-          point.bindTooltip(tooltip, {sticky: true});
+          siteMarker.bindTooltip(tooltip, {sticky: true});
 
           if (!NWISmarkers[siteID]) {
-            NWISmarkers[siteID] = point;
-            NWISmarkers[siteID].data = { siteName: siteName, siteCode: siteID };
-            nwisSitesLayer.addLayer(NWISmarkers[siteID]);
+            NWISmarkers[siteID] = {"siteName":siteName, "siteID":siteID, "latlng":L.latLng(lat, lng)}
           }
-
+          nwisSitesLayer.addLayer(siteMarker);
         }
       });
     }
   });
+}
+
+function fillIDHTML (inStr) {
+  var replaced = inStr.replace(/_\d*_/g, function(match) {return getSiteLinkHTML(match.substring(1, match.length-1));});
+  return replaced;
+}
+
+function getSiteLinkHTML (siteID) {
+  var html = '<a href = "#0" class="' + idNumLinkClass + '">' + siteID + '</a>';
+  return html;
+}
+
+function goToSite (siteID) {
+  if (!NWISmarkers[siteID]){
+    queryNWISsiteCallback(siteID, function() { goToSite(siteID); });
+    return;
+  }
+  var siteInfo = NWISmarkers[siteID];
+  var latlng =  siteInfo["latlng"];
+  theMap.flyTo(latlng, 14);
+
+  console.log("going to " + siteID);
+}
+
+function highlightSite (siteID) {
+
 }
 
 function setBasemap(baseMap) {

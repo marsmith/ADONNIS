@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta name="author" content="Martyn Smith - USGS NY WSC">
+    <meta name="author" content="Ian Scilipoti - USGS NY WSC">
 	<link rel="copyright" href="license.txt">
-    <title>ADONNIS</title>
+    <title>ADONNIS (Beta)</title>
     <meta http-equiv="content-type" content="text/html; utf-8"/>
     <meta charset="utf-8">
     <link href="https://fonts.googleapis.com/css?family=Lato" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  </head>
+</head>
   <body>
     
     <div id="top-menu">
@@ -18,8 +18,8 @@
         <div class="title">
             <a class='top-menu-brand d-none d-md-block float-left' href="https://www.usgs.gov"><img src="images/logo.png"></a>
             
-            <span class="app-name">ADONNIS</span>
-            <span class="app-name-mobile">ADONNIS</span> 
+            <span class="app-name">ADONNIS (Beta)</span>
+            <span class="app-name-mobile">ADONNIS (Beta)</span> 
         </div>
 
         <button id="aboutButton" class="btn btn-default top-menu-btn pull-right">
@@ -68,7 +68,7 @@
                                         <div class="col-6 mx-auto">
                                             <div class="text-center">
                                                 <i class="fa fa-cog fa-spin fa-3x"></i>
-                                                <span class="mt-2">Loading Data...</span>
+                                                <span class="mt-2">Loading...</span>
                                             </div>
                                         </div>
                                     </div>
@@ -80,6 +80,7 @@
                                     </div>
 
                                     <div id="adonnisResults">
+
                                         <div class="alert alert-danger" id="highPriorityWarnings">
                                             HIGH PRIORITY WARNINGS FOUND
                                         </div>
@@ -88,16 +89,11 @@
                                             Medium priority warnings found
                                         </div>
 
-                                        <!-- <h5>Site ID:</h5>
-
-                                        <div class="alert alert-info" role="alert" id="siteIdDisp">
-                                        </div> -->
-
                                         <button class="btn btn-block btn-link card-title border dropdown-toggle text-reset" data-toggle="collapse" data-target="#siteIdDispCollapse" aria-expanded="true" aria-controls="siteIdDispCollapse">
                                             Site ID
                                         </button>
                                         <div class="collapse show px-3" id="siteIdDispCollapse">
-                                            <div class="alert alert-info" role="alert" id="siteIdDisp">
+                                            <div class="alert alert-success" role="alert" id="siteIdDisp">
                                             </div>
                                         </div>
 
@@ -105,7 +101,7 @@
                                             Story
                                         </button>
                                         <div class="collapse show px-3" id="storyDispCollapse">
-                                            <div class="alert alert-info " role="alert" id="storyDisp">
+                                            <div class="alert alert-success " role="alert" id="storyDisp">
                                                 
                                             </div>
                                         </div>
@@ -326,9 +322,9 @@
                                     All data is provisional unless otherwise noted
                                 </div>
 
-                                <p>Need some text here</p>
+                                <p>This program is in development. Results should be verified by an expert in all cases.</p>
 
-                                <p>Developed by <a href="https://www.usgs.gov/staff-profiles/martyn-smith">Martyn Smith</a> of the <a href="https://ny.water.usgs.gov">USGS New York Water Science Center</a>
+                                <p>Developed by Ian Scilipoti of the <a href="https://ny.water.usgs.gov">USGS New York Water Science Center</a>
                                 <p>Icons from <a href="https://github.com/USGS-WiM/marker-creator">Marker Creator</a> developed by<a href="https://wim.usgs.gov"> USGS Web Informatics and Mapping</a><br><br>
                                 <!-- Source code available <a href="https://github.com/marsmith/go2mapper">here.</a></p> -->
                                 <span id="appVersion"></span>
