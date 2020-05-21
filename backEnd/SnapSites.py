@@ -1,5 +1,4 @@
 import GDALData
-import matplotlib.pyplot as plt
 import Helpers
 import math
 import sys
@@ -132,7 +131,7 @@ def snapPoint(snapablePoint, baseData, graph = None, snapCutoff = CUTOFF_DIST):
     
             warnings = []
             if trueDist > WARNING_DIST:
-                message = str(siteId) + " was forced to snap to an above averagely far away stream. This could be a faulty snap."
+                message = Helpers.formatID(str(siteId)) + " was forced to snap to an above averagely far away stream. This could be a faulty snap."
                 warning = WarningLog.Warning(priority = WarningLog.LOW_PRIORITY, message = message)
                 warnings.append(warning)
             snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch, warnings = warnings)
@@ -453,20 +452,20 @@ def getSiteSnapAssignment (graph):
     for faultySite in atFaultSites:
         faultySiteID = faultySite[0]
         faultySiteConflictCount = faultySite[1]
-        message = str(faultySiteID) + " conflicts with " + str(faultySiteConflictCount) + " other sites. Consider changing this site's ID"
+        message = Helpers.formatID(faultySiteID) + " conflicts with " + str(faultySiteConflictCount) + " other sites. Consider changing this site's ID"
         warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message))
 
     for faultyPair in atFaultPairs:
         pairA = str(faultyPair[0])
         pairB = str(faultyPair[1])
-        message = pairA + " conflicts with " + pairB + ". Consider changing the site ID of one of these two sites"
+        message = Helpers.formatID(pairA) + " conflicts with " + Helpers.formatID(pairB) + ". Consider changing the site ID of one of these two sites"
         warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message))
 
     #finally, assign any warning to the site itself
     for assignment in assignments:
         assignmentID = assignment.siteID
         if assignmentID in allImplicatedSites:
-            message = str(assignmentID) + " is involved in a site conflict. See story/medium priority warnings for conflict details."
+            message = Helpers.formatID(assignmentID) + " was used to generate results AND is involved in a site conflict. See story/medium priority warnings for conflict details."
             warning = WarningLog.Warning(WarningLog.HIGH_PRIORITY, message)
             assignment.assignmentWarnings.clear()
             assignment.assignmentWarnings.append(warning)

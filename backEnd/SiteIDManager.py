@@ -70,7 +70,7 @@ class SiteIDManager (object):
             self.ids[code] = siteIDs
             return True
         except:
-            return False
+            return False """
     
     def loadHucWeb (self, code):
         if code in self.ids:
@@ -81,5 +81,5 @@ class SiteIDManager (object):
 
         self.ids[code] = sorted(ids, key=lambda id: Helpers.getFullID(id))
 
-        return True """
+        return True
         

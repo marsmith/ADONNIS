@@ -123,3 +123,9 @@ def shortenID (siteID):
         if trailingDigits == "00":
             return siteID[:8]
     return siteID
+
+
+#this format allows the frontend to make hyperlinks out of site IDs
+#relatively arbitrary, but needs to match the front end regex
+def formatID (siteID):
+    return "_" + str(siteID) + "_"

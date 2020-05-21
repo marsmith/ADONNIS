@@ -1,9 +1,11 @@
 from collections import namedtuple
 from GDALData import RESTRICTED_FCODES, BaseData, loadFromQuery
 from Helpers import *
+import Helpers
 from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment
 import sys
 import Failures
+import WarningLog
 
 if __debug__:
     import matplotlib.pyplot as plt
@@ -509,7 +511,9 @@ class StreamGraph (object):
             #graphSite is similar to Snap, but stores a reference to segmentID instead of feature
             #we assume that the feature reference itself isn't stable once the GDAL object gets
             #removed by the garbage collector
-            if len(snaps) > 0:
+            if Failures.isFailureCode(snaps):
+                self.warningLog.addWarning(WarningLog.MED_PRIORITY, Helpers.formatID(siteID) + " could not be snapped to a line. This is likely due to bad NHD data. Ensure that results don't conflict with this site.")
+            elif len(snaps) > 0:
                 potentialGraphSites = [GraphSite(siteID = siteID, huc = huc, segmentID = str(snap.feature["properties"]["OBJECTID"]), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, generalWarnings = snap.warnings, assignmentWarnings = []) for snap in snaps]
                 self.addSiteSnaps(siteID, potentialGraphSites)
 

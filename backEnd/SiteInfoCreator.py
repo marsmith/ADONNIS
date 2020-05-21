@@ -330,7 +330,7 @@ def getSiteID (lat, lng, withheldSites = []):
 
         newID = Helpers.buildFullID(partCode, newDon)
         newID = beautifyID(newID, downstreamSiteID, upstreamSiteID, warningLog)
-        story = "Found an upstream site (" + upstreamSiteID + ") and a downstream site (" + downstreamSiteID + "). New site is the weighted average of these two sites."
+        story = "Found an upstream site " + Helpers.formatID(upstreamSiteID) + " and a downstream site " + Helpers.formatID(downstreamSiteID) + ". New site is the weighted average of these two sites."
 
         if __debug__:
             print ("found upstream is " + upstreamSiteID)
@@ -377,7 +377,7 @@ def getSiteID (lat, lng, withheldSites = []):
             story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(offsetAfterBeautify) + " sites between upstream site and new site"
             warningLog.addWarning(WarningLog.HIGH_PRIORITY, "No downstream bound on result. Needs verification!")
         else:
-            story = "Found an upstream site (" + upstreamSiteID + "). Based on list of all sites, assume that (" + nextSequentialDownstreamSite + ") is the nearest downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
+            story = "Found an upstream site " + Helpers.formatID(upstreamSiteID) + ". Based on list of all sites, assume that " + Helpers.formatID(nextSequentialDownstreamSite) + " is the nearest downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
             warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, downstream bound is based on list of sequential sites and may not be the true downstream bound. This could result in site clustering.")
 
         if __debug__:
@@ -419,10 +419,10 @@ def getSiteID (lat, lng, withheldSites = []):
         offsetAfterBeautify = Helpers.getSiteIDOffset(newID, fullDownstreamID)
         
         if nextSequentialUpstreamSite is None:
-            story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(offsetAfterBeautify) + " sites between upstream site and new site"
+            story = "Only found a upstream site " + Helpers.formatID(upstreamSiteID) + ". New site ID is based on upstream site while allowing space for " + str(offsetAfterBeautify) + " sites between upstream site and new site"
             warningLog.addWarning(WarningLog.HIGH_PRIORITY, "No upstream bound on result. Needs verification!")
         else:
-            story = "Found an upstream site (" + upstreamSiteID + "). Based on list of all sites, assume that (" + nextSequentialUpstreamSite + ") is the nearest downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
+            story = "Found an upstream site " + Helpers.formatID(upstreamSiteID) + ". Based on list of all sites, assume that " + Helpers.formatID(nextSequentialUpstreamSite) + " is the nearest downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
             warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, upstream bound is based on list of sequential sites and may not be the true upstream bound. This could result in site clustering.")
         
         if  __debug__:
@@ -493,7 +493,7 @@ def getSiteID (lat, lng, withheldSites = []):
         newID = Helpers.buildFullID(partCode, newDsn)
         newID = beautifyID(newID, fullIDA, fullIDB, warningLog)
 
-        story = "Could not find any sites on the network. Estimating based on " + oppositePairA[0] + " and " + oppositePairB[0] + "."
+        story = "Could not find any sites on the network. Estimating based on " + Helpers.formatID(oppositePairA[0]) + " and " + Helpers.formatID(oppositePairB[0]) + "."
         
         if __debug__:
             print("no sites found nearby. Estimating new ID based on nearby sites")
