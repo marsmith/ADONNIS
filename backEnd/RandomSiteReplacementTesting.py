@@ -2,7 +2,7 @@ import random
 from GDALData import loadFromQuery
 import json
 import os
-from SiteInfoCreator import getSiteID
+import SiteInfoCreator
 from SiteIDManager import SiteIDManager
 from SnapSites import snapPoint, SnapablePoint
 import StreamGraph
@@ -67,7 +67,7 @@ def generateTestSiteIDList (numSites, partNumber, version):
                     allSnaps.extend(snaps)
 
                 #assign all possible snaps of each site to the graph
-                testingGraph.refreshSiteSnaps(allSnaps)
+                testingGraph.assignSiteSnaps(allSnaps)
 
                 isolatedSites = []
 
@@ -127,8 +127,6 @@ def randomReplacementTesting (numTests):
         idNeighbors = siteIDManager.getNeighborIDs(siteID)
         if idNeighbors is not None and siteID[:2] == "01":
 
-
-
             lowerNeighbor = idNeighbors[0]
             upperNeighbor = idNeighbors[1]
             if len(lowerNeighbor) < 10:
@@ -138,7 +136,7 @@ def randomReplacementTesting (numTests):
 
             if lowerNeighbor is not None and upperNeighbor is not None:
 
-                generatedID = getSiteID(lat, lng, withheldSites = [siteID], enforceSingleSnap = True)
+                generatedID = SiteInfoCreator.SiteInfoCreator(lat, lng, withheldSites = [siteID]).getSiteID()
 
                 #only test sites that have single best snaps.
                 #this shouldn't limit the randomness of the tests. 
@@ -198,7 +196,7 @@ def runTestList (fileName, outputName, numLines = 100):
         upperID = Helpers.getFullID(upperBound)
         lowerID = Helpers.getFullID(lowerBound)
         output = ""
-        generatedID = getSiteID(float(lat), float(lng), withheldSites = [siteID])
+        generatedID = SiteInfoCreator.SiteInfoCreator(float(lat), float(lng), withheldSites = [siteID]).getSiteID()
         newID = generatedID["id"]
         log = json.dumps(generatedID["log"])
         betweenBounds = "n"

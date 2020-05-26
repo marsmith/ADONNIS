@@ -14,7 +14,7 @@ if __debug__:
 NUM_SNAPS = 6# how many possible locations that aren't the same as the nearest do we consider?
 CUTOFF_DIST = 0.004
 WARNING_DIST = 0.003
-POINTS_PER_LINE = 2
+POINTS_PER_LINE = 2 #how many possible points on a given feature do we consider for snapping
 adverbNameSeparators = [" at ", " above ", " near ", " below "]
 waterTypeNames = [" brook", " pond", " river", " lake", " stream", " outlet", " creek", " bk", " ck"]
 #a possible snap for a given point
@@ -38,7 +38,8 @@ def getSiteStreamNameIdentifier (siteName):
         return ""
     return lowerCase[0:endIndex]
 
-def snapPoint(snapablePoint, baseData, graph = None, snapCutoff = CUTOFF_DIST):
+#snap a point to stream data. Basedata is expected to be a baseData object with GEOJson formatted data 
+def snapPoint(snapablePoint, baseData, snapCutoff = CUTOFF_DIST):
 
     lineLayer = baseData.lineLayer
 
@@ -137,8 +138,6 @@ def snapPoint(snapablePoint, baseData, graph = None, snapCutoff = CUTOFF_DIST):
             snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch, warnings = warnings)
             possibleSnaps.append(snap)
 
-    
-
     sortedPossibleSnaps = sorted(possibleSnaps, key=lambda snap: snap.snapDistance)
     #limit the number of considered snaps to a fixed number
     consideredSnaps = sortedPossibleSnaps#sortedPossibleSnaps[:min(NUM_SNAPS, len(sortedPossibleSnaps))]
@@ -159,7 +158,7 @@ def snapPoint(snapablePoint, baseData, graph = None, snapCutoff = CUTOFF_DIST):
     return consideredSnaps
 
 #get a list of assignments for a given graph and a list of warnings generated
-def getSiteSnapAssignment (graph):
+def getSiteSnapAssignment (graph, assignBadSites = False):
     #a copy of the current graph used to try different possible snap operations
     testingGraph = graph#copy.deepcopy(graph)#.clone()
     testingGraphNavigator = StreamGraphNavigator(testingGraph)
@@ -169,12 +168,10 @@ def getSiteSnapAssignment (graph):
         allSnaps.extend(snaps)
 
     #assign all possible snaps of each site to the graph
-    testingGraph.refreshSiteSnaps(allSnaps)
+    testingGraph.assignSiteSnaps(allSnaps)
 
     assignments = []
     allRankedChoices = {}
-    #for each site, holds a list of other sites that 
-    siteConflicts = set()
 
     def addAssignment (siteAssignment):
         alreadyContainedAssignment = False
@@ -192,6 +189,13 @@ def getSiteSnapAssignment (graph):
         #if we reach this line then we don't have an assignment for this ID yet. Add one
         assignments.append(siteAssignment)
 
+    def removeAssignment (siteID):
+        for i, assignment in enumerate(assignments):
+            if assignment.siteID == siteID:
+                assignments.pop(i)
+                return
+
+    #get the range of occurances of siteID in a list of IDs (sites)
     def getSiteIndexRange (siteID, sites):
         firstIndex = -1
         lastIndex = -1
@@ -203,6 +207,9 @@ def getSiteSnapAssignment (graph):
                 lastIndex = i
         return (firstIndex, lastIndex)
 
+    #given a list of rankedChoices:
+    #(assignment, orderError, distanceScore, upstreamSitesIdx, nameMatch, orderConflicts)
+    #choose the best choice based on a tiered system. 
     def getBestRankedChoice (rankedChoices):
         minOrderError = sys.maxsize
         bestScoreChoice = None
@@ -225,6 +232,7 @@ def getSiteSnapAssignment (graph):
                     bestScoreChoice = choice
         return bestScoreChoice
 
+    #loop through all upstream paths by getting all sinks and getting all upstream paths from each sink
     sinks = graph.getSinks()
     for sink in sinks:
         upstreamPaths = sink.getUpstreamNeighbors()
@@ -354,9 +362,12 @@ def getSiteSnapAssignment (graph):
                 else:
                     allRankedChoices[siteID] = [bestScoreChoice]
 
-    #choose an assignment from the best picked ranked choices
+    #holds tuples of two sites that conflict with eachother. 
+    siteConflicts = set()
+
+    #choose an assignment from the prefiltered list of best choices
     #in almost all cases, there will only be one ranked choice to choose from
-    #there will only be two if the site had possible snaps on networks with different sinks
+    #there will only be two if the site had a possible snap on two networks with different sinks
     for choices in allRankedChoices.values():
         bestRankedChoice = getBestRankedChoice(choices)
         assignment = bestRankedChoice[0]
@@ -364,7 +375,8 @@ def getSiteSnapAssignment (graph):
 
         # for each conflict forced by this choice, add a conflict to the total list going 
         # in both directions (a conflicts with b AND b conflicts with a)
-        for conflictingSite in bestRankedChoice[5]:
+        orderConflicts = bestRankedChoice[5]
+        for conflictingSite in orderConflicts:
             conflictingCmp = Helpers.siteIDCompare(conflictingSite, assignment.siteID)
             #make sure we put the larger ID first so that if this pair appears again we don't add it again (bc we use a set)
             if conflictingCmp > 0:
@@ -377,7 +389,8 @@ def getSiteSnapAssignment (graph):
             for conflictingSite in bestRankedChoice[5]:
                 print("\t conflicts with " + conflictingSite)      
 
-    #verify that all site IDs are accounted for
+    #this code doesn't really do anything. The above code accounts for all site IDs getting assigned
+    """ #verify that all site IDs are accounted for
     #this code should never really have to run
     accountedForSiteIDs = set()
     for assignment in assignments:
@@ -388,7 +401,7 @@ def getSiteSnapAssignment (graph):
             if __debug__:
                 print("missing site! adding in post: " + str(siteID))
             #add the most likely snap for this site
-            assignments.append(graph.siteSnaps[siteID][0])
+            assignments.append(graph.siteSnaps[siteID][0]) """
 
     #keep track of which sites we think are causing the conflicts
     atFaultSites = []
@@ -403,10 +416,11 @@ def getSiteSnapAssignment (graph):
         mostConflictingSite = None
 
         for conflict in siteConflicts:
-            #a conflict is between two sites
+            #a conflict is between two sites, a, and b
             conflictA = conflict[0]
             conflictB = conflict[1]
-
+            
+            #for this conflict pair add an involvement to both sites
             siteConflictCounts[conflictA] += 1 
             siteConflictCounts[conflictB] += 1
 
@@ -444,17 +458,17 @@ def getSiteSnapAssignment (graph):
 
             if conflictA == mostConflictingSite or conflictB == mostConflictingSite:
                 siteConflicts.remove(conflict)
-    #reset warnings in this catagory so they don't build up
 
     warnings = []
     assignmentWarnings = []
     
+    #generate warnings such as site a conflicts with x other sites
     for faultySite in atFaultSites:
         faultySiteID = faultySite[0]
         faultySiteConflictCount = faultySite[1]
         message = Helpers.formatID(faultySiteID) + " conflicts with " + str(faultySiteConflictCount) + " other sites. Consider changing this site's ID"
         warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message))
-
+    #generate warnings like site a conflicts with site b, replace either
     for faultyPair in atFaultPairs:
         pairA = str(faultyPair[0])
         pairB = str(faultyPair[1])
@@ -470,6 +484,15 @@ def getSiteSnapAssignment (graph):
             assignment.assignmentWarnings.clear()
             assignment.assignmentWarnings.append(warning)
 
+    #if we are not assigning bad sites remove all assignments related to at fault sites
+    if not assignBadSites:
+        for assignmentID in allImplicatedSites:
+            if assignmentID in allImplicatedSites:
+                removeAssignment(assignmentID)
+
+    #we return warnings instead of adding them to log directly because this function may run many times
+    #with each new query. So storing warnings in the graph allows the most up to date warnings to be 
+    #retrieved at the time of returning the finished site ID data
     return (assignments, warnings)
 
 if __debug__:

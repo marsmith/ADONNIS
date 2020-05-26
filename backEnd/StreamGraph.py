@@ -154,7 +154,7 @@ class StreamSegment (object):
 
 class StreamGraph (object):
 
-    def __init__(self, withheldSites = [], warningLog = None):
+    def __init__(self, withheldSites = [], warningLog = None, assignBadSites = False):
         self.segments = {}
         self.nodes = []
         self.safeDataBoundary = [] #list of regions we consider safe from edge effects of query radius
@@ -165,6 +165,7 @@ class StreamGraph (object):
         self.withheldSites = withheldSites
         self.warningLog = warningLog
         self.currentAssignmentWarnings = []
+        self.assignBadSites = assignBadSites
     if __debug__:
         #visualize the graph using matplotlib
         def visualize(self, showSegInfo = False, customPoints = []):
@@ -245,6 +246,12 @@ class StreamGraph (object):
         self.addGeom(baseData)
         return True
 
+    #do we want to assign bad sites to the graph? 
+    #when we change this we have to refresh all snaps
+    def setAssignBadSitesStatus (self, status):
+        self.assignBadSites = status
+        self.refreshSiteSnaps();
+
     #safely remove a segment from the graph
     def removeSegment (self, segment, replacedBy = None):
         segmentID = segment.segmentID
@@ -283,8 +290,18 @@ class StreamGraph (object):
     def addGraphSite (self, graphSite):
         self.segments[graphSite.segmentID].addGraphSite(graphSite)
 
+    def refreshSiteSnaps (self):
+        if __debug__:
+            print("refreshing site snaps")
+        assignmentInfo = getSiteSnapAssignment(self, assignBadSites=self.assignBadSites)
+        assignments = assignmentInfo[0]
+        warnings = assignmentInfo[1]
+        self.assignSiteSnaps(assignments)
+        #since we reload assignments, we reload warnings stored
+        self.currentAssignmentWarnings = warnings
+
     #given a list of assignments (siteID, snapInfo), clear/update all segments
-    def refreshSiteSnaps (self, snapAssignments):
+    def assignSiteSnaps (self, snapAssignments):
         #collections.namedtuple('Snap', 'featureObjectID snapDistance distAlongFeature')
         #start by removing old sites
         for segment in self.segments.values():
@@ -518,12 +535,6 @@ class StreamGraph (object):
                 self.addSiteSnaps(siteID, potentialGraphSites)
 
         #refresh all site snaps given the new site data
-        if __debug__:
-            print("refreshing site snaps")
-        assignmentInfo = getSiteSnapAssignment(self)
-        assignments = assignmentInfo[0]
-        warnings = assignmentInfo[1]
-        self.refreshSiteSnaps(assignments)
-        #since we reload assignments, we reload warnings stored
-        self.currentAssignmentWarnings = warnings
+        self.refreshSiteSnaps()
+        
         #self.cleanGraph()

@@ -1,11 +1,12 @@
 from StreamGraph import *
 from StreamGraphNavigator import *
-from SiteInfoCreator import getSiteID
+import SiteInfoCreator
 from GDALData import getSiteIDsStartingWith
 from SnapSites import getSiteSnapAssignment
 import json
 import sys
 
+#test driver. Allows for command line interaction and testing
 while True:
     #segID = input("enter a edge segmentID: ")
     idReplacement = input("Test by replacing an existing site?")
@@ -40,7 +41,7 @@ while True:
 
     arguments = sys.argv
 
-    results = getSiteID(lat, lng, withheldSites = excludedList)
+    results = SiteInfoCreator.SiteInfoCreator(lat, lng, withheldSites = excludedList).getSiteID(useBadSites=False)
 
     if results is None:
         print("failed")

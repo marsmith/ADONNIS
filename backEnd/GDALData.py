@@ -26,6 +26,8 @@ QUERY_ATTEMPTS = 10
 DATA_PADDING = 0.6
 TIMEOUT = 6
 
+#generic way to query a service with multiple attempts and individual timeout
+#mainly usful b/c NHD is so unreliable
 def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
     attemptsUsed = 0
     success = False
@@ -45,6 +47,7 @@ def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
             print("failed to retrieve " + queryName + " on all attempts. Failing")
         return Failures.QUERY_FAILURE_CODE
 
+#Get's the nearest location. Returns (distance, town/place name, state)
 def getNearestPlace (lat, lng, timeout = 5):
     locationsUrl = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/18/query?geometry=" + str(lng) +"," + str(lat) + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"
     result = queryWithAttempts(locationsUrl, QUERY_ATTEMPTS, timeout = timeout, queryName="nearPlaces")
@@ -78,7 +81,8 @@ def getNearestPlace (lat, lng, timeout = 5):
     distance = Helpers.degDistance(nearestPoint[1], nearestPoint[0], lat, lng)
 
     return {"distanceToPlace":distance, "placeName":placeName, "state":stateAlpha}
-    
+
+#get's nearby bridges and road crossings. Used to generate name context
 def getNearestBridges (lat, lng, timeout = 5):
     locationsUrl = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/10/query?geometry=" + str(lng) +"," + str(lat) + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"
     result = queryWithAttempts(locationsUrl, QUERY_ATTEMPTS, timeout = timeout, queryName="nearBridges")
@@ -141,6 +145,7 @@ def buildGeoJson (xmlStr):
                 geojson["features"].append(feature)
     return json.dumps(geojson)
 
+#get's a list of siteIDs that start with a certain number of digits 
 def getSiteIDsStartingWith (siteID, timeout = TIMEOUT):
     similarSitesQuery = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + siteID + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&column_name=huc_cd&list_of_search_criteria=search_site_no%2Csite_tp_cd"
     result = queryWithAttempts (similarSitesQuery, QUERY_ATTEMPTS, timeout = timeout, queryName="similarSiteIds")
@@ -157,19 +162,7 @@ def getSiteIDsStartingWith (siteID, timeout = TIMEOUT):
         return Failures.QUERY_PARSE_FAILURE_CODE
     return (sitesLayer)  
 
-def loadPartCodeSites (code):
-    siteURL = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + code + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&list_of_search_criteria=search_site_no%2Csite_tp_cd"
-    req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
-    allSites = []
-    try:
-        root = ET.fromstring(req.text)
-        for site in root:
-            siteNo = site.find('site_no').text
-            allSites.append(siteNo)
-    except:
-        return Failures.QUERY_PARSE_FAILURE_CODE
-    return allSites
-
+#loads all sites from specified hydraulic unit code
 def loadHUCSites (code):
     siteURL = "https://waterservices.usgs.gov/nwis/site/?format=mapper&huc=" + code + "&siteType=ST&siteStatus=all"
     req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
@@ -187,6 +180,7 @@ def loadHUCSites (code):
         return Failures.QUERY_PARSE_FAILURE_CODE
     return returnList
 
+#gets sites from NWIS within a certain radius
 def loadSitesFromQuery (lat, lng, radiusKM = 5):
     approxRadiusInDeg = Helpers.approxKmToDegrees(radiusKM)
     #northwest
@@ -211,6 +205,7 @@ def loadSitesFromQuery (lat, lng, radiusKM = 5):
             print("could not read query")
         return Failures.QUERY_PARSE_FAILURE_CODE
 
+#This function gets the core data needed to construct a stream graph
 def loadFromQuery(lat, lng, radiusKM = 5):
 
     if radiusKM > MAX_SAFE_QUERY_DIST_KM:

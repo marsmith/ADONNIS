@@ -2,7 +2,6 @@ import Helpers
 import GDALData
 import Failures
 
-
 #SITE_INFO_PATH = Path("siteInfo")
 # this should be replaced mostly with a sql database at some point.. 
 class SiteIDManager (object):

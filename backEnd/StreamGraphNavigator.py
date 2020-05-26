@@ -1,3 +1,4 @@
+#Written by Ian Scilipoti - USGS water science center
 import sys
 import Failures
 #a class that has various functionality to navigate the graph of a stream graph. Will autoexpand the graph 
@@ -154,6 +155,7 @@ class StreamGraphNavigator (object):
                     #we want to return the new site and the distance to it plus the distance upstream along our trib
                     return (newSearch[0], newSearch[1] + totalDistance)
 
+    #gets the nearest site downstream
     def getNextDownstreamSite (self, segment, downstreamPositionOnSegment):
         foundSite = None
 
@@ -252,7 +254,7 @@ class StreamGraphNavigator (object):
             #we searched downstream and found no sites. If we terminated without error thus far it means we reached the end of the network
             return Failures.END_OF_BASIN_CODE
 
-
+    #get's all trib mouths on the network that are named
     def getNamedTribMouths (self):
         mouths = []
         for segment in self.streamGraph.segments.values():

@@ -29,9 +29,12 @@ def pointsEqual (p1, p2):
 def dist (x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
+#a faster distance to compare relative distances between things (i.e which of these two things is closer)
+#same as regular distance but omits the sqrt function
 def fastMagDist (x1, y1, x2, y2):
     return (x2 - x1)**2 + (y2 - y1)**2
 
+#given an ID, gets the full 10 digit ID by appending zeros until 10 digits is reached
 def getFullID (id):
     newID = str(id)
 
@@ -66,6 +69,7 @@ def siteIDCompare (a, b):
 
     return aDSN - bDSN
 
+#get's the difference betwen two site IDs
 def getSiteIDOffset (a, b):
     fullA = getFullID(a)
     fullB = getFullID(b)
@@ -75,10 +79,14 @@ def getSiteIDOffset (a, b):
 
     return abs(aDSN - bDSN)
 
-def buildFullID (partCode, DNSwithExtension):
+#get the full ID given the downstream number (DSN) and a partcode (first two digits)
+#some cases the DSN starts with leading zeros. Like: 01035342 <- (partcode:01, DSN:035342)
+#So this function adds leading zeros when necessary. This fuction assumes that there 
+#the DSN with leading zeros will be a full 8 digits by itself and will prepend enough zeros to ensure that
+def buildFullID (partCode, DSNwithExtension):
     #we expect the DNS with extension to be at least 8 digits
     #but, if the leading numbers of the DSN are 0s then this will be fewer digits when converted to an int
-    intDSN = int(DNSwithExtension)
+    intDSN = int(DSNwithExtension)
     missingLeadingZeros = 8 - len(str(intDSN))
 
     return str(partCode) + missingLeadingZeros*"0" + str(intDSN)
@@ -91,23 +99,25 @@ def normalize (x, y):
 
     return (x/mag, y/mag)
 
+#utility for testing. Removes string formatting for CSV files
 def flattenString (string):
     string = string.replace("\n", " ")
     string = string.replace("\t", " ")
     string = string.replace(",", " ")
     return string
 
-
+#round num to m digits (ex: num = 30.23. m = 0.1, return:30.2)
 def roundTo (num, m):
     return math.floor(float(num)/m + 0.5) * m
 
+#gets the string rep of a float with numDigits digits after the decimal point
 def getFloatTruncated (number, numDigits):
     numString = str(number)
     decimalIndex = numString.index(".")
     return numString[0:min(len(numString), decimalIndex + numDigits)]
 
 
-
+#check if n is between a and b
 def betweenBounds (n, a, b):
     upperBound = max(a, b)
     lowerBound = min(a, b)
@@ -117,6 +127,7 @@ def betweenBounds (n, a, b):
     else:
         return False
 
+#get's the shortened version of an ID
 def shortenID (siteID):
     if len(siteID) > 8:
         trailingDigits = siteID[-2:]
