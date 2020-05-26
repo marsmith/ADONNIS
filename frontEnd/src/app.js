@@ -51,8 +51,11 @@ var MapX = '-74.58'; //set initial map longitude
 var MapY = '41.905'; //set initial map latitude
 var MapZoom = 8; //set initial map zoom
 var NWISsiteServiceURL = 'https://waterservices.usgs.gov/nwis/site/';
+var NHDserviceURL = 'https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query/';
+var NHDserviceURLalt = 'https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query';
+var supportEmail = "iscilipoti@contractor.usgs.gov";
 
-var NHDstreamRadius = 3000;
+var NHDstreamRadius = 2000;
 var siteDisplayZoomLevel = 12;
 //END user config variables 
 
@@ -62,7 +65,6 @@ var baseMapLayer, basemaplayerLabels;
 
 var nwisSitesLayer;
 var NWISmarkers;
-var highlightedSites;
 
 var NHDlinesLayer;
 var isQueryingLines;
@@ -114,12 +116,11 @@ function initializeMap() {
   $('#highPriorityWarnings').hide();
   $('#mediumPriorityWarnings').hide();
   $('#adonnisResults').hide();
-  $('#nhdFailure').hide();
+  $('#frontEndFailure').hide();
 
   cursorIcon = L.divIcon({className: 'wmm-pin wmm-yellow wmm-icon-diamond wmm-icon-blue wmm-size-25'});
   siteIcon = L.divIcon({className: 'wmm-pin wmm-altblue wmm-icon-diamond wmm-icon-blue wmm-size-25'});
   NWISmarkers = {};
-  highlightedSites = new set();
 }
 
 function initListeners() {
@@ -207,16 +208,22 @@ function initListeners() {
   });
 
   /*  END EVENT HANDLERS */
+
+  $('.leaflet-container').css('cursor','crosshair');
 }
 
-function moveCursor (latlng) {
+function moveCursor (latlng, snap = true) {
   
   $('#adonnisResults').hide();
   $('#latitude').val(latlng.lat);
   $('#longitude').val(latlng.lng);
   
-  if(lastQueriedFeatures != null && latlng.distanceTo(lastQueryLatlng) < NHDstreamRadius/2) {
-    var snappedLatLng = snapToFeature(latlng, lastQueriedFeatures);
+  if(lastQueriedFeatures != null && latlng.distanceTo(lastQueryLatlng) < NHDstreamRadius/2 || snap == false) {
+    var snappedLatLng = latlng;
+    if (snap == true) {
+      snappedLatLng = snapToFeature(latlng, lastQueriedFeatures);
+    }
+    
     if (cursor == null) {
       cursor = L.marker(snappedLatLng, {icon: cursorIcon}).addTo(theMap);
       cursor.bindPopup('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr" style = "float:right;">Yes</button>', {offset: L.point(0,-20)});      
@@ -237,7 +244,7 @@ function moveCursor (latlng) {
     });
   }
   else {
-    queryNHDStreams (latlng, function(){ moveCursor(latlng) });
+    queryNHDStreams (latlng, function(){ moveCursor(latlng)}, null, function() { moveCursor(latlng, false);});
   }
 }
 
@@ -246,15 +253,11 @@ function displaySiteInfo (siteInfo)
   $('#adonnisResults').show();
   $('#initialAdvice').hide();
 
-  $('#siteIdDisp').html(fillIDHTML(siteInfo["id"]));
-  $('#storyDisp').html(fillIDHTML(siteInfo["story"]));
-
   var names = siteInfo["nameInfo"]["suggestedNames"];
   var namesHTML = ""
   for (var name of names){
-    namesHTML += '<div class="alert alert-success" role="alert" id="namesDisp">';
-    namesHTML += name
-    namesHTML += '</div>';
+    
+    namesHTML += getAlertHTML(name, "secondary");
   }
 
   $('#namesDisp').html(namesHTML);
@@ -265,6 +268,11 @@ function displaySiteInfo (siteInfo)
   var numMediumPriority = log["medium priority"].length;
   var numHighPriority = log["high priority"].length;
   var totalWarnings = numLowPriority + numMediumPriority + numHighPriority;
+
+  var siteIDalertType = numHighPriority > 0 ? 'danger' : (numMediumPriority > 0 ? 'warning' : 'success');
+
+  $('#siteIdDisp').html(getAlertHTML(fillIDHTML(siteInfo["id"]), siteIDalertType));
+  $('#storyDisp').html(fillIDHTML(siteInfo["story"]));
 
   if (totalWarnings > 0) {
     $('#warningSection').show();
@@ -280,27 +288,15 @@ function displaySiteInfo (siteInfo)
     var warningsHTML = "";
 
     for (var warningBody of log["high priority"]) {
-      warningsHTML += '<div class="alert alert-danger">';
-      warningsHTML += fillIDHTML(warningBody);
-      warningsHTML += '</div>';
+      warningsHTML += getAlertHTML(fillIDHTML(warningBody), "danger")
     }
 
     for (var warningBody of log["medium priority"]) {
-      warningsHTML += '<div class="alert alert-warning">';
-      warningsHTML += fillIDHTML(warningBody);
-      warningsHTML += '</div>';
-    }
-
-    for (var warningBody of log["medium priority"]) {
-      warningsHTML += '<div class="alert alert-warning">';
-      warningsHTML += fillIDHTML(warningBody);
-      warningsHTML += '</div>';
+      warningsHTML += getAlertHTML(fillIDHTML(warningBody), "warning");
     }
 
     for (var warningBody of log["low priority"]) {
-      warningsHTML += '<div class="alert alert-info">';
-      warningsHTML += fillIDHTML(warningBody);
-      warningsHTML += '</div>';
+      warningHTML += getAlertHTML(fillIDHTML(warningLog), "info");
     }
 
     $('#warningsDisp').html(warningsHTML);
@@ -336,18 +332,35 @@ function querySiteInfo (latLng, callback) {
     error: function(jqXH, text, errorThrown){
       console.log("failed query: " + text + " error=" + errorThrown);
       console.log(jqXH.responseText);
-      $('#loading').hide();
+      $('#loading').hide(); 
+      var emailBody = "A fatal issue occured at the coordinates: " + latLng.lat + ", " + latLng.lng + ".";
+      var warningBody = 'Failure parsing results from backend. <a href="mailto:' + supportEmail + '?subject=ADONNIS failure&body=' + emailBody + '">Help improve ADONNIS by sharing the lat/long in question</a>.';
+      showFrontendWarning(warningBody, 2);
     },
   }); 
-  //callback({"id": "01362012", "story": "Found an upstream site (01362032) and a downstream site (0136200705)", "log": {"low priority": [], "medium priority": ["0136200705 conflicts with 7 other sites. Consider changing this site's ID", "01362005 conflicts with 6 other sites. Consider changing this site's ID", "01362008 conflicts with 01362004. Consider changing the site ID of one of these two sites", "01362032 conflicts with 01362030. Consider changing the site ID of one of these two sites"], "high priority": ["01362032 is involved in a site conflict. See story/medium priority warnings for conflict details.", "0136200705 is involved in a site conflict. See story/medium priority warnings for conflict details.", "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."]}});
+}
+
+//severity 1 is yellow warning. severity 2 is danger warning
+function showFrontendWarning (body, severity) {
+  var severityAlertTags = ["success", "warning", "danger"];
+  $('#frontEndFailure').html(getAlertHTML(body, severityAlertTags[severity]));
+  $('#frontEndFailure').show();
+}
+
+function getAlertHTML (body, alertTag) {
+  
+  var openTag = '<div class="alert alert-' + alertTag + '">';
+  var closeTag = '</div>';
+  return openTag + body + closeTag;
 }
 
 //attempt to get streams in a radius around latlng. Send features to callback in format callback(results)
-function queryNHDStreams (latlng, callback, ) {
+function queryNHDStreams (latlng, callback, retryService, failureCallback) {
   
   console.log('querying NHD', NHDstreamRadius);
   //var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2C+LENGTHKM%2C+STREAMLEVE%2C+FCODE%2C+OBJECTID%2C+ARBOLATESU&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=" + NHDstreamRadius + "&units=esriSRUnit_Meter&returnGeometry=true&f=pjson";
-	var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=" + NHDstreamRadius + "&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson";
+  var queryUrl = "https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?geometry=" + latlng.lng + "," + latlng.lat + "&outFields=GNIS_NAME%2CREACHCODE&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=" + NHDstreamRadius + "&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=pjson";
+  //                https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/?geometry=-74.60977282623656%2C41.841805710824715&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=3000&units=esriSRUnit_Meter&returnGeometry=true&f=pjson
 	
 	if (isQueryingLines == true) {
 		console.log("already querying");
@@ -357,10 +370,22 @@ function queryNHDStreams (latlng, callback, ) {
 
   $('#loading').show();
 
+  var args = {
+    'geometry': latlng.lng + "," + latlng.lat,
+    'geometryType':'esriGeometryPoint',
+    'inSR':'4326',
+    'outSR':'4326',
+    'distance':NHDstreamRadius,
+    'units':'esriSRUnit_Meter',
+    'returnGeometry':'true',
+    'f':'pjson'
+  };
+  var serviceURL = retryService ? retryService : NHDserviceURL;
 	return $.ajax({
-		url: queryUrl,
+		url: serviceURL,
 		dataType: 'json',
-		timeout: 5000,
+    timeout: 7000,
+    data: args,
 		success: function(results){
       console.log("query success")
       isQueryingLines = false;
@@ -368,19 +393,24 @@ function queryNHDStreams (latlng, callback, ) {
       lastQueryLatlng = latlng
       highlightFeature(lastQueriedFeatures);
       $('#loading').hide();
-      $('#nhdFailure').hide();
+      $('#frontEndFailure').hide();
       callback()
 		},
 		error: function(jqXH, text, errorThrown){
       console.log("failed query: " + text + " error=" + errorThrown);
       console.log(jqXH.responseText);
-      
-
-      
       isQueryingLines = false;
-      
+      //if (retryService != null) {
       $('#loading').hide(); 
-      $('#nhdFailure').show();
+      showFrontendWarning("Could not connect to NHD server. Could not snap point to NHD data.", 1);
+      if (failureCallback != null) {
+        failureCallback();
+      }
+      //}
+      //else {
+      //  console.log("retrying alt URL");
+      //  queryNHDStreams(latlng, callback, NHDserviceURL);
+      //}
 		},
 	});
 }
@@ -442,8 +472,8 @@ function snapToFeature (latlng, features) {
 	}
 
 	if(smallestDistFeatureIndex == -1){
-		console.error("found no nearest feature returning [-1, -1]");
-		return [-1, -1];
+		console.error("found no nearest feature returning unsnapped latlng");
+		return latlng;
 	}
 
 	//now find whether left or right of smallestDistIndex is closer
@@ -615,13 +645,9 @@ function goToSite (siteID) {
   }
   var siteInfo = NWISmarkers[siteID];
   var latlng =  siteInfo["latlng"];
-  theMap.flyTo(latlng, 14);
+  theMap.flyTo(latlng, 15);
 
   console.log("going to " + siteID);
-}
-
-function highlightSite (siteID) {
-
 }
 
 function setBasemap(baseMap) {
