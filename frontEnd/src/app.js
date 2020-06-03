@@ -54,17 +54,21 @@ var NWISsiteServiceURL = 'https://waterservices.usgs.gov/nwis/site/';
 var NHDserviceURL = 'https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query/';
 var NHDserviceURLalt = 'https://hydro.nationalmap.gov/arcgis/rest/services/NHDPlus_HR/MapServer/2/query';
 var supportEmail = "iscilipoti@contractor.usgs.gov";
+var streamLevelColors = ["#ff2f00", "#ff00d4", "#1500ff", "#00fff7", "#04ff00", "#d4ff00", "#ffd000", "#ff5900", "#ff8282", "#949494"]
 
 var NHDstreamRadius = 2000;
 var siteDisplayZoomLevel = 12;
+var siteHighlightZoomLevel = 15;
 //END user config variables 
 
 //START global variables
 var theMap;
 var baseMapLayer, basemaplayerLabels;
 
-var nwisSitesLayer;
-var NWISmarkers;
+var nwisSitesLayer;//leaflet layer that displays NWIS sites
+var NWISmarkers;//list of all NWIS markers on the map currently
+var queriedNetworkLayer;//layer that displays lines queried on backend
+var highlightedLocationsLayer;
 
 var NHDlinesLayer;
 var isQueryingLines;
@@ -75,6 +79,8 @@ var cursor;
 var cursorIcon;
 var siteIcon;
 var snappedCursorLatLng;
+var currentResultsIDs = []; //these are the ID(s) that are displayed as results. Keep track so we can hyperlink them properly
+var currentResultsLatLng;
 
 var idNumLinkClass = "idNum"
 //END global variables
@@ -108,8 +114,9 @@ function initializeMap() {
 
   //define layers
   nwisSitesLayer = featureGroup().addTo(theMap);
-
+  queriedNetworkLayer = featureGroup().addTo(theMap);
   NHDlinesLayer = featureGroup().addTo(theMap);
+  highlightedLocationsLayer = featureGroup().addTo(theMap);
 
   //hide laoding spinner
   $('#loading').hide();
@@ -207,6 +214,15 @@ function initListeners() {
     goToSite(siteID);
   });
 
+  $("#adonnisResults").on("mouseover", "[class='" + idNumLinkClass + "']", function(event){
+    var siteID = $( this ).text();
+    highlightSite(siteID);
+  });
+
+  $("#adonnisResults").on("mouseleave", "[class='" + idNumLinkClass + "']", function(event){
+    highlightedLocationsLayer.clearLayers();
+  });
+
   /*  END EVENT HANDLERS */
 
   $('.leaflet-container').css('cursor','crosshair');
@@ -241,6 +257,7 @@ function moveCursor (latlng, snap = true) {
     $("#yesCorr").click(function(){
       cursor.closePopup();
       querySiteInfo(snappedCursorLatLng, displaySiteInfo);
+      $('body').toggleClass('isOpenMenu');
     });
   }
   else {
@@ -248,12 +265,12 @@ function moveCursor (latlng, snap = true) {
   }
 }
 
-function displaySiteInfo (siteInfo)
+function displaySiteInfo (siteInfo, latLng)
 {
   $('#adonnisResults').show();
   $('#initialAdvice').hide();
 
-  var names = siteInfo["nameInfo"]["suggestedNames"];
+  var names = siteInfo["names"];
   var namesHTML = ""
   for (var name of names){
     
@@ -264,15 +281,35 @@ function displaySiteInfo (siteInfo)
   
   var log = siteInfo["log"];
 
-  var numLowPriority = log["low priority"].length;
-  var numMediumPriority = log["medium priority"].length;
-  var numHighPriority = log["high priority"].length;
+  var numLowPriority = log["lowPriority"].length;
+  var numMediumPriority = log["mediumPriority"].length;
+  var numHighPriority = log["highPriority"].length;
   var totalWarnings = numLowPriority + numMediumPriority + numHighPriority;
 
   var siteIDalertType = numHighPriority > 0 ? 'danger' : (numMediumPriority > 0 ? 'warning' : 'success');
 
-  $('#siteIdDisp').html(getAlertHTML(fillIDHTML(siteInfo["id"]), siteIDalertType));
-  $('#storyDisp').html(fillIDHTML(siteInfo["story"]));
+  var idInfo = siteInfo["idInfo"];
+  var idInfoAlt = siteInfo["idInfoAlt"];
+
+  currentResultsIDs = [];
+  currentResultsIDs.push(stripIDHTMLFormat(idInfo["id"]));
+  currentResultsLatLng = latLng;
+
+  $('#siteIdDisp').html(getAlertHTML(fillIDHTML(idInfo["id"]), siteIDalertType));
+  $('#storyDisp').html(fillIDHTML(idInfo["story"]));
+  
+  if (idInfoAlt != null){
+    currentResultsIDs.push(stripIDHTMLFormat(idInfoAlt["id"]));
+    $('#alternateResults').show();
+    //fill warning automatically since we only get alt results given 3rd tier warning
+    //3rd tier warnings always come with 2nd tier warnings..
+    $('#siteIdDispAlt').html(getAlertHTML(fillIDHTML(idInfoAlt["id"]), 'warning'));
+    $('#storyDispAlt').html(fillIDHTML(idInfoAlt["story"]));
+  }
+  else {
+    $('#alternateResults').hide();
+  }
+  
 
   if (totalWarnings > 0) {
     $('#warningSection').show();
@@ -287,16 +324,16 @@ function displaySiteInfo (siteInfo)
 
     var warningsHTML = "";
 
-    for (var warningBody of log["high priority"]) {
-      warningsHTML += getAlertHTML(fillIDHTML(warningBody), "danger")
+    for (var warning of log["highPriority"]) {
+      warningsHTML += getAlertHTML(fillIDHTML(warning["body"]), "danger")
     }
 
-    for (var warningBody of log["medium priority"]) {
-      warningsHTML += getAlertHTML(fillIDHTML(warningBody), "warning");
+    for (var warning of log["mediumPriority"]) {
+      warningsHTML += getAlertHTML(fillIDHTML(warning["body"]), "warning");
     }
 
-    for (var warningBody of log["low priority"]) {
-      warningHTML += getAlertHTML(fillIDHTML(warningLog), "info");
+    for (var warning of log["lowPriority"]) {
+      warningsHTML += getAlertHTML(fillIDHTML(warning["body"]), "info");
     }
 
     $('#warningsDisp').html(warningsHTML);
@@ -304,13 +341,29 @@ function displaySiteInfo (siteInfo)
   else {
     $('#warningSection').hide();
   }
+  if (queriedNetworkLayer != null) {
+    queriedNetworkLayer.clearLayers();
+  }
+
+  if ("network" in siteInfo) {
+    var network = siteInfo["network"]
+    queriedNetworkLayer = L.geoJSON(network, {
+      style: function(feature) {
+        var level = parseInt(feature.properties.streamLevel)
+        return {color: streamLevelColors[level]};
+      }
+    }).addTo(queriedNetworkLayer);
+    NHDlinesLayer.clearLayers();
+  }
 }
 
 function querySiteInfo (latLng, callback) {
-
+  $('#frontEndFailure').hide();
+  //callback({"idInfo": {"id": "_01362013_", "story": "Requested site info at 42.273, -73.959. ADONNIS used sites with incorrect ID's when calculating the new ID. Found a upstream site _01362032_ and a downstream site _0136200705_. New site is the weighted average of these two sites."}, "idInfoAlt": {"id": "_0136202825_", "story": "Requested site info at 42.273, -73.959. ADONNIS ignored sites with incorrect ID's when calculating the new ID. Found an upstream site _01362028_. Based on list of all sites, assume that _01362030_ is the nearest sequential downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"}, "log": {"lowPriority": ["Found upstream and downstream bound. But, downstream bound is based on list of sequential sites and may not be the true downstream bound. This could result in site ID clustering."], "mediumPriority": ["_0136200705_ conflicts with 7 other sites. Consider changing this site's ID", "_01362005_ conflicts with 6 other sites. Consider changing this site's ID", "_01362008_ conflicts with _01362004_. Consider changing the site ID of one of these two sites", "_01362032_ conflicts with _01362030_. Consider changing the site ID of one of these two sites", "_0136200705_ conflicts with 7 other sites. Consider changing this site's ID", "_01362005_ conflicts with 6 other sites. Consider changing this site's ID", "_01362015_ conflicts with 5 other sites. Consider changing this site's ID", "_01362008_ conflicts with _01362004_. Consider changing the site ID of one of these two sites", "_01362032_ conflicts with _01362030_. Consider changing the site ID of one of these two sites"], "highPriority": ["_01362032_ was used to generate results AND is involved in a site conflict. See story/medium priority warnings for conflict details.", "_0136200705_ was used to generate results AND is involved in a site conflict. See story/medium priority warnings for conflict details.", "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."]}, "names": ["BELL BROOK TRIBUTARY AT SOUTH CAIRO NY", "BELL BROOK TRIBUTARY AT MOUTH AT SOUTH CAIRO NY", "BELL BROOK TRIBUTARY NEAR BELL BROOK AT SOUTH CAIRO NY", "BELL BROOK TRIBUTARY AT MOUTH NEAR BELL BROOK AT SOUTH CAIRO NY", "BELL BROOK TRIBUTARY 0.4 MILES WEST OF BELL BROOK AT SOUTH CAIRO NY", "BELL BROOK TRIBUTARY AT MOUTH 0.4 MILES WEST OF BELL BROOK AT SOUTH CAIRO NY"]}, latLng);
+  //return;
   $('#loading').show();
   console.log("attemping site info query");
-	return $.ajax({
+	return $.ajax({ 
 		type : 'post',
 		url: "./siteID.php",
 		dataType: 'json',
@@ -322,8 +375,8 @@ function querySiteInfo (latLng, callback) {
 		success: function(theResult){
       var resultsJSON = JSON.parse(theResult);
       console.log("result is: " + theResult);
-			if (resultsJSON && resultsJSON.id.length > 0) {
-				callback(resultsJSON);
+			if (resultsJSON) {
+				callback(resultsJSON, latLng);
 			} else {
 				console.log("couldn't read results");
       }
@@ -633,21 +686,56 @@ function fillIDHTML (inStr) {
   return replaced;
 }
 
+function stripIDHTMLFormat (inStr) {
+  var replaced = inStr.replace(/_\d*_/g, function(match) {return match.substring(1, match.length-1);});
+  return replaced;
+}
+
 function getSiteLinkHTML (siteID) {
   var html = '<a href = "#0" class="' + idNumLinkClass + '">' + siteID + '</a>';
   return html;
 }
 
 function goToSite (siteID) {
-  if (!NWISmarkers[siteID]){
-    queryNWISsiteCallback(siteID, function() { goToSite(siteID); });
-    return;
+  //catch cases when site doesn't exist in NWIS because its the new site ID suggestions
+  if (currentResultsIDs && currentResultsIDs.includes(siteID)) {
+    theMap.flyTo(currentResultsLatLng, siteHighlightZoomLevel);
   }
-  var siteInfo = NWISmarkers[siteID];
-  var latlng =  siteInfo["latlng"];
-  theMap.flyTo(latlng, 15);
+  else {
+    if (!NWISmarkers[siteID]){
+      queryNWISsiteCallback(siteID, function() { goToSite(siteID); });
+      return;
+    }
+    var siteInfo = NWISmarkers[siteID];
+    var latlng = siteInfo["latlng"];
+    theMap.flyTo(latlng, siteHighlightZoomLevel);
+  }
 
   console.log("going to " + siteID);
+  $('body').toggleClass('isOpenMenu');
+}
+
+function highlightSite (siteID) {
+  //catch cases when site doesn't exist in NWIS because its the new site ID suggestions
+  if (currentResultsIDs && currentResultsIDs.includes(siteID)) {
+    highlightLatLng(currentResultsLatLng, true);
+  }
+  else {
+    if (!NWISmarkers[siteID]){
+      queryNWISsiteCallback(siteID, function() { highlightSite(siteID); });
+      return;
+    }
+    var siteInfo = NWISmarkers[siteID];
+    var latlng =  siteInfo["latlng"];
+    highlightLatLng(latlng, true);
+  }
+}
+
+function highlightLatLng (latLng, clear) {
+  if (clear) {
+    highlightedLocationsLayer.clearLayers();
+  }
+  L.circle(latLng, {radius:120, color:"#c2134b"}).addTo(highlightedLocationsLayer)
 }
 
 function setBasemap(baseMap) {

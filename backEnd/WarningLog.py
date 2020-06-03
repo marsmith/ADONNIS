@@ -8,11 +8,11 @@ SITE_CONFLICT_INVOLVEMENT = "[high priority] INCORRECT SITE NUMBERS INVOLVED IN 
 
 GENERIC_FLAG = "[low priority] WARNINGS"
 
-LOW_PRIORITY = "low priority"
-MED_PRIORITY = "medium priority"
-HIGH_PRIORITY = "high priority"
+LOW_PRIORITY = "lowPriority"
+MED_PRIORITY = "mediumPriority"
+HIGH_PRIORITY = "highPriority"
 
-Warning = collections.namedtuple('Warning', 'priority message')
+Warning = collections.namedtuple('Warning', 'priority message responsibleSite implicatedSites')
 
 class WarningLog (object):
 
@@ -26,11 +26,14 @@ class WarningLog (object):
     def addWarningTuple (self, warning):
         priority = warning.priority
         message = warning.message
-        self.addWarning(priority, message)
+        responsibleSite = warning.responsibleSite
+        implicatedSites = warning.implicatedSites
+        self.addWarning(priority, message, responsibleSite, implicatedSites)
 
-    def addWarning (self, priority, warningBody):
+    def addWarning (self, priority, warningBody, responsibleSite = None, implicatedSites = None):
         priorityClass = self.warningInfo[priority]
-        priorityClass.append(warningBody)
+        warning = {"body":warningBody, "responsibleSite":responsibleSite, "implicatedSites":implicatedSites}
+        priorityClass.append(warning)
         """ if warningCode in priorityDict:
             priorityDict[warningCode].append(warningBody)
         else:
@@ -47,5 +50,5 @@ class WarningLog (object):
             
         return output
 
-    def getJSON (self):
-        return self.warningInfo
+    def getJSONStruct (self):
+        return self.warningInfo.copy()

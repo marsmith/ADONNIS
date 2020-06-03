@@ -397,7 +397,27 @@ class StreamGraph (object):
             closeLoops(sink) """
         closeDownstreamJunctions()
 
+    def getGeoJSON (self):
+        geojson = {
+            "type": "FeatureCollection",
+            "crs": {"type":"name","properties":{"name":"EPSG:4326"}},
+            "features":[]
+        }
 
+        for segment in self.segments.values():
+            feature = {
+                "type":"Feature",
+                "geometry":{
+                    "type": "LineString",
+                    "coordinates": [segment.downStreamNode.position, segment.upStreamNode.position]
+                },
+                "properties": {
+                    "streamLevel":segment.streamLevel,
+                }
+            }
+            geojson["features"].append(feature)
+
+        return geojson
     #collapse redundant nodes with only two neighbors
     def cleanGraph (self):
         queue = []
@@ -529,7 +549,7 @@ class StreamGraph (object):
             #we assume that the feature reference itself isn't stable once the GDAL object gets
             #removed by the garbage collector
             if Failures.isFailureCode(snaps):
-                self.warningLog.addWarning(WarningLog.MED_PRIORITY, Helpers.formatID(siteID) + " could not be snapped to a line. This is likely due to bad NHD data. Ensure that results don't conflict with this site.")
+                self.warningLog.addWarning(WarningLog.MED_PRIORITY, Helpers.formatID(siteID) + " could not be snapped to a line. This is likely due to bad NHD data. Ensure that results don't conflict with this site.", responsibleSite=siteID)
             elif len(snaps) > 0:
                 potentialGraphSites = [GraphSite(siteID = siteID, huc = huc, segmentID = str(snap.feature["properties"]["OBJECTID"]), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, generalWarnings = snap.warnings, assignmentWarnings = []) for snap in snaps]
                 self.addSiteSnaps(siteID, potentialGraphSites)

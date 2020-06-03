@@ -133,7 +133,7 @@ def snapPoint(snapablePoint, baseData, snapCutoff = CUTOFF_DIST):
             warnings = []
             if trueDist > WARNING_DIST:
                 message = Helpers.formatID(str(siteId)) + " was forced to snap to an above averagely far away stream. This could be a faulty snap."
-                warning = WarningLog.Warning(priority = WarningLog.LOW_PRIORITY, message = message)
+                warning = WarningLog.Warning(priority = WarningLog.LOW_PRIORITY, message = message, responsibleSite = siteId, implicatedSites = None)
                 warnings.append(warning)
             snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch, warnings = warnings)
             possibleSnaps.append(snap)
@@ -260,7 +260,8 @@ def getSiteSnapAssignment (graph, assignBadSites = False):
 
             for orderedIdx, siteID in enumerate(uniqueOrderedIDs):
                 firstOccuranceIdx, lastOccuranceIdx = siteIndexRanges[siteID]
-
+                if siteID == "01433500":
+                    print("test");
                 #get a list of possible assignments for this ID
                 #Here, an choice is a tuple (assignment, index)
                 siteChoices = []
@@ -411,7 +412,7 @@ def getSiteSnapAssignment (graph, assignBadSites = False):
 
     while len(siteConflicts) > 0:
         #count which sites appear in the most number of conflicts
-        siteConflictCounts = dict((siteID, 0) for siteID in graph.siteSnaps)
+        siteConflictTotals = dict((siteID, []) for siteID in graph.siteSnaps)
         mostConflicts = 0
         mostConflictingSite = None
 
@@ -421,15 +422,15 @@ def getSiteSnapAssignment (graph, assignBadSites = False):
             conflictB = conflict[1]
             
             #for this conflict pair add an involvement to both sites
-            siteConflictCounts[conflictA] += 1 
-            siteConflictCounts[conflictB] += 1
+            siteConflictTotals[conflictA].append(conflictB) 
+            siteConflictTotals[conflictB].append(conflictA)
 
-            if siteConflictCounts[conflictA] > mostConflicts:
-                mostConflicts = siteConflictCounts[conflictA]
+            if len(siteConflictTotals[conflictA]) > mostConflicts:
+                mostConflicts = len(siteConflictTotals[conflictA])
                 mostConflictingSite = conflictA
             
-            if siteConflictCounts[conflictB] > mostConflicts:
-                mostConflicts = siteConflictCounts[conflictB]
+            if len(siteConflictTotals[conflictB]) > mostConflicts:
+                mostConflicts = len(siteConflictTotals[conflictB])
                 mostConflictingSite = conflictB
         
         #catch cases when sites conflict with eachother equally and fixing either would remove issues
@@ -447,7 +448,7 @@ def getSiteSnapAssignment (graph, assignBadSites = False):
                     break
         else:
             #remove this conflict and keep track of it as a problem site
-            atFaultSites.append((mostConflictingSite, mostConflicts))
+            atFaultSites.append((mostConflictingSite, siteConflictTotals[mostConflictingSite]))
             allImplicatedSites.add(mostConflictingSite)
 
         siteConflictsCpy = siteConflicts.copy()
@@ -465,22 +466,22 @@ def getSiteSnapAssignment (graph, assignBadSites = False):
     #generate warnings such as site a conflicts with x other sites
     for faultySite in atFaultSites:
         faultySiteID = faultySite[0]
-        faultySiteConflictCount = faultySite[1]
-        message = Helpers.formatID(faultySiteID) + " conflicts with " + str(faultySiteConflictCount) + " other sites. Consider changing this site's ID"
-        warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message))
+        faultySiteConflicts = faultySite[1]
+        message = Helpers.formatID(faultySiteID) + " conflicts with " + str(len(faultySiteConflicts)) + " other sites. Consider changing this site's ID"
+        warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message, responsibleSite = faultySiteID, implicatedSites=faultySiteConflicts))
     #generate warnings like site a conflicts with site b, replace either
     for faultyPair in atFaultPairs:
         pairA = str(faultyPair[0])
         pairB = str(faultyPair[1])
         message = Helpers.formatID(pairA) + " conflicts with " + Helpers.formatID(pairB) + ". Consider changing the site ID of one of these two sites"
-        warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message))
+        warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message, responsibleSite = pairA, implicatedSites = [pairB]))
 
     #finally, assign any warning to the site itself
     for assignment in assignments:
-        assignmentID = assignment.siteID
-        if assignmentID in allImplicatedSites:
-            message = Helpers.formatID(assignmentID) + " was used to generate results AND is involved in a site conflict. See story/medium priority warnings for conflict details."
-            warning = WarningLog.Warning(WarningLog.HIGH_PRIORITY, message)
+        assignmentSiteID = assignment.siteID
+        if assignmentSiteID in allImplicatedSites:
+            message = Helpers.formatID(assignmentSiteID) + " was used to generate results AND is involved in a site conflict. See story/medium priority warnings for conflict details."
+            warning = WarningLog.Warning(WarningLog.HIGH_PRIORITY, message, responsibleSite=assignmentSiteID, implicatedSites=None)
             assignment.assignmentWarnings.clear()
             assignment.assignmentWarnings.append(warning)
 
@@ -525,8 +526,8 @@ if __debug__:
             x.append(geom[0])
             y.append(geom[1])
 
-            plt.text(geom[0], geom[1], idNum, color='red')
-        plt.scatter(x,y, color='red')
+            #plt.text(geom[0], geom[1], idNum, color='red')
+        #plt.scatter(x,y, color='red')
 
         x = []
         y = []

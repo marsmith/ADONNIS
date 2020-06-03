@@ -45,7 +45,17 @@ class SiteInfoCreator (object):
         else:
             self.streamGraph.addGeom(self.baseData)
 
-    def getSiteNameContext (self, lat, lng, streamGraph, baseData):
+        self.siteNameContext = None
+
+    def getSiteNameContext (self):
+        lat = self.lat
+        lng = self.lng
+        streamGraph = self.streamGraph
+        baseData = self.baseData
+
+        if Failures.isFailureCode(baseData):
+            return baseData
+
         if self.context is not None:
             return self.context
         context = {}
@@ -131,7 +141,15 @@ class SiteInfoCreator (object):
         self.context = context
         return context
            
-    def getSiteNameInfo (self, siteNameContext):
+    def getSiteNameInfo (self):
+        if self.siteNameContext is None:
+            self.siteNameContext = self.getSiteNameContext()
+
+        siteNameContext = self.siteNameContext
+
+        if Failures.isFailureCode(siteNameContext):
+            return []
+
         #beginning of name
         beginning = [siteNameContext["streamName"] + " "]
         if len(siteNameContext["mouth"]) > 0:
@@ -186,8 +204,10 @@ class SiteInfoCreator (object):
             for beg in beginning:
                 allNames.append((beg + mid + end).upper())
 
-        return {"suggestedNames":allNames, "context":siteNameContext}
+        return allNames
 
+    def getNetworkGeoJSON (self):
+        return self.streamGraph.getGeoJSON()
 
 #withheld sites is a list of sites to be ignored while calculating a new site
     def getSiteID (self, useBadSites = True):
@@ -208,27 +228,14 @@ class SiteInfoCreator (object):
 
         #create the json that gets resturned
         def getResults (siteID = "unknown", story = "See warning log", failed=False):
-            if not failed:
-                siteNameContext = self.getSiteNameContext(lat, lng, streamGraph, self.baseData)
-
-                if Failures.isFailureCode(siteNameContext):
-                    nameResults = {"suggestedNames":["unknown"], "context":{}}
-                else:
-                    nameResults = self.getSiteNameInfo(siteNameContext)
-                    nameResults["context"] = [] #don't need this feature now
-            else:
-                nameResults = {"suggestedNames":["unknown"], "context":{}}
-
             results = dict()
-            results["id"] = siteID
+            results["id"] = Helpers.formatID(siteID)
 
             snapLatFormatted = Helpers.getFloatTruncated(lat, 7)
             snapLngFormatted = Helpers.getFloatTruncated(lng, 7)
             storyHeader = "Requested site info at " + str(snapLatFormatted) + ", " + str(snapLngFormatted) + ". "
-            useBadSitesStory = ("Using " if useBadSites else "Not using ") + "incorrect IDs. "
+            useBadSitesStory = ("" if useBadSites else "ADONNIS ignored sites with incorrect ID's when calculating the new ID. ")
             results["story"] = storyHeader + useBadSitesStory + story
-            results["log"] = warningLog.getJSON()
-            results["nameInfo"] = nameResults
             return results
 
         if Failures.isFailureCode(self.baseData):
@@ -576,12 +583,7 @@ class SiteInfoCreator (object):
         return siteID    
 
 if __name__ == "__main__":
-    useBadSites = True
     latlngArgs = sys.argv[1]
-    if len(sys.argv) > 2:
-        useBadSitesArgs = sys.argv[2]
-        if useBadSitesArgs == "False":
-            useBadSites = False
 
     lat,lng = latlngArgs.split(",")
 
@@ -589,15 +591,14 @@ if __name__ == "__main__":
     lng = float(lng)
 
     siteInfoCreator = SiteInfoCreator(lat, lng)
-    dictResults = siteInfoCreator.getSiteID(useBadSites = useBadSites)
-
-    print (json.dumps(dictResults))
-
-    """ if Failures.isFailureCode(siteInfo):
-        res = {'Results': str(siteInfo), 'Story': "Could not produce story.", 'Log': ""}
-        results = json.dumps(res)
-        print(results)
+    allSitesID = siteInfoCreator.getSiteID(useBadSites = True)
+    #capture log here before doing filteredSites query so we don't double up on warnings
+    logInfo = siteInfoCreator.warningLog.getJSONStruct()
+    possibleNames = siteInfoCreator.getSiteNameInfo()
+    if len(logInfo[WarningLog.HIGH_PRIORITY]) > 0:
+        filteredSitesID = siteInfoCreator.getSiteID(useBadSites = False)
     else:
-        res = {'Results': str(siteInfo[0]), 'Story': str(siteInfo[1])}
-        results = json.dumps(res)
-        print(results) """
+        filteredSitesID = None
+    results = {"idInfo":allSitesID, "idInfoAlt":filteredSitesID, "log":logInfo, "names":possibleNames, "network":siteInfoCreator.getNetworkGeoJSON()}
+
+    print (json.dumps(results))
