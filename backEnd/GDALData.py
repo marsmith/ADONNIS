@@ -12,7 +12,7 @@ import Failures
 
 
 STREAM_PATH = "hu4"
-MAX_SAFE_QUERY_DIST_KM = 7
+MAX_SAFE_QUERY_DIST_KM = 3.5
 
 BaseData = namedtuple('BaseData', 'lineLayer siteLayer dataBoundary')
 PointOfContext = namedtuple('PointOfContext', 'distance point name')
@@ -206,7 +206,7 @@ def loadSitesFromQuery (lat, lng, radiusKM = 5):
         return Failures.QUERY_PARSE_FAILURE_CODE
 
 #This function gets the core data needed to construct a stream graph
-def loadFromQuery(lat, lng, radiusKM = 5):
+def loadFromQuery(lat, lng, radiusKM = 3.5):
 
     if radiusKM > MAX_SAFE_QUERY_DIST_KM:
         raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
