@@ -1,4 +1,16 @@
 import math
+
+#segment defined by two points (v, w)
+#returns points (x,y), relative position on point (0-1)
+def nearestPointOnSegment(vx, vy, wx, wy, px, py):
+  l2 = fastMagDist(vx, vy, wx, wy)
+  if (l2 == 0):
+      return fastMagDist(vx, vy, px, py)
+
+  t = ((px - vx) * (wx - vx) + (py - vy) * (wy - vy)) / l2;
+  t = max(0, min(1, t))
+  return (vx + t * (wx - vx), vy + t * (wy - vy)), t
+
 #approximates the number of degrees latitude or longitude equivilant to km kilometers
 def approxKmToDegrees (km):
         return (1/111) * km

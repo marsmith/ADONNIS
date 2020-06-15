@@ -11,7 +11,6 @@ import sys
 import Failures
 
 
-STREAM_PATH = "hu4"
 MAX_SAFE_QUERY_DIST_KM = 3.5
 
 BaseData = namedtuple('BaseData', 'lineLayer siteLayer dataBoundary')

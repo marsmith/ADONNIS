@@ -3,9 +3,11 @@ from GDALData import RESTRICTED_FCODES, BaseData, loadFromQuery
 from Helpers import *
 import Helpers
 from SnapSites import snapPoint, SnapablePoint, Snap, getSiteSnapAssignment
+import SnapSites
 import sys
 import Failures
 import WarningLog
+import math
 
 if __debug__:
     import matplotlib.pyplot as plt
@@ -15,6 +17,8 @@ UNKNOWN = 0         #000
 UPSTREAM = 1        #001 a one in the one's place means upstream
 UPSTREAMTRIB = 3    #011 contains a one in the one's place, but also contains a 1 in the two's place, indicating upstream and a trib
 DOWNSTREAM = 4      #100 contains a one in the four's place indicating a downstream site 
+
+DETAIL_POINTS_PER_KM = 3
 
 
 #tuples used
@@ -89,7 +93,7 @@ class StreamNode (object):
 
 #a segment connecting two points
 class StreamSegment (object):
-    def __init__(self, upStreamNode, downStreamNode, ID, length, streamLevel, arbolateSum, streamName):
+    def __init__(self, upStreamNode, downStreamNode, ID, length, streamLevel, arbolateSum, streamName, detailPoints = []):
         #streamSegments get 0 appended on the FID to ensure uniqueness
         self.upStreamNode = upStreamNode
         self.downStreamNode = downStreamNode
@@ -99,6 +103,7 @@ class StreamSegment (object):
         self.streamLevel = streamLevel
         self.arbolateSum = arbolateSum
         self.streamName = streamName
+        self.detailPoints = detailPoints
 
     #we assume that this site position is indeed on our segment. 
     #distAlongSegment = 0 would imply that the site is located at upStreamNode
@@ -144,11 +149,22 @@ class StreamSegment (object):
                 return site
         return None
     
-    def getPointOnSegment (self, distDownstreamAlongSegment):
+    def getPointOnSegment (self, distDownstreamAlongSegment, useDetailPoints = False):
         percent = distDownstreamAlongSegment / self.length
+        if useDetailPoints:
+            floatDetailPointInd = percent * (len(self.detailPoints)-1)
+            firstDetailPointInd = math.floor(floatDetailPointInd)
+            secondDetailPointInd = min(len(self.detailPoints)-1, firstDetailPointInd+1)
+            decimal = floatDetailPointInd - firstDetailPointInd
 
-        pointX = percent * self.downStreamNode.position[0] + (1 - percent) * self.upStreamNode.position[0]
-        pointY = percent * self.downStreamNode.position[1] + (1 - percent) * self.upStreamNode.position[1]
+            firstDetailPoint = self.detailPoints[firstDetailPointInd]
+            secondDetailPoint = self.detailPoints[secondDetailPointInd]
+            
+            pointX = decimal * secondDetailPoint[0] + (1 - decimal) * firstDetailPoint[0]
+            pointY = decimal * secondDetailPoint[1] + (1 - decimal) * firstDetailPoint[1]
+        else:
+            pointX = percent * self.downStreamNode.position[0] + (1 - percent) * self.upStreamNode.position[0]
+            pointY = percent * self.downStreamNode.position[1] + (1 - percent) * self.upStreamNode.position[1]
 
         return (pointX, pointY)
 
@@ -160,12 +176,13 @@ class StreamGraph (object):
         self.safeDataBoundary = [] #list of regions we consider safe from edge effects of query radius
 
         self.removedSegments = {}#cleaned segments. keep track to prevent duplicates. The dict values point to the segment that replaced this segment, if it exists
-        self.siteSnaps = {}#list of sites that have already been added
+        self.siteSnaps = {}#dictionary of added sites. Values are arrays of graphSites
         self.nextNodeID = 0#local ID counter for stream nodes. Just a simple way of keeping track of nodes. This gets incremented
         self.withheldSites = withheldSites
         self.warningLog = warningLog
         self.currentAssignmentWarnings = []
         self.assignBadSites = assignBadSites
+        self.currentSnapAssignments = {}
     if __debug__:
         #visualize the graph using matplotlib
         def visualize(self, showSegInfo = False, customPoints = []):
@@ -192,7 +209,8 @@ class StreamGraph (object):
                     percentAlongSegment = sites.distDownstreamAlongSegment / streamSeg.length
                     percentAlongSegmentInverse = 1 - percentAlongSegment
 
-                    position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
+                    #position = (startPt[0] * percentAlongSegmentInverse + endPt[0] * percentAlongSegment, startPt[1] * percentAlongSegmentInverse + endPt[1] * percentAlongSegment)
+                    position = streamSeg.getPointOnSegment(sites.distDownstreamAlongSegment)
                     sitesX.append(position[0])
                     sitesY.append(position[1])
                     plt.text(position[0], position[1] + 0.00001 * i, sites.siteID, fontsize = 8, color = 'red')
@@ -263,8 +281,8 @@ class StreamGraph (object):
             self.removedSegments[segmentID] = replacedBy
     
     #add a segment to the graph
-    def addSegment (self, upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName):
-        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName)    
+    def addSegment (self, upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName, detailPoints = []):
+        newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName, detailPoints = detailPoints)    
         #add the new segment to the dictionary
         self.segments[segmentID] = newSegment
         #from the perspective of the upstream node, this segment is downstream and vice versa
@@ -310,6 +328,10 @@ class StreamGraph (object):
         #add sites to segments
         for assignment in snapAssignments:
             self.addGraphSite(assignment)
+            #also update the graphs current site snaps 
+            assignmentID = assignment.siteID
+            assignmentPoint = self.segments[assignment.segmentID].getPointOnSegment(assignment.distDownstreamAlongSegment, useDetailPoints=True)
+            self.currentSnapAssignments[assignmentID] = assignmentPoint;
             
     #has this graph ever contained this segment?
     #used when adding new segments to prevent duplicates
@@ -409,10 +431,11 @@ class StreamGraph (object):
                 "type":"Feature",
                 "geometry":{
                     "type": "LineString",
-                    "coordinates": [segment.downStreamNode.position, segment.upStreamNode.position]
+                    "coordinates": segment.detailPoints#[segment.downStreamNode.position, segment.upStreamNode.position]
                 },
                 "properties": {
                     "streamLevel":segment.streamLevel,
+                    "streamNm":segment.streamName
                 }
             }
             geojson["features"].append(feature)
@@ -448,8 +471,9 @@ class StreamGraph (object):
             #choosing arbolate sum of downstream segment is accurate for the collapsed segment
             newArbolateSum = downstreamSegment.arbolateSum
             name = downstreamSegment.streamName
+            newDetailPoints = downstreamSegment.detailPoints[0:-1] + upstreamSegment.detailPoints
 
-            newSegment = self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength, newStreamLevel, newArbolateSum, name)    
+            newSegment = self.addSegment(newSegmentUpstreamNode, newSegmentDownstreamNode, newID, newLength, newStreamLevel, newArbolateSum, name, detailPoints=newDetailPoints)    
 
             #add the sites to the new segment
             for site in upstreamSegment.sites:
@@ -486,6 +510,31 @@ class StreamGraph (object):
     #guaranteedNetLineIndex a streamline feature that is definitely on the network we are interested in
     def addGeom(self, baseData):
         lineLayer = baseData.lineLayer
+        if __debug__:
+            SnapSites.visualize(baseData, [])
+        def getDetailPoints (geomPoints, length):
+            numDesiredDetailPoints = int(length * DETAIL_POINTS_PER_KM)
+            numPoints = len(geomPoints)
+
+            if numPoints < numDesiredDetailPoints:
+                return geomPoints
+
+            detailPoints = [geomPoints[0]] #add the start point at least
+            for i in range(1, numDesiredDetailPoints-1):
+                firstGeomIndFloat = (i / (numDesiredDetailPoints - 1)) * (numPoints-1)
+                firstGeomInd = math.floor(firstGeomIndFloat)
+                secondGeomInd = min(numPoints-1, firstGeomInd+1)
+                decimal = firstGeomIndFloat - firstGeomInd
+
+                firstGeomPt = geomPoints[firstGeomInd]
+                secondGeomPt = geomPoints[secondGeomInd]
+
+                pointX = decimal * secondGeomPt[0] + (1 - decimal) * firstGeomPt[0]
+                pointY = decimal * secondGeomPt[1] + (1 - decimal) * firstGeomPt[1]
+
+                detailPoints.append([pointX, pointY])
+            detailPoints.append(geomPoints[-1])# add the endpoint at least
+            return detailPoints
 
         for line in lineLayer:
             lineProps = line["properties"]
@@ -524,7 +573,9 @@ class StreamGraph (object):
             if downstreamNode == None:
                 downstreamNode = self.addNode(downstreamPt)
 
-            self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName)
+
+            detailPoints = getDetailPoints(geom, length)
+            self.addSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName, detailPoints = detailPoints)
 
         siteLayer = baseData.siteLayer
 

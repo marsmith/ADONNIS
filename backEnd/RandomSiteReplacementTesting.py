@@ -11,6 +11,7 @@ import Helpers
 import time
 import Failures
 import json
+from pathlib import Path
 
 SITE_DATA_PATH = Path("testData")
 
@@ -196,9 +197,12 @@ def runTestList (fileName, outputName, numLines = 100):
         upperID = Helpers.getFullID(upperBound)
         lowerID = Helpers.getFullID(lowerBound)
         output = ""
-        generatedID = SiteInfoCreator.SiteInfoCreator(float(lat), float(lng), withheldSites = [siteID]).getSiteID()
+        infoCreator = SiteInfoCreator.SiteInfoCreator(float(lat), float(lng), withheldSites = [siteID])
+        generatedID = infoCreator.getSiteID(useBadSites = True, logWarnings=True)
+        
         newID = generatedID["id"]
-        log = json.dumps(generatedID["log"])
+        newID = newID.replace("_", "")
+        log = json.dumps(infoCreator.warningLog.getJSONStruct())
         betweenBounds = "n"
         
         try:
@@ -232,6 +236,6 @@ def runTestList (fileName, outputName, numLines = 100):
     outputFile.close()
 
 
-runTestList("testingSet01.csv", "testingSet01_2.csv", numLines = 30)
+runTestList("testingSet01.csv", "testingSet01_2.csv", numLines = 100)
 #generateTestSiteIDList(100, "01", "_2")
 #randomReplacementTesting(30)

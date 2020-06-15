@@ -58,6 +58,7 @@ def snapPoint(snapablePoint, baseData, snapCutoff = CUTOFF_DIST):
         numPoints = len(lineGeom)
         lineLength = float(line["properties"]["LENGTHKM"])
         numSamples = max(2, int(min(samplesPerKM * lineLength, numPoints)))
+        objectID = line["properties"]["OBJECTID"]
 
         minDist = sys.float_info.max
 
@@ -90,55 +91,49 @@ def snapPoint(snapablePoint, baseData, snapCutoff = CUTOFF_DIST):
         lineLength = float(line["properties"]["LENGTHKM"])
         objectID = line["properties"]["OBJECTID"]
         lineName = line["properties"]["GNIS_NAME"]
+
+
         if lineName == None:
             lineName = ""
         else:
             lineName = lineName.lower()
 
-        points = []
-
-        distAlongSegment = 0
-        #collect all points and their respective distances
-        for i in range(0, numPoints):
-            point = lineGeom[i]
-            #we make assumption that each point in the geo is equally spaced
-            geomSegmentLen = lineLength / numPoints
-            #get a fast approx dist            
-            distance = Helpers.fastMagDist(point[0], point[1], sitePoint[0], sitePoint[1])
-
-            points.append((distance, distAlongSegment, i))
-            distAlongSegment += geomSegmentLen
-
-        #sort possible line points on their distance to the site 
-        sortedPoints = sorted(points, key=lambda point: point[0])
-        #cutoff all but POINTS_PER_LINE of the line points
-        pointsToConsider = min(POINTS_PER_LINE, len(sortedPoints))
-        sortedPoints = sortedPoints[:pointsToConsider]
-
-        #check if this snap features a name match
         nameMatch = False
         if len(stationIdentifier) > 0:
             if stationIdentifier in lineName:
                 nameMatch = True
 
-        for point in sortedPoints:
-            pointIndex = point[2]
-            pointPosition = lineGeom[pointIndex]
+        averagePointDistance = lineLength / (numPoints-1)
 
-            #calculate the true distance
-            trueDist = Helpers.dist(sitePoint[0], sitePoint[1], pointPosition[0], pointPosition[1])
+        summedDistAlongSegment = 0
+        nearestPointDistanceSqr = sys.float_info.max
+        nearestPointDistAlongSegment = 0
+        nearestPoint = None
+        for i in range(0, numPoints-1):
+            p1 = lineGeom[i]
+            p2 = lineGeom[i+1]
+            pointOnSegment, t = Helpers.nearestPointOnSegment(p1[0], p1[1], p2[0], p2[1], sitePoint[0], sitePoint[1])
 
-            distAlongSeg = point[1]
-    
-            warnings = []
-            if trueDist > WARNING_DIST:
-                message = Helpers.formatID(str(siteId)) + " was forced to snap to an above averagely far away stream. This could be a faulty snap."
-                warning = WarningLog.Warning(priority = WarningLog.LOW_PRIORITY, message = message, responsibleSite = siteId, implicatedSites = None)
-                warnings.append(warning)
-            snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = distAlongSeg, nameMatch = nameMatch, warnings = warnings)
-            possibleSnaps.append(snap)
+            distanceSqr = Helpers.fastMagDist(sitePoint[0], sitePoint[1], pointOnSegment[0], pointOnSegment[1])
+
+            if distanceSqr < nearestPointDistanceSqr:
+                nearestPointDistanceSqr = distanceSqr
+                nearestPointDistAlongSegment = summedDistAlongSegment + t * averagePointDistance
+                nearestPoint = pointOnSegment
+            summedDistAlongSegment += averagePointDistance
+
+        warnings = []
+        trueDist = math.sqrt(nearestPointDistanceSqr)
+        if trueDist > WARNING_DIST:
+            message = Helpers.formatID(str(siteId)) + " was forced to snap to an above averagely far away stream. This could be a faulty snap."
+            warning = WarningLog.Warning(priority = WarningLog.LOW_PRIORITY, message = message, responsibleSite = siteId, implicatedSites = None)
+            warnings.append(warning)
+        snap = Snap(feature = line, snapDistance = trueDist, distAlongFeature = nearestPointDistAlongSegment, nameMatch = nameMatch, warnings = warnings)
+        possibleSnaps.append(snap)
+ 
 
     sortedPossibleSnaps = sorted(possibleSnaps, key=lambda snap: snap.snapDistance)
+
     #limit the number of considered snaps to a fixed number
     consideredSnaps = sortedPossibleSnaps#sortedPossibleSnaps[:min(NUM_SNAPS, len(sortedPossibleSnaps))]
     nameMatchFound = False
@@ -153,6 +148,8 @@ def snapPoint(snapablePoint, baseData, snapCutoff = CUTOFF_DIST):
             consideredSnaps.pop(i)
 
     if len(consideredSnaps) == 0:
+        # if siteId == "01387700":
+        #     print("test")
         return Failures.SNAP_FAILURE_CODE
 
     return consideredSnaps
@@ -260,8 +257,7 @@ def getSiteSnapAssignment (graph, assignBadSites = False):
 
             for orderedIdx, siteID in enumerate(uniqueOrderedIDs):
                 firstOccuranceIdx, lastOccuranceIdx = siteIndexRanges[siteID]
-                if siteID == "01433500":
-                    print("test");
+
                 #get a list of possible assignments for this ID
                 #Here, an choice is a tuple (assignment, index)
                 siteChoices = []
@@ -526,8 +522,8 @@ if __debug__:
             x.append(geom[0])
             y.append(geom[1])
 
-            #plt.text(geom[0], geom[1], idNum, color='red')
-        #plt.scatter(x,y, color='red')
+            plt.text(geom[0], geom[1], idNum, color='red')
+        plt.scatter(x,y, color='red')
 
         x = []
         y = []

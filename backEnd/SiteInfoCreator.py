@@ -15,9 +15,9 @@ import WarningLog
 import collections
 
 #---query limits
-MAX_PRIMARY_QUERIES = 30
+MAX_PRIMARY_QUERIES = 40
 #how many queries will we try AFTER finding a single upstream/downstream site to find the other upstream/downstream site?
-MAX_SECONDARY_SITE_QUERIES = 5
+MAX_SECONDARY_SITE_QUERIES = 20
 #what's the smallest reasonable distance between two sites
 #according to Gary Wall this is 500 feet 
 #rounding down to be safe, we get 100 meters 
@@ -41,7 +41,7 @@ class SiteInfoCreator (object):
         if Failures.isFailureCode(self.baseData):
             if __debug__:
                 print ("could not get data")
-            warningLog.addWarning(WarningLog.HIGH_PRIORITY, self.baseData)
+            self.warningLog.addWarning(WarningLog.HIGH_PRIORITY, self.baseData)
         else:
             self.streamGraph.addGeom(self.baseData)
 
@@ -103,9 +103,10 @@ class SiteInfoCreator (object):
         
         bridges = GDALData.getNearestBridges(lat, lng)
         namedTribMouths = navigator.getNamedTribMouths()
-        
-        contextualPlaces.extend([{"name": context.name, "point":context.point, "distance":context.distance} for context in bridges])
-        contextualPlaces.extend([{"name": mouth[0], "point": mouth[1], "distance":Helpers.degDistance(mouth[1][0], mouth[1][1], lng, lat)} for mouth in namedTribMouths])
+        if not Failures.isFailureCode(bridges):
+            contextualPlaces.extend([{"name": contextBridge.name, "point":contextBridge.point, "distance":contextBridge.distance} for contextBridge in bridges])
+        if not Failures.isFailureCode(namedTribMouths):
+            contextualPlaces.extend([{"name": mouth[0], "point": mouth[1], "distance":Helpers.degDistance(mouth[1][0], mouth[1][1], lng, lat)} for mouth in namedTribMouths])
 
         context["contextualPlaces"] = contextualPlaces
 
@@ -210,7 +211,7 @@ class SiteInfoCreator (object):
         return self.streamGraph.getGeoJSON()
 
 #withheld sites is a list of sites to be ignored while calculating a new site
-    def getSiteID (self, useBadSites = True):
+    def getSiteID (self, useBadSites = True, logWarnings = False):
         lat = self.lat
         lng = self.lng
         warningLog = self.warningLog
@@ -320,9 +321,10 @@ class SiteInfoCreator (object):
                 warningLog.addWarningTuple(warning)
 
             huc = siteAssignment.huc
-        
-        for warning in streamGraph.currentAssignmentWarnings:
-            warningLog.addWarningTuple(warning)
+
+        if logWarnings:
+            for warning in streamGraph.currentAssignmentWarnings:#apply warnings from streamGraph
+                warningLog.addWarningTuple(warning)
 
         #handle all combinations of having an upstream site and/or a downstream site (also having neither)
         
@@ -591,14 +593,15 @@ if __name__ == "__main__":
     lng = float(lng)
 
     siteInfoCreator = SiteInfoCreator(lat, lng)
-    allSitesID = siteInfoCreator.getSiteID(useBadSites = True)
+    allSitesID = siteInfoCreator.getSiteID(useBadSites = True, logWarnings=True)
+    
     #capture log here before doing filteredSites query so we don't double up on warnings
     logInfo = siteInfoCreator.warningLog.getJSONStruct()
     possibleNames = siteInfoCreator.getSiteNameInfo()
     if len(logInfo[WarningLog.HIGH_PRIORITY]) > 0:
-        filteredSitesID = siteInfoCreator.getSiteID(useBadSites = False)
+        filteredSitesID = siteInfoCreator.getSiteID(useBadSites = False, logWarnings=False)
     else:
         filteredSitesID = None
-    results = {"idInfo":allSitesID, "idInfoAlt":filteredSitesID, "log":logInfo, "names":possibleNames, "network":siteInfoCreator.getNetworkGeoJSON()}
+    results = {"idInfo":allSitesID, "idInfoAlt":filteredSitesID, "log":logInfo, "names":possibleNames, "network":siteInfoCreator.getNetworkGeoJSON(), "snaps":siteInfoCreator.streamGraph.currentSnapAssignments}
 
     print (json.dumps(results))
