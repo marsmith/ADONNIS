@@ -11,6 +11,20 @@ def nearestPointOnSegment(vx, vy, wx, wy, px, py):
   t = max(0, min(1, t))
   return (vx + t * (wx - vx), vy + t * (wy - vy)), t
 
+def formatList (list):
+    if len(list) == 1:
+        return list[0]
+    formatedString = ""
+    oxfordComma = len(list) > 2
+    for i in range(0, len(list)-1):
+        formatedString += str(list[i])
+        if i < len(list)-2:
+            formatedString += ", "
+    if oxfordComma:
+        formatedString += ","
+    formatedString += " and " + str(list[-1])
+    return formatedString
+
 #approximates the number of degrees latitude or longitude equivilant to km kilometers
 def approxKmToDegrees (km):
         return (1/111) * km

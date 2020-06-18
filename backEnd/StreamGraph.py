@@ -298,9 +298,12 @@ class StreamGraph (object):
         return newNode
 
     def addSiteSnaps (self, siteID, snapInfo):
-        if siteID not in self.siteSnaps and siteID not in self.withheldSites:
+        if siteID not in self.withheldSites:
             #snapInfo is a list of possible snaps. Each element is of type snap from SnapSites.py
-            self.siteSnaps[siteID] = snapInfo
+            if siteID not in self.siteSnaps: 
+                self.siteSnaps[siteID] = snapInfo
+            else:
+                self.siteSnaps[siteID].extend(snapInfo)
 
     def addSite (self, segmentID, siteID, distDownstreamAlongSegment):
         self.segments[segmentID].addSite(siteID, distDownstreamAlongSegment)
@@ -591,17 +594,15 @@ class StreamGraph (object):
 
             pt = site["geometry"]["coordinates"]
             #don't try to add sites that aren't within the safe data boundary
-            if not self.pointWithinSafeDataBoundary(pt):
-                continue
+            # if not self.pointWithinSafeDataBoundary(pt):
+            #     continue
             snapablePoint = SnapablePoint(point = pt, name = siteName, id = siteID)
             snaps = snapPoint(snapablePoint, baseData)
             #build a list of graphSites
             #graphSite is similar to Snap, but stores a reference to segmentID instead of feature
             #we assume that the feature reference itself isn't stable once the GDAL object gets
             #removed by the garbage collector
-            if Failures.isFailureCode(snaps):
-                self.warningLog.addWarning(WarningLog.MED_PRIORITY, Helpers.formatID(siteID) + " could not be snapped to a line. This is likely due to bad NHD data. Ensure that results don't conflict with this site.", responsibleSite=siteID)
-            elif len(snaps) > 0:
+            if not Failures.isFailureCode(snaps) and len(snaps) > 0:
                 potentialGraphSites = [GraphSite(siteID = siteID, huc = huc, segmentID = str(snap.feature["properties"]["OBJECTID"]), snapDist = snap.snapDistance, distDownstreamAlongSegment = snap.distAlongFeature, nameMatch = snap.nameMatch, generalWarnings = snap.warnings, assignmentWarnings = []) for snap in snaps]
                 self.addSiteSnaps(siteID, potentialGraphSites)
 

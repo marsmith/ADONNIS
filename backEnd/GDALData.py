@@ -19,6 +19,8 @@ DataBoundary = namedtuple('DataBoundary', 'point radius')
 
 RESTRICTED_FCODES = [56600]
 
+ALLOWED_SITE_TYPES = ["OC","OC-CO","ES","LK","ST","ST-CA","ST-DCH","ST-TS","AT","WE","SP"]
+
 QUERY_ATTEMPTS = 10 
 # the distance in km around a queried data radius that we consider the data 
 # to be safe from edge effects
@@ -127,7 +129,7 @@ def buildGeoJson (xmlStr):
             hucCode = site.find('huc_cd').text
 
             #make sure this is a stream not a well. Well sites have 14 digits
-            if siteType == "ST" and len(siteNo) < 13:
+            if siteType in ALLOWED_SITE_TYPES and len(siteNo) < 13:
                 #build feature. This is based on the format of the geoJson returned from the streams query
                 feature = {
                     "type":"Feature",

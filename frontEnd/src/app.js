@@ -69,8 +69,6 @@ var baseMapLayer, basemaplayerLabels;
 var nwisSitesLayer;//leaflet layer that displays NWIS sites
 var NWISmarkers;//list of all NWIS markers on the map currently
 var queriedNetworkLayer;//layer that displays lines queried on backend
-var highlightedLocationsLayer;
-var warningConflictDisplayLayer;
 
 var NHDlinesLayer;
 var isQueryingLines;
@@ -78,9 +76,12 @@ var lastQueriedFeatures;
 var lastQueryLatlng; //last query of NHD data. Not nec the same as last query of backend
 var lastQueryWarnings;
 
+var highlightedSites;
+
 var cursor;
 var cursorIcon;
 var siteIcon;
+var highlightedIcon;
 var snappedCursorLatLng;
 var currentResultsIDs = []; //these are the ID(s) that are displayed as results. Keep track so we can hyperlink them properly
 var currentResultsLatLng;
@@ -118,10 +119,7 @@ function initializeMap() {
 
   //define layers
   nwisSitesLayer = featureGroup().addTo(theMap);
-  //queriedNetworkLayer = featureGroup().addTo(theMap);
   NHDlinesLayer = featureGroup().addTo(theMap);
-  highlightedLocationsLayer = featureGroup().addTo(theMap);
-  warningConflictDisplayLayer = featureGroup().addTo(theMap);
 
   //hide laoding spinner
   $('#loading').hide();
@@ -132,8 +130,10 @@ function initializeMap() {
 
   cursorIcon = L.divIcon({className: 'wmm-pin wmm-yellow wmm-icon-diamond wmm-icon-blue wmm-size-25'});
   siteIcon = L.divIcon({className: 'wmm-pin wmm-altblue wmm-icon-diamond wmm-icon-blue wmm-size-25'});
+  highlightedIcon = L.divIcon({className: 'wmm-pin wmm-red wmm-icon-noicon wmm-icon-white wmm-size-30'});
   NWISmarkers = {};
   lastQueryWarnings = [];
+  highlightedSites = [];
 }
 
 function initListeners() {
@@ -205,14 +205,13 @@ function initListeners() {
   });
 
   $("#adonnisResults").on("mouseleave", "[class='" + idNumLinkClass + "']", function(event){
-    highlightedLocationsLayer.clearLayers();
+    clearHighlightedSites();
   });
   //display warning previews
   $("#adonnisResults").on("click", "[class~='adonnisWarning']", function(event){
     console.log("clicked on alert");
     var warningNumber = $( this ).data("warning");
     if (warningNumber != undefined && warningNumber != null) {
-      hideWarningConflictDisplay();
       displayWarningConflicts(lastQueryWarnings[warningNumber]);
     }
   });
@@ -239,7 +238,7 @@ function moveCursor (latlng, snap = true) {
     }
     
     if (cursor == null) {
-      cursor = L.marker(snappedLatLng, {icon: cursorIcon}).addTo(theMap);
+      cursor = L.marker(snappedLatLng, {icon: cursorIcon, riseOnHover: true}).addTo(theMap);
       cursor.bindPopup('<p>Is this location correct?</p><button type="button" class="btn" id="notCorr">No</button><button type="button" class="btn btn-primary" id="yesCorr" style = "float:right;">Yes</button>', {offset: L.point(0,-20)});      
     }
     else {
@@ -263,33 +262,12 @@ function moveCursor (latlng, snap = true) {
   }
 }
 
-function disableTooltipR (layerGroup) {
-  var lg = layerGroup instanceof L.featureGroup;
-  console.log("is this a layerGroup? " + lg);
-  var to = typeof layerGroup;
-  console.log("lg is a " + to);
-  
-  if (layerGroup && layerGroup instanceof L.featureGroup) {
-    console.log("is a group");
-    layerGroup.eachLayer(function(l) {
-      if(l.getTooltip()) {
-        console.log(l.isTooltipOpen());
-        l.closeTooltip();
-      }
-      else {
-        console.log("not a tooltip");
-      }
-      if (l instanceof L.featureGroup) {
-        disableTooltipR(l);
-      }
-    });
-  }
-}
-
 function displaySiteInfo (siteInfo, latLng)
 {
   lastQueryWarnings = [];
   $('#adonnisResults').show();
+  $('#highPriorityWarnings').hide();
+  $('#mediumPriorityWarnings').hide();
   $('#initialAdvice').hide();
 
   var names = siteInfo["names"];
@@ -427,20 +405,17 @@ function displayWarningConflicts (warning) {
   if (responsibleSiteLatLng == null) {
     return;
   }
+  highlightSite(responsibleSite)
   var foundLatLngs = [responsibleSiteLatLng];
   for (var implicatedSite of implicatedSites) {
     var implicatedSiteLatLng = tryGetSiteLatLng(implicatedSite);
     if (implicatedSiteLatLng == null) {
       continue;
     }
-    L.polyline([implicatedSiteLatLng, responsibleSiteLatLng], {color:"#ff2f00", dashArray:"1 8"}).addTo(warningConflictDisplayLayer);
     foundLatLngs.push(implicatedSiteLatLng);
+    highlightSite(implicatedSite)
   }
   theMap.fitBounds(L.latLngBounds(foundLatLngs));
-}
-
-function hideWarningConflictDisplay () {
-  warningConflictDisplayLayer.clearLayers();
 }
 
 function querySiteInfo (latLng, callback) {
@@ -484,7 +459,7 @@ function querySiteInfo (latLng, callback) {
       {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-74.6942189327947, 41.49058140363039, 0, 100.00000000000001], [-74.69107853215587, 41.48441527609562, 0, 0]]}, "properties": {"streamLevel": 3, "streamNm": ""}}, 
       {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-74.72504498019707, 41.511356040562944, 0, 100.00000000000001], [-74.72396139726706, 41.510239873237836, 0, 0]]}, "properties": {"streamLevel": 5, "streamNm": ""}}, 
       {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-74.73876364248267, 41.51550690845849, 0, 100.00000000000001], [-74.73903311550835, 41.51582304315643, 0, 93.82047000000001]]}, "properties": {"streamLevel": 4, "streamNm": ""}}, 
-      {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-74.73791624820043, 41.48598793349669, 0, 48.47690000000001], [-74.73770580257379, 41.48586714802557, 0, 47.490520000000004]]}, "properties": {"streamLevel": 4, "streamNm": ""}}]}});
+      {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-74.73791624820043, 41.48598793349669, 0, 48.47690000000001], [-74.73770580257379, 41.48586714802557, 0, 47.490520000000004]]}, "properties": {"streamLevel": 4, "streamNm": ""}}]}}, latLng);
       
     return;
   }
@@ -492,7 +467,7 @@ function querySiteInfo (latLng, callback) {
   $('#loading').show();
   console.log("attemping site info query");
 	return $.ajax({ 
-		type : 'post',
+		type : 'get',
 		url: "./siteID.php",
 		dataType: 'json',
 		data:
@@ -501,10 +476,8 @@ function querySiteInfo (latLng, callback) {
 				'lng' : latLng.lng
         },
 		success: function(theResult){
-      var resultsJSON = JSON.parse(theResult);
-      console.log("result is: " + theResult);
-			if (resultsJSON) {
-				callback(resultsJSON, latLng);
+			if (theResult) {
+				callback(theResult, latLng);
 			} else {
 				console.log("couldn't read results");
       }
@@ -815,16 +788,20 @@ function queryNWISsites(bounds) {
         var lng = $(this).attr('lng');
 
         if (siteID.length <= 10) {
-
-          var siteMarker = L.marker([lat, lng], {icon: siteIcon, draggable:false});
+          var thisIcon = siteIcon;
+          if (highlightedSites.includes(siteID)){
+            thisIcon = highlightedIcon;
+          }
+          var siteMarker = L.marker([lat, lng], {icon: thisIcon, draggable:false});
 
           var tooltip = siteID + "<br>" + siteName;
           siteMarker.bindTooltip(tooltip, {sticky: true});
 
           if (!NWISmarkers[siteID]) {
-            NWISmarkers[siteID] = {"siteName":siteName, "siteID":siteID, "latlng":L.latLng(lat, lng)}
+            NWISmarkers[siteID] = {"siteName":siteName, "siteID":siteID, "latlng":L.latLng(lat, lng), "marker":null}
           }
           nwisSitesLayer.addLayer(siteMarker);
+          NWISmarkers[siteID]["marker"] = siteMarker
         }
       });
     }
@@ -883,16 +860,33 @@ function goToSite (siteID) {
 }
 
 function highlightSite (siteID) {
-  getSiteLatLngThenCall(siteID, function (latlng) {
-    highlightLatLng(latlng, true);
-  });
+  highlightedSites.push(siteID);
+  if (currentResultsIDs && currentResultsIDs.includes(siteID) && cursor) {
+    cursor.setIcon(highlightedIcon);
+  }
+  else {
+    if(NWISmarkers[siteID] && NWISmarkers[siteID]["marker"]) {
+      NWISmarkers[siteID]["marker"].setIcon(highlightedIcon);
+    }
+  }
+
+  // getSiteLatLngThenCall(siteID, function (latlng) {
+  //   highlightLatLng(latlng, true);
+  // });
 }
 
-function highlightLatLng (latLng, clear) {
-  if (clear) {
-    highlightedLocationsLayer.clearLayers();
+function clearHighlightedSites () {
+  cursor.setIcon(cursorIcon);
+  for (var site in NWISmarkers) {
+    //check if site is a key of snapInfo dict
+    if (NWISmarkers.hasOwnProperty(site)) { 
+      if(NWISmarkers[site].marker){
+        NWISmarkers[site].marker.setIcon(siteIcon);
+      }
+    }
   }
-  L.circle(latLng, {radius:120, color:"#c2134b"}).addTo(highlightedLocationsLayer)
+  highlightedSites = [];
+
 }
 
 function setBasemap(baseMap) {

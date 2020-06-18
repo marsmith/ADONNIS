@@ -12,7 +12,7 @@ if __debug__:
     import matplotlib.pyplot as plt
 
 NUM_SNAPS = 6# how many possible locations that aren't the same as the nearest do we consider?
-CUTOFF_DIST = 0.004
+CUTOFF_DIST = 0.01
 WARNING_DIST = 0.003
 POINTS_PER_LINE = 2 #how many possible points on a given feature do we consider for snapping
 adverbNameSeparators = [" at ", " above ", " near ", " below "]
@@ -463,7 +463,9 @@ def getSiteSnapAssignment (graph, assignBadSites = False):
     for faultySite in atFaultSites:
         faultySiteID = faultySite[0]
         faultySiteConflicts = faultySite[1]
-        message = Helpers.formatID(faultySiteID) + " conflicts with " + str(len(faultySiteConflicts)) + " other sites. Consider changing this site's ID"
+        conflictingSitesString = Helpers.formatList([Helpers.formatID(fsc) for fsc in faultySiteConflicts])
+        
+        message = Helpers.formatID(faultySiteID) + " conflicts with " + conflictingSitesString + ". Consider changing this site's ID"
         warnings.append(WarningLog.Warning(priority=WarningLog.MED_PRIORITY, message=message, responsibleSite = faultySiteID, implicatedSites=faultySiteConflicts))
     #generate warnings like site a conflicts with site b, replace either
     for faultyPair in atFaultPairs:

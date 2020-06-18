@@ -12,6 +12,7 @@ import math
 import sys
 import json
 import WarningLog
+import copy
 import collections
 
 #---query limits
@@ -89,7 +90,7 @@ class SiteInfoCreator (object):
         
         placeInfo = GDALData.getNearestPlace(lat, lng)
         if Failures.isFailureCode(placeInfo):
-            context["distanceToPlace"] = "-1"
+            context["distanceToPlace"] = -1
             context["state"] = "unknown"
             context["placeName"] = "unknown"
         else:
@@ -248,7 +249,8 @@ class SiteInfoCreator (object):
         if Failures.isFailureCode(snapInfo):
             if __debug__:
                 print ("could not snap")
-            warningLog.addWarning(WarningLog.HIGH_PRIORITY, snapInfo)
+            if logWarnings:
+                warningLog.addWarning(WarningLog.HIGH_PRIORITY, snapInfo)
             return getResults(failed = True)
 
         feature = snapInfo[0].feature
@@ -306,19 +308,21 @@ class SiteInfoCreator (object):
         #add warnings from found sites, collect HUC
         if upstreamSite is not None:
             siteAssignment = upstreamSite[0]
-            for warning in siteAssignment.generalWarnings:
-                warningLog.addWarningTuple(warning)
-            for warning in siteAssignment.assignmentWarnings:
-                warningLog.addWarningTuple(warning)
+            if logWarnings:
+                for warning in siteAssignment.generalWarnings:
+                    warningLog.addWarningTuple(warning)
+                for warning in siteAssignment.assignmentWarnings:
+                    warningLog.addWarningTuple(warning)
 
             huc = siteAssignment.huc
         
         if downstreamSite is not None:
             siteAssignment = downstreamSite[0]
-            for warning in siteAssignment.generalWarnings:
-                warningLog.addWarningTuple(warning)
-            for warning in siteAssignment.assignmentWarnings:
-                warningLog.addWarningTuple(warning)
+            if logWarnings:
+                for warning in siteAssignment.generalWarnings:
+                    warningLog.addWarningTuple(warning)
+                for warning in siteAssignment.assignmentWarnings:
+                    warningLog.addWarningTuple(warning)
 
             huc = siteAssignment.huc
 
@@ -338,7 +342,8 @@ class SiteInfoCreator (object):
 
             if Helpers.siteIDCompare(downstreamSiteID, upstreamSiteID) < 0:
                 message = "The found upstream site is larger than found downstream site. ADONNIS output almost certainly incorrect."
-                warningLog.addWarning(WarningLog.HIGH_PRIORITY, message)
+                if logWarnings:
+                    warningLog.addWarning(WarningLog.HIGH_PRIORITY, message)
 
             fullUpstreamSiteID = Helpers.getFullID(upstreamSiteID)
             fullDownstreamSiteID = Helpers.getFullID(downstreamSiteID)
@@ -356,7 +361,7 @@ class SiteInfoCreator (object):
             newDon = int(downstreamSiteIdDsn * (1 - newSitePercentage) + upstreamSiteIdDsn * newSitePercentage)
 
             newID = Helpers.buildFullID(partCode, newDon)
-            newID = self.beautifyID(newID, downstreamSiteID, upstreamSiteID)
+            newID = self.beautifyID(newID, downstreamSiteID, upstreamSiteID, logWarnings=logWarnings)
             story = "Found a upstream site " + Helpers.formatID(upstreamSiteID) + " and a downstream site " + Helpers.formatID(downstreamSiteID) + ". New site is the weighted average of these two sites."
 
             if __debug__:
@@ -397,15 +402,17 @@ class SiteInfoCreator (object):
             lowerBound = Helpers.buildFullID(partCode, upstreamSiteDSN + siteIDOffset - allowedError)
             
             newID = Helpers.buildFullID(partCode, newSiteIDDSN)
-            newID = self.beautifyID(newID, lowerBound, upperBound)
+            newID = self.beautifyID(newID, lowerBound, upperBound, logWarnings=logWarnings)
             offsetAfterBeautify = Helpers.getSiteIDOffset(newID, fullUpstreamID)
             
             if nextSequentialDownstreamSite is None:
                 story = "Only found a upstream site (" + upstreamSiteID + "). New site ID is based on upstream site while allowing space for " + str(offsetAfterBeautify) + " sites between upstream site and new site"
-                warningLog.addWarning(WarningLog.HIGH_PRIORITY, "No downstream bound on result. Needs verification!")
+                if logWarnings:
+                    warningLog.addWarning(WarningLog.HIGH_PRIORITY, "No downstream bound on result. Needs verification!")
             else:
                 story = "Found an upstream site " + Helpers.formatID(upstreamSiteID) + ". Based on list of all sites, assume that " + Helpers.formatID(nextSequentialDownstreamSite) + " is the nearest sequential downstream site. New ID is based on the upstream site and bounded by the sequential downstream site"
-                warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, downstream bound is based on list of sequential sites and may not be the true downstream bound. This could result in site ID clustering.")
+                if logWarnings:
+                    warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, downstream bound is based on list of sequential sites and may not be the true downstream bound. This could result in site ID clustering.")
 
             if __debug__:
                     print("found upstream, but not downstream")
@@ -442,15 +449,17 @@ class SiteInfoCreator (object):
             lowerBound = Helpers.buildFullID(partCode, downstreamSiteDSN - siteIDOffset - allowedError)
             
             newID = Helpers.buildFullID(partCode, newSiteIDDSN)
-            newID = self.beautifyID(newID, lowerBound, upperBound)
+            newID = self.beautifyID(newID, lowerBound, upperBound, logWarnings=logWarnings)
             offsetAfterBeautify = Helpers.getSiteIDOffset(newID, fullDownstreamID)
             
             if nextSequentialUpstreamSite is None:
                 story = "Only found a downstream site " + Helpers.formatID(downstreamSiteID) + ". New site ID is based on downstream site while allowing space for " + str(offsetAfterBeautify) + " sites between downstream site and new site"
-                warningLog.addWarning(WarningLog.HIGH_PRIORITY, "No upstream bound on result. Needs verification!")
+                if logWarnings:
+                    warningLog.addWarning(WarningLog.HIGH_PRIORITY, "No upstream bound on result. Needs verification!")
             else:
                 story = "Found a downstream site " + Helpers.formatID(downstreamSiteID) + ". Based on list of all sites, assume that " + Helpers.formatID(nextSequentialUpstreamSite) + " is the nearest sequential upstream site. New ID is based on the downstream site and bounded by the sequential upstream site"
-                warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, upstream bound is based on list of sequential sites and may not be the true upstream bound. This could result in site ID clustering.")
+                if logWarnings:
+                    warningLog.addWarning(WarningLog.LOW_PRIORITY, "Found upstream and downstream bound. But, upstream bound is based on list of sequential sites and may not be the true upstream bound. This could result in site ID clustering.")
             
             if  __debug__:
                 print("found downstream, but not upstream")
@@ -463,7 +472,8 @@ class SiteInfoCreator (object):
             # get huge radius of sites:
             sitesInfo = GDALData.loadSitesFromQuery(lat, lng, 30)
             if Failures.isFailureCode(sitesInfo):
-                warningLog.addWarning(WarningLog.HIGH_PRIORITY, sitesInfo)
+                if logWarnings:
+                    warningLog.addWarning(WarningLog.HIGH_PRIORITY, sitesInfo)
                 return getResults(failed = True)
             
             sites = []
@@ -518,7 +528,7 @@ class SiteInfoCreator (object):
             newDsn = int(dsnA * (1 - newSitePercentage) + dsnB * newSitePercentage)
 
             newID = Helpers.buildFullID(partCode, newDsn)
-            newID = self.beautifyID(newID, fullIDA, fullIDB)
+            newID = self.beautifyID(newID, fullIDA, fullIDB, logWarnings=logWarnings)
 
             story = "Could not find any sites on the network. Estimating based on " + Helpers.formatID(oppositePairA[0]) + " and " + Helpers.formatID(oppositePairB[0]) + "."
             
@@ -531,7 +541,7 @@ class SiteInfoCreator (object):
 
         return getResults(siteID = newID, story = story) 
 
-    def beautifyID (self, siteID, lowerBound, upperBound):
+    def beautifyID (self, siteID, lowerBound, upperBound, logWarnings = True):
         warningLog = self.warningLog
         siteID = str(siteID)
         shortenedID = siteID[:7]
@@ -546,7 +556,8 @@ class SiteInfoCreator (object):
         #now check if this number exists already
         idsInfo = GDALData.getSiteIDsStartingWith(shortenedID)
         if Failures.isFailureCode(idsInfo):
-            warningLog.addWarning(WarningLog.LOW_PRIORITY, "Cannot verify if this site number already exists(" + idsInfo + "). Ensure this step is manually completed.")
+            if logWarnings:
+                warningLog.addWarning(WarningLog.LOW_PRIORITY, "Cannot verify if this site number already exists(" + idsInfo + "). Ensure this step is manually completed.")
             return siteID
         
         siteLayer = idsInfo
@@ -580,8 +591,8 @@ class SiteInfoCreator (object):
 
                 if testNewID not in existingNumbers and Helpers.betweenBounds(testNewDSN, lowerBoundDSN, upperBoundDSN):
                     return testNewID
-        
-        warningLog.addWarning(WarningLog.MED_PRIORITY, "Failed to find gap in ID space for new ID. This ID already exists.")
+        if logWarnings:
+            warningLog.addWarning(WarningLog.MED_PRIORITY, "Failed to find gap in ID space for new ID. This ID already exists.")
         return siteID    
 
 if __name__ == "__main__":
@@ -591,17 +602,19 @@ if __name__ == "__main__":
 
     lat = float(lat)
     lng = float(lng)
-
+    
     siteInfoCreator = SiteInfoCreator(lat, lng)
     allSitesID = siteInfoCreator.getSiteID(useBadSites = True, logWarnings=True)
     
     #capture log here before doing filteredSites query so we don't double up on warnings
     logInfo = siteInfoCreator.warningLog.getJSONStruct()
     possibleNames = siteInfoCreator.getSiteNameInfo()
+    #capture assignments with all snaps. Once the second pass happens that ignores bad sites, it won't add all sites
+    snapAssignments = copy.copy(siteInfoCreator.streamGraph.currentSnapAssignments);
     if len(logInfo[WarningLog.HIGH_PRIORITY]) > 0:
         filteredSitesID = siteInfoCreator.getSiteID(useBadSites = False, logWarnings=False)
     else:
         filteredSitesID = None
-    results = {"idInfo":allSitesID, "idInfoAlt":filteredSitesID, "log":logInfo, "names":possibleNames, "network":siteInfoCreator.getNetworkGeoJSON(), "snaps":siteInfoCreator.streamGraph.currentSnapAssignments}
+    results = {"idInfo":allSitesID, "idInfoAlt":filteredSitesID, "log":logInfo, "names":possibleNames, "network":siteInfoCreator.getNetworkGeoJSON(), "snaps":snapAssignments}
 
     print (json.dumps(results))
