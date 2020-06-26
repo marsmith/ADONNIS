@@ -61,6 +61,11 @@
                                                   Go!
                                               </button>
                                           </div>
+                                          <div class="col">
+                                            <button type="button" class="btn btn-secondary" id="getShareLink">
+                                                Share
+                                            </button>
+                                          </div>
                                         </div>
                                     </form>
 
@@ -82,7 +87,6 @@
                                     </div>
 
                                     <div id="adonnisResults">
-
                                         <div class="alert alert-danger" id="highPriorityWarnings">
                                             HIGH PRIORITY WARNINGS FOUND
                                         </div>
@@ -152,12 +156,12 @@
                             <div id="basemapsPanel" class="card-body collapse" data-parent="#accordion">
                                 <button id="btnStreets" class="btn btn-default slick-btn basemapBtn equalize"><img class="basemapThumb" alt="" src="images/streets.jpg"><br class="basemapThumb">Streets</button>
                                 <button id="btnSatellite" class="btn btn-default slick-btn basemapBtn equalize" ><img class="basemapThumb" alt="" src="images/imagery.jpg"><br class="basemapThumb">Imagery</button>
-                                <button id="btnImageryClarity" class="btn btn-default slick-btn basemapBtn equalize slick-btn-selection" ><img class="basemapThumb" alt="" src="images/imagery_clarity.jpg"><br class="basemapThumb">Imagery Clarity</button>
+                                <button id="btnImageryClarity" class="btn btn-default slick-btn basemapBtn equalize " ><img class="basemapThumb" alt="" src="images/imagery_clarity.jpg"><br class="basemapThumb">Imagery Clarity</button>
                                 <button id="btnTopo" class="btn btn-default slick-btn basemapBtn equalize"><img class="basemapThumb" alt="" src="images/topo.jpg"><br class="basemapThumb">Topo</button>
                                 <button id="btnTerrain" class="btn btn-default slick-btn basemapBtn equalize"><img class="basemapThumb" alt="" src="images/terrain.jpg"><br class="basemapThumb">Terrain</button>
                                 <button id="btnGray" class="btn btn-default slick-btn basemapBtn equalize " ><img class="basemapThumb" alt="" src="images/gray.jpg"><br class="basemapThumb">Gray</button>
                                 <button id="btnDarkGray" class="btn btn-default slick-btn basemapBtn equalize" ><img class="basemapThumb" alt="" src="images/darkgray.jpg"><br class="basemapThumb">DarkGray</button>
-                                <button id="btnNatGeo" class="btn btn-default slick-btn basemapBtn equalize"><img class="basemapThumb" alt="" src="images/natgeo.jpg"><br class="basemapThumb">NatGeo</button>
+                                <button id="btnNatGeo" class="btn btn-default slick-btn basemapBtn equalize slick-btn-selection"><img class="basemapThumb" alt="" src="images/natgeo.jpg"><br class="basemapThumb">NatGeo</button>
                             </div>
 
                         </div>
@@ -215,148 +219,72 @@
             </div>
         </div>
     </div>
-    <div id="graphModal" class="modal fade"  tabindex="-1" role="dialog" >
+    <div id="sharableLinkModal" class="modal fade"  tabindex="-1" role="dialog" >
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Data Retrieval and Graphing Module</h5>
+                    <h5 class="modal-title">Sharable Link</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div class="modal-body">
-                    <div class="card">
-                        <div id="analysis" class="card-body">
-
-                            <h5 class="card-title">Select Station(s)</h5>
-                            <select class="appFilter" id="stationSelect" data-selectname="Select Station" multiple></select>
-
-                            <h5 class="card-title mt-4">Select Sublocation(s)</h5>
-                            <select class="appFilter" id="sublocationSelect" data-selectname="Select Sublocation" multiple></select>
-
-                            <h5 class="card-title mt-4">Select Parameter(s)</h5>
-                            <select class="appFilter" id="parameterSelect" data-selectname="Select Parameter" multiple></select>
-
-                            <h5 class="card-title mt-4">Select Time Period</h5>
-
-                            <div class="mt-2">
-                                <div class="mb-2 form-check">
-                                    <label class="form-check-label">
-                                        <input class="form-check-input" type="radio" name="timeSelect" id="timePeriodRadio" value="period" checked>
-                                        Choose Time Period
-                                    </label>
-                                </div>
-                                    
-                                <select class="" id="timePeriodSelect" data-selectname="SelectDatePeriod">
-                                    <option value="P1D">Past 1 Day</option>
-                                    <option value="P7D" selected="selected">Past 7 Days</option>
-                                    <option value="P30D">Past 30 Days</option>
-                                    <option value="P2M">Past 2 Months</option>
-                                    <option value="P6M">Past 6 Months</option>
-                                </select>
-
-                            </div>
-
-                            <div class="mt-2">OR</div>
-
-                            <div class="mt-2">
-                                <div class="form-check">
-                                    <label class="form-check-label">
-                                        <input class="form-check-input" type="radio" name="timeSelect" id="specificRadio" value="range" checked>
-                                        Choose Specific Date Range
-                                    </label>
-                                </div>
-                                    
-
-                                <input id="startDate" type="text" value="2018-04-16" class="datepicker">
-                                <span>Start Date</span>
-
-        
-                                <input id="endDate" type="text" value="2018-04-19" class="mt-1 datepicker">
-                                <span>End Date</span>
-    
-                            </div>
-            
-                        </div>
-                        <div class="card-footer text-center">
-                            <button id="showGraph" type="button" class="btn btn-success">Show Graph</button>
-                        </div>
-    
-                    </div> 
-                    
-                    <div class="row" id="graph-loading" style="display:none;">
-                        <div class="col-6 mx-auto">
-                            <div class="text-center">
-                                <i class="fa fa-cog fa-spin fa-3x"></i>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="graphContainer">
-                    </div>
-
-                    <div id="heatmapContainer">
-                    </div>
-
+                <div id="aboutModalBody" class="modal-body">
+                    <a href="https://ny.water.usgs.gov/maps/adonnis/" id="sharableLink"> https://ny.water.usgs.gov/maps/adonnis/ </a>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" id="downloadData" class="btn btn-success">Download Data</button>
-                        
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Dismiss</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="aboutModal" class="modal fade"  tabindex="-1" role="dialog" >
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">ADONNIS</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div id="aboutModalBody" class="modal-body">
+                    <ul class="nav nav-tabs" id="aboutModalTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="aboutTab" href="#aboutTabPane" data-toggle="tab" role="tab"><i class="fa fa-question-circle"></i>&nbsp;About the application</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="disclaimerTab" href="#disclaimerTabPane" data-toggle="tab" role="tab"><i class="fa fa-exclamation-circle"></i>&nbsp;Disclaimer</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content">
+                        <div role="tabpanel" class="tab-pane active" id="aboutTabPane"><br>
+
+                            <div class="alert alert-info" role="alert">
+                                All data is provisional unless otherwise noted
+                            </div>
+
+                            <p>This program is in development. Results should be verified by an expert in all cases.</p>
+
+                            <p>Developed by Ian Scilipoti of the <a href="https://ny.water.usgs.gov">USGS New York Water Science Center</a>
+                            <p>Icons from <a href="https://github.com/USGS-WiM/marker-creator">Marker Creator</a> developed by<a href="https://wim.usgs.gov"> USGS Web Informatics and Mapping</a><br><br>
+                            <!-- Source code available <a href="https://github.com/marsmith/go2mapper">here.</a></p> -->
+                            <span id="appVersion"></span>
+                        </div>
+                        <div role="tabpanel" class="tab-pane" id="disclaimerTabPane"><br>
+                            <h4>USGS Software User Rights Notice</h4>
+                            <p>Software and related material (data and (or) documentation), contained in or furnished in connection with a software distribution, are made available by the U.S. Geological Survey (USGS) to be used in the public interest and in the advancement of science, subject to the following restrictions and understandings.</p>
+                                
+                            <p>Because the software and related material are free and provided "as is," the authors, the USGS, and the United States Government have made no warranty, express or implied, as to accuracy or completeness and are not obligated to provide the user with any support, consulting, training or assistance of any kind with regard to the use, operation, and performance of this software nor to provide the user with any updates, revisions, new versions or "bug fixes".</p>
+                                
+                            <p>The user assumes all risk for any damages whatsoever resulting from loss of use, data, or profits arising in connection with the access, use, quality, or performance of this software.</p>	
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                 </div>
             </div><!-- /.modal-content -->
         </div> <!-- /.modal-dialog -->
     </div><!-- /.modal -->
-
-    
-    <div id="aboutModal" class="modal fade"  tabindex="-1" role="dialog" >
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                    <h5 class="modal-title">ADONNIS</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div id="aboutModalBody" class="modal-body">
-                        <ul class="nav nav-tabs" id="aboutModalTabs" role="tablist">
-                            <li class="nav-item">
-                                <a class="nav-link active" id="aboutTab" href="#aboutTabPane" data-toggle="tab" role="tab"><i class="fa fa-question-circle"></i>&nbsp;About the application</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" id="disclaimerTab" href="#disclaimerTabPane" data-toggle="tab" role="tab"><i class="fa fa-exclamation-circle"></i>&nbsp;Disclaimer</a>
-                            </li>
-                        </ul>
-                        <div class="tab-content">
-                            <div role="tabpanel" class="tab-pane active" id="aboutTabPane"><br>
-
-                                <div class="alert alert-info" role="alert">
-                                    All data is provisional unless otherwise noted
-                                </div>
-
-                                <p>This program is in development. Results should be verified by an expert in all cases.</p>
-
-                                <p>Developed by Ian Scilipoti of the <a href="https://ny.water.usgs.gov">USGS New York Water Science Center</a>
-                                <p>Icons from <a href="https://github.com/USGS-WiM/marker-creator">Marker Creator</a> developed by<a href="https://wim.usgs.gov"> USGS Web Informatics and Mapping</a><br><br>
-                                <!-- Source code available <a href="https://github.com/marsmith/go2mapper">here.</a></p> -->
-                                <span id="appVersion"></span>
-                            </div>
-                            <div role="tabpanel" class="tab-pane" id="disclaimerTabPane"><br>
-                                <h4>USGS Software User Rights Notice</h4>
-                                <p>Software and related material (data and (or) documentation), contained in or furnished in connection with a software distribution, are made available by the U.S. Geological Survey (USGS) to be used in the public interest and in the advancement of science, subject to the following restrictions and understandings.</p>
-                                  
-                                <p>Because the software and related material are free and provided "as is," the authors, the USGS, and the United States Government have made no warranty, express or implied, as to accuracy or completeness and are not obligated to provide the user with any support, consulting, training or assistance of any kind with regard to the use, operation, and performance of this software nor to provide the user with any updates, revisions, new versions or "bug fixes".</p>
-                                  
-                                <p>The user assumes all risk for any damages whatsoever resulting from loss of use, data, or profits arising in connection with the access, use, quality, or performance of this software.</p>	
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    </div>
-                </div><!-- /.modal-content -->
-            </div> <!-- /.modal-dialog -->
-        </div><!-- /.modal -->
 
     <div id="mapDiv">
     </div>

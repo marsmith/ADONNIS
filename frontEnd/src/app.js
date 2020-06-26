@@ -112,10 +112,12 @@ function initializeMap() {
   control.scale().addTo(theMap);
 
   //basemap
-  baseMapLayer = basemapLayer('ImageryClarity').addTo(theMap);;
+  baseMapLayer = basemapLayer('NationalGeographic').addTo(theMap);;
 
   //set initial view
   theMap.setView([MapY, MapX], MapZoom);
+
+  $('.leaflet-container').css('cursor','crosshair');
 
   //define layers
   nwisSitesLayer = featureGroup().addTo(theMap);
@@ -134,6 +136,18 @@ function initializeMap() {
   NWISmarkers = {};
   lastQueryWarnings = [];
   highlightedSites = [];
+
+  var queryString = window.location.search;
+  var urlParams = new URLSearchParams(queryString);
+
+  if (urlParams.has("lat") && urlParams.has("lng")) {
+    var urlLat = parseFloat(urlParams.get("lat"));
+    var urlLng = parseFloat(urlParams.get("lng"));
+
+    //console.log(urlLat + ", " + urlLng)
+
+    querySiteInfo(L.latLng(urlLat, urlLng), displaySiteInfo);
+  }
 }
 
 function initListeners() {
@@ -178,7 +192,6 @@ function initListeners() {
   });
 
   $('#aboutButton').click(function () {
-    alert('clicked');
     $('#aboutModal').modal('show');
   });
   
@@ -216,9 +229,15 @@ function initListeners() {
     }
   });
 
-  /*  END EVENT HANDLERS */
+  $("#getShareLink").on("click", function(event){
+    $("#sharableLinkModal").modal("show");
+    var pageURL = window.location.href.split('?')[0]
+    var shareLink = pageURL + getURLargs()
+    $("#sharableLink").attr("href", shareLink);
+    $("#sharableLink").html(shareLink);
+  });
 
-  $('.leaflet-container').css('cursor','crosshair');
+  /*  END EVENT HANDLERS */
 }
 
 function moveCursor (latlng, snap = true) {
@@ -869,10 +888,16 @@ function highlightSite (siteID) {
       NWISmarkers[siteID]["marker"].setIcon(highlightedIcon);
     }
   }
+}
 
-  // getSiteLatLngThenCall(siteID, function (latlng) {
-  //   highlightLatLng(latlng, true);
-  // });
+function getURLargs () {
+  if (currentResultsLatLng == null) {
+    return ""
+  }
+  var lng = currentResultsLatLng.lng
+  var lat = currentResultsLatLng.lat
+
+  return "?lng="+lng+"&lat="+lat;
 }
 
 function clearHighlightedSites () {
