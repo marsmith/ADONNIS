@@ -2,12 +2,11 @@
 // ----- ADONNIS -----------------------------------------------------------------
 // ------------------------------------------------------------------------------
 
-// copyright:   2018 Martyn Smith - USGS NY WSC
+// copyright:   Ian G. Scilipoti - USGS NY WSC
 
-// authors:   Martyn J. Smith - USGS NY WSC
-//            Ian G. Scilipoti - USGS NY WSC
+// authors:   Ian G. Scilipoti - USGS NY WSC
 
-// purpose:  USGS NY WSC Web App Template
+// purpose:  USGS NY ADONNIS frontend
 
 // updates:
 // 08.07.2018 - MJS - Created
@@ -79,7 +78,9 @@ var lastQueryWarnings;
 var highlightedSites;
 
 var cursor;
+var cursorIconStyle = 'wmm-pin wmm-yellow wmm-icon-diamond wmm-icon-blue wmm-size-25';
 var cursorIcon;
+var siteIconStyle = 'wmm-pin wmm-altblue wmm-icon-diamond wmm-icon-blue wmm-size-25';
 var siteIcon;
 var highlightedIcon;
 var snappedCursorLatLng;
@@ -87,7 +88,7 @@ var currentResultsIDs = []; //these are the ID(s) that are displayed as results.
 var currentResultsLatLng;
 
 var idNumLinkClass = "idNum"
-var simulateBackendResponse = false;
+var simulateBackendResponse = true;
 //END global variables
 
 //instantiate map
@@ -130,8 +131,8 @@ function initializeMap() {
   $('#adonnisResults').hide();
   $('#frontEndFailure').hide();
 
-  cursorIcon = L.divIcon({className: 'wmm-pin wmm-yellow wmm-icon-diamond wmm-icon-blue wmm-size-25'});
-  siteIcon = L.divIcon({className: 'wmm-pin wmm-altblue wmm-icon-diamond wmm-icon-blue wmm-size-25'});
+  cursorIcon = L.divIcon({className: cursorIconStyle});
+  siteIcon = L.divIcon({className: siteIconStyle});
   highlightedIcon = L.divIcon({className: 'wmm-pin wmm-red wmm-icon-noicon wmm-icon-white wmm-size-30'});
   NWISmarkers = {};
   lastQueryWarnings = [];
@@ -143,11 +144,37 @@ function initializeMap() {
   if (urlParams.has("lat") && urlParams.has("lng")) {
     var urlLat = parseFloat(urlParams.get("lat"));
     var urlLng = parseFloat(urlParams.get("lng"));
-
-    //console.log(urlLat + ", " + urlLng)
-
     querySiteInfo(L.latLng(urlLat, urlLng), displaySiteInfo);
   }
+
+  //legend stuff:
+
+  var streamLevellLegend = L.control({position: 'topleft'});
+  
+  streamLevellLegend.onAdd = function (theMap) {
+      var div = L.DomUtil.create('div', 'info legend');
+      div.innerHTML += "Stream <br> Level";
+      // loop through our density intervals and generate a label with a colored square for each interval
+      for (var i = 0; i < streamLevelColors.length; i++) {
+          div.innerHTML += '<p> <i style="background:' + streamLevelColors[i] + '"> </i>' + i + "</p>";
+      }
+
+      return div;
+  };
+
+  streamLevellLegend.addTo(theMap);
+
+  var iconLegend = L.control({position: 'bottomright'});
+  
+  iconLegend.onAdd = function (theMap) {
+      var div = L.DomUtil.create('div', 'info legendFixedWidth');
+      div.innerHTML += 'Existing Site <div class="' + siteIconStyle + '" style="transform: translate3d(100px, 0px, 0px)"><\div>';
+      div.innerHTML += '<br><br><br>New Site <div class="' + cursorIconStyle + '" style="transform: translate3d(100px, -10px, 0px)"><\div>';
+
+      return div;
+  };
+
+  iconLegend.addTo(theMap);
 }
 
 function initListeners() {
@@ -209,7 +236,8 @@ function initListeners() {
   //go to sites from site links
   $("#adonnisResults").on("click", "[class='" + idNumLinkClass + "']", function(event){
     var siteID = $( this ).text();
-    goToSite(siteID);
+    //goToSite(siteID);
+    includeSiteInView(siteID);
   });
 
   $("#adonnisResults").on("mouseover", "[class='" + idNumLinkClass + "']", function(event){
@@ -235,6 +263,10 @@ function initListeners() {
     var shareLink = pageURL + getURLargs()
     $("#sharableLink").attr("href", shareLink);
     $("#sharableLink").html(shareLink);
+  });
+
+  $("#reloadButton").on("click", function (event){
+    location.reload();
   });
 
   /*  END EVENT HANDLERS */
@@ -878,6 +910,10 @@ function goToSite (siteID) {
   $('body').toggleClass('isOpenMenu');
 }
 
+function includeSiteInView (siteID) {
+  getSiteLatLngThenCall(siteID, zoomToInclude);
+}
+
 function highlightSite (siteID) {
   highlightedSites.push(siteID);
   if (currentResultsIDs && currentResultsIDs.includes(siteID) && cursor) {
@@ -898,6 +934,12 @@ function getURLargs () {
   var lat = currentResultsLatLng.lat
 
   return "?lng="+lng+"&lat="+lat;
+}
+
+function zoomToInclude (latLng) {
+  var curBounds = theMap.getBounds();
+  curBounds.extend(latLng);
+  theMap.flyToBounds(curBounds);
 }
 
 function clearHighlightedSites () {

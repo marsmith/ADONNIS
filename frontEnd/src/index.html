@@ -45,29 +45,44 @@
                             <div id="explanationPanel" class="card-body collapse show" data-parent="#accordion">
                                 <div class="card-body">
                                     <div class="alert alert-info" role="alert" id="initialAdvice">
-                                        Click a point on the map or enter a lat/long to start the process
+                                        Click a point on the map or enter a lat/long to start the process. <br>
+                                        Lat/long values are expected in decimal degrees. <br>
+                                        Once a point has been entered and the location confirmed on the map, a response could take up to a few minutes.
                                     </div>
 
-                                    <form>
+                                    <container>
                                         <div class="row">
-                                          <div class="col">
-                                            <input type="text" class="form-control" placeholder="Latitude" id="latitude">
-                                          </div>
-                                          <div class="col">
-                                            <input type="text" class="form-control" placeholder="Longitude" id="longitude">
-                                          </div>
-                                          <div class="col">
-                                              <button class="btn btn-info" id="enterLatLng" type="button">
-                                                  Go!
-                                              </button>
-                                          </div>
-                                          <div class="col">
-                                            <button type="button" class="btn btn-secondary" id="getShareLink">
-                                                Share
-                                            </button>
-                                          </div>
+                                            <div class="col-7">
+                                                <form>
+                                                    <div class="row">
+                                                        <div class="col">
+                                                            <input type="text" class="form-control" placeholder="Latitude" id="latitude">
+                                                        </div>
+                                                        <div class="col">
+                                                            <input type="text" class="form-control" placeholder="Longitude" id="longitude">
+                                                        </div>
+                                                        <div class="col">
+                                                            <button class="btn btn-info" id="enterLatLng" type="button">
+                                                                Go!
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                            <div class="col">
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" class="btn btn-secondary" id="getShareLink">
+                                                        Share
+                                                    </button>
+                                                    <button type="button" class="btn btn-secondary" id="reloadButton">
+                                                        Reload
+                                                    </button>
+                                                </div>
+                                            </div>
+                                           
                                         </div>
-                                    </form>
+                                    </container>
+                                    <br>
 
                                     <div class="row" id="loading">
                                         <div class="col-6 mx-auto">
@@ -223,7 +238,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Sharable Link</h5>
+                    <h5 class="modal-title">Shareable Link</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -264,6 +279,10 @@
 
                             <p>This program is in development. Results should be verified by an expert in all cases.</p>
 
+                            <a href="../docs/_build/html/index.html"> See the code documentation. </a>
+                            
+                            <br>
+                            
                             <p>Developed by Ian Scilipoti of the <a href="https://ny.water.usgs.gov">USGS New York Water Science Center</a>
                             <p>Icons from <a href="https://github.com/USGS-WiM/marker-creator">Marker Creator</a> developed by<a href="https://wim.usgs.gov"> USGS Web Informatics and Mapping</a><br><br>
                             <!-- Source code available <a href="https://github.com/marsmith/go2mapper">here.</a></p> -->
