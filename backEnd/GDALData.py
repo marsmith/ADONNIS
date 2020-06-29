@@ -14,8 +14,11 @@ import Failures
 MAX_SAFE_QUERY_DIST_KM = 3.5
 
 BaseData = namedtuple('BaseData', 'lineLayer siteLayer dataBoundary')
+""" The core data needed for StreamGraph. """
 PointOfContext = namedtuple('PointOfContext', 'distance point name')
+""" A place that can be used as context for a site name. """
 DataBoundary = namedtuple('DataBoundary', 'point radius')
+""" The boundary around some queried data. """
 
 RESTRICTED_FCODES = [56600]
 
@@ -27,9 +30,16 @@ QUERY_ATTEMPTS = 10
 DATA_PADDING = 0.6
 TIMEOUT = 6
 
-#generic way to query a service with multiple attempts and individual timeout
-#mainly usful b/c NHD is so unreliable
+
 def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
+    """ generic way to query a service with multiple attempts and individual timeout. 
+        Mainly usful because of how unreliable NHD requests seem to be.
+        
+        :param attempts: How many attempts before returning QUERY_FAILURE_CODE.  
+        :param timeout: How much time should each attempt be given. 
+        :param queryName: A name associated with this request. Used in generating print warnings.
+
+        :return: Response text or a Failure code. """
     attemptsUsed = 0
     success = False
     while (attemptsUsed < attempts):
@@ -48,8 +58,15 @@ def queryWithAttempts (url, attempts, timeout = 3, queryName="data"):
             print("failed to retrieve " + queryName + " on all attempts. Failing")
         return Failures.QUERY_FAILURE_CODE
 
-#Get's the nearest location. Returns (distance, town/place name, state)
 def getNearestPlace (lat, lng, timeout = 5):
+    """ Get's the nearest location information. 
+
+    :param lat: Latitude of request
+    :param lng: Longitude of request
+    :param timeout: Request timeout before failure code is returned
+
+    :return: A tuple with the following information (distance, town/place name, state code) """
+
     locationsUrl = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/18/query?geometry=" + str(lng) +"," + str(lat) + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"
     result = queryWithAttempts(locationsUrl, QUERY_ATTEMPTS, timeout = timeout, queryName="nearPlaces")
     
@@ -83,8 +100,14 @@ def getNearestPlace (lat, lng, timeout = 5):
 
     return {"distanceToPlace":distance, "placeName":placeName, "state":stateAlpha}
 
-#get's nearby bridges and road crossings. Used to generate name context
 def getNearestBridges (lat, lng, timeout = 5):
+    """ Get's nearby bridges and river-road crossings. Used to generate names. 
+    
+    :param lat: Latitude of request
+    :param lng: Longitude of request
+    :param timeout: Request timeout before failure code is returned
+    
+    :return: A list of PointOfContext instances for nearby bridges and river-road crossings. """
     locationsUrl = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/10/query?geometry=" + str(lng) +"," + str(lat) + "&geometryType=esriGeometryPoint&inSR=4326&outSR=4326&distance=7000&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson"
     result = queryWithAttempts(locationsUrl, QUERY_ATTEMPTS, timeout = timeout, queryName="nearBridges")
     
@@ -110,8 +133,12 @@ def getNearestBridges (lat, lng, timeout = 5):
     
     return bridges
 
-#convert the xml results of a stream site query to geojson
 def buildGeoJson (xmlStr):
+    """ Converts the xml response from NWIS to GeoJson
+    
+    :param xml: An XML string from an NWIS site service.
+    
+    :return: The formatted GeoJson representation of the xml. """
     root = ET.fromstring(xmlStr)
     geojson = {
         "type": "FeatureCollection",
@@ -145,9 +172,13 @@ def buildGeoJson (xmlStr):
                 }
                 geojson["features"].append(feature)
     return json.dumps(geojson)
-
-#get's a list of siteIDs that start with a certain number of digits 
+ 
 def getSiteIDsStartingWith (siteID, timeout = TIMEOUT):
+    """ Get a list of siteIDs that start with a string of digits
+    
+    :param siteID: A partial or complete siteID string
+    
+    :return: A list of GeoJson formatted siteIDs"""
     similarSitesQuery = "https://waterdata.usgs.gov/nwis/inventory?search_site_no=" + siteID + "&search_site_no_match_type=beginning&site_tp_cd=ST&group_key=NONE&format=sitefile_output&sitefile_output_format=xml&column_name=site_no&column_name=station_nm&column_name=site_tp_cd&column_name=dec_lat_va&column_name=dec_long_va&column_name=huc_cd&list_of_search_criteria=search_site_no%2Csite_tp_cd"
     result = queryWithAttempts (similarSitesQuery, QUERY_ATTEMPTS, timeout = timeout, queryName="similarSiteIds")
     
@@ -163,8 +194,12 @@ def getSiteIDsStartingWith (siteID, timeout = TIMEOUT):
         return Failures.QUERY_PARSE_FAILURE_CODE
     return (sitesLayer)  
 
-#loads all sites from specified hydraulic unit code
 def loadHUCSites (code):
+    """ Loads all sites from specified hydraulic unit code.
+    
+    :param code: The HUC code.
+    
+    :return: A list of siteIDs. """
     siteURL = "https://waterservices.usgs.gov/nwis/site/?format=mapper&huc=" + code + "&siteType=ST&siteStatus=all"
     req = queryWithAttempts(siteURL, QUERY_ATTEMPTS, queryName="siteData", timeout = TIMEOUT)
     returnList = []
@@ -181,8 +216,15 @@ def loadHUCSites (code):
         return Failures.QUERY_PARSE_FAILURE_CODE
     return returnList
 
-#gets sites from NWIS within a certain radius
 def loadSitesFromQuery (lat, lng, radiusKM = 5):
+    """ Gets sites from NWIS within a certain radius. 
+
+    :param lat: Latitude of request.
+    :param lng: Longitude of request.
+    :param radiusKM: Radius of sites to request in KM.
+
+    :return: A list of GeoJson formatted sites. 
+    """
     approxRadiusInDeg = Helpers.approxKmToDegrees(radiusKM)
     #northwest
     nwLat = lat + approxRadiusInDeg
@@ -206,9 +248,15 @@ def loadSitesFromQuery (lat, lng, radiusKM = 5):
             print("could not read query")
         return Failures.QUERY_PARSE_FAILURE_CODE
 
-#This function gets the core data needed to construct a stream graph
 def loadFromQuery(lat, lng, radiusKM = 3.5):
+    """ This function gets the core data needed to construct a stream graph. It wraps loadSitesFromQuery().
+    
+    :param lat: Latitude of request.
+    :param lng: Longitude of request.
+    :param radiusKM: Radius of sites to request in KM.
 
+    :return: A BaseData instance.
+    """
     if radiusKM > MAX_SAFE_QUERY_DIST_KM:
         raise RuntimeError("Queries with radii greater than " + str(MAX_SAFE_QUERY_DIST_KM) + " may cause data loss due to webserver limitations")
 

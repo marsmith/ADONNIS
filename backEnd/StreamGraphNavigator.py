@@ -4,14 +4,21 @@ import Failures
 #a class that has various functionality to navigate the graph of a stream graph. Will autoexpand the graph 
 #at edges when a search runs into the edge of the graph
 class StreamGraphNavigator (object):
-
+    """ This class does most of the heavy lifting. It allows searches to be conducted to find the nearest up and downstream sites. 
+    
+        In the process of searching this class may expand the graph its given to continue a search in a direction with no data. """
     def __init__(self, streamGraph, terminateSearchOnQuery = False):
         self.streamGraph = streamGraph
         self.terminateSearchOnQuery = terminateSearchOnQuery
 
-    #navigate downstream until a path with lower streamlevel is found. This function returns the first segment
-    #directly upstream from the junction of the main path and the tributary that 'segment' is on
     def findNextLowerStreamLevelPath (self, segment, downStreamPositionOnSegment = 0, expand=True):
+        """ Navigate downstream until a path with lower streamlevel is found.
+        
+        :param segment: The segment to search downstream from.
+        :param downStreamPositionOnSegment: The position on the segment the search started from. This is used to get accurate distance measurements.
+        :param expand: Do we expand the graph to help fulfil this query?
+        
+        :return: This function returns the first segment directly upstream from the junction of the main path and the tributary that 'segment' is on. """
         tribLevel = segment.streamLevel
 
         dist = -downStreamPositionOnSegment #when we sum dist up, we must subtract
@@ -50,10 +57,19 @@ class StreamGraphNavigator (object):
         else:
             return Failures.END_OF_BASIN_CODE
 
-    # get a sorted list of all upstream sites from 'segment'
-    # list is sorted such that sites with higher IDS (closer to the mouth of the river) are first
-    # returns either an error code or a tuple (upstream sites, collectedUpstreamDistance)
     def collectSortedUpstreamSites (self, segment, downStreamPositionOnSegment, siteLimit = 1, autoExpand = True):
+        """ Get a sorted list of all upstream sites from 'segment' 
+        
+            List is sorted such that sites with higher IDS (closer to the mouth of the river) are first
+            
+            There are always a finite number of upstream sites, however, this method could still take a long time if no siteLimit is specified.
+
+            :param segment: The segment to search downstream from.
+            :param downStreamPositionOnSegment: The position on the segment the search started from. This is used to get accurate distance measurements.
+            :param siteLimit: The number of sites desired before the search terminates.
+            :param expand: Do we expand the graph to help fulfil this query?
+
+            :return: Either an error code or a tuple (upstream sites, total distance)"""
         # contains tuples of the form (site, dist to site)
         foundSites = []
 
@@ -112,10 +128,12 @@ class StreamGraphNavigator (object):
 
         return (foundSites, summedDistance)
     
-    #assume our graph is clean and loop free
-    #returns a tuple (siteID, distance traversed to find site)
-    # or None if no site is found
-    def getNextUpstreamSite (self, segment, downstreamPositionOnSegment):        
+    def getNextUpstreamSite (self, segment, downstreamPositionOnSegment):   
+        """ Find the next upstream site using backtracking if required.
+        
+        :param segment: The segment to search downstream from.
+        :param downStreamPositionOnSegment: The position on the segment the search started from. This is used to get accurate distance measurements.
+        :return: The found site or an error code."""     
         #get the first upstream site
         upstreamSitesInfo = self.collectSortedUpstreamSites(segment, downstreamPositionOnSegment, siteLimit = 1)
         
@@ -157,6 +175,12 @@ class StreamGraphNavigator (object):
 
     #gets the nearest site downstream
     def getNextDownstreamSite (self, segment, downstreamPositionOnSegment):
+        """ Gets the nearest downstream site.
+        
+        :param segment: The segment to search downstream from.
+        :param downStreamPositionOnSegment: The position on the segment the search started from. This is used to get accurate distance measurements.
+        
+        :return: The nearest downstream site or an error code. """
         foundSite = None
 
         for site in segment.sites:
@@ -256,6 +280,7 @@ class StreamGraphNavigator (object):
 
     #get's all trib mouths on the network that are named
     def getNamedTribMouths (self):
+        """ Gets all named trib mouths on the Navigator graph. Used for site naming. """
         mouths = []
         for segment in self.streamGraph.segments.values():
             if segment.streamName == "":

@@ -235,7 +235,5 @@ def runTestList (fileName, outputName, numLines = 100):
     outputFile.write(footer)
     outputFile.close()
 
-
-runTestList("testingSet01.csv", "testingSet01_2.csv", numLines = 100)
-#generateTestSiteIDList(100, "01", "_2")
-#randomReplacementTesting(30)
+if __name__ == "__main__":
+    runTestList("testingSet01.csv", "testingSet01_2.csv", numLines = 100)

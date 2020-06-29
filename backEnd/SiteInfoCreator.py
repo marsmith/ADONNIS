@@ -29,6 +29,7 @@ AT_DISTANCE = 1609.34 #(meters) a mile. Otherwise, name is "near"
 CONTEXT_DIST_LIMIT = 4000 #about 2.5 miles
 
 class SiteInfoCreator (object):
+    """ The entry point for getting a new site ID. """
 
     def __init__(self, lat, lng, withheldSites = []):
         self.lat = lat
@@ -49,6 +50,9 @@ class SiteInfoCreator (object):
         self.siteNameContext = None
 
     def getSiteNameContext (self):
+        """ Build up a dict containing contextual information to generate site names. 
+        
+        The finished context object is stored in the SiteInfoCreator instance. """
         lat = self.lat
         lng = self.lng
         streamGraph = self.streamGraph
@@ -144,6 +148,10 @@ class SiteInfoCreator (object):
         return context
            
     def getSiteNameInfo (self):
+        """ Gets the name info dict. Contains a list of possible names.
+        
+        This could be modified to also return the context dict created. Allowing a back and forth between
+        the backend and the frontend. """
         if self.siteNameContext is None:
             self.siteNameContext = self.getSiteNameContext()
 
@@ -209,10 +217,17 @@ class SiteInfoCreator (object):
         return allNames
 
     def getNetworkGeoJSON (self):
+        """ Get a GeoJson formatted version of this SiteInfoCreator instance's streamgraph instance. """
         return self.streamGraph.getGeoJSON()
 
 #withheld sites is a list of sites to be ignored while calculating a new site
     def getSiteID (self, useBadSites = True, logWarnings = False):
+        """ Get the siteID. Lat and Lng are provided to the constructor.
+        
+        :param useBadSites: When false, any site that has warnings associated with it will be ignored in calculating the new ID.
+        :param logWarnings: Should this request log warnings into the SiteInfoCreator's WarningLog instance? 
+        
+        :return: A dict {"id": the_id, "story": the_story}"""
         lat = self.lat
         lng = self.lng
         warningLog = self.warningLog
@@ -542,6 +557,13 @@ class SiteInfoCreator (object):
         return getResults(siteID = newID, story = story) 
 
     def beautifyID (self, siteID, lowerBound, upperBound, logWarnings = True):
+        """ Get the 'pretty' version of a site ID. 
+        :param siteID: The site to beautify.
+        :param lowerBound: The absolute lowest ID that the new ID could be beautified to.
+        :param upperBound: The absolute highest ID that the new ID could be beautified to. 
+        :param logWarnings: Should this operation log warnings? 
+        
+        :return: A prettier valid siteID or a warning on failure. """
         warningLog = self.warningLog
         siteID = str(siteID)
         shortenedID = siteID[:7]

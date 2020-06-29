@@ -13,6 +13,7 @@ if __debug__:
     import matplotlib.pyplot as plt
 
 #constants for neighbor relationships
+#the complexity here isn't really used.. 
 UNKNOWN = 0         #000
 UPSTREAM = 1        #001 a one in the one's place means upstream
 UPSTREAMTRIB = 3    #011 contains a one in the one's place, but also contains a 1 in the two's place, indicating upstream and a trib
@@ -34,20 +35,27 @@ class StreamNode (object):
         self.instanceID = instanceID        
 
     def addNeighbor (self, segment, relationship = UNKNOWN):
+        """ Add a neighbor to this node with a specific relationship """
         self.neighbors.append(NeighborRelationship(segment=segment, relationship=relationship))
 
     def neighborHasRelationShip(self, neighborTuple, relationship):
+        """ Check to see if a given neighbor has the specified relationship. """
         if neighborTuple.relationship & relationship == relationship:
             return True
         return False
 
     def getUpstreamNeighbors(self):
+        """ Gets the upstream neighbors. """
         return self.getCodedNeighbors(UPSTREAM)
 
     def getDownstreamNeighbors(self):
+        """ Gets the downstream neighbors. """
         return self.getCodedNeighbors(DOWNSTREAM)
 
+
+
     def getCodedNeighbors (self, relationshipCode):
+        """ Gets the neighbors with the specified relationship. """
         results = []
         for neighbor in self.neighbors:
             #does the relationship contain this flag
@@ -55,10 +63,12 @@ class StreamNode (object):
                 results.append(neighbor.segment)
         return results
 
-    # returns a list of upstream branches of this node sorted by stream level 
-    # the order will be:
-    # tribs, sorted by arbolate sum first, followed by the mainstream branch
     def getSortedUpstreamBranches (self):
+        """ Returns a list of upstream branches of this node sorted by stream level 
+        
+        the order will be:
+        
+        tribs, sorted by arbolate sum first, followed by the mainstream branch """
         tribs = []
         minStreamLevel = float("inf")
         for neighbor in self.neighbors:
@@ -82,6 +92,7 @@ class StreamNode (object):
     
     #removes the neighbor with neighborID if it exists. Return true if removed successfully
     def removeNeighbor (self, segment):
+        """ Remove a neighbor by segment reference """
         for i, neighbor in enumerate(self.neighbors):
             if neighbor.segment.segmentID == segment.segmentID:
                 self.neighbors.pop(i)
@@ -89,6 +100,7 @@ class StreamNode (object):
         return False
 
     def numNeighbors(self):
+        """ Get the number of neighbors of this node. """
         return len(self.neighbors)
 
 #a segment connecting two points
@@ -109,16 +121,20 @@ class StreamSegment (object):
     #distAlongSegment = 0 would imply that the site is located at upStreamNode
     #similarly, distAlongSegment = self.length wouold imply it is located at downStreamNode
     def addSite (self, siteID, distAlongSegment):
-
+        """ Add a gauge to this segment.
+        
+        :param distAlongSegment: 0 would imply that the site is located at upStreamNode. segment.length implys that the site is located at the downStreamNode."""
         self.sites.append(GraphSite(siteID = siteID, distDownstreamAlongSegment = distAlongSegment, segmentID = self.segmentID, snapDist = 0))
         self.sites = sorted(self.sites, key=lambda site: site.distDownstreamAlongSegment)
     
+    """ Add a site via a GraphSite object which stores the dist up segment, etc. """
     def addGraphSite(self, graphSite):
         self.sites.append(graphSite)
         self.sites = sorted(self.sites, key=lambda site: site.distDownstreamAlongSegment)
 
-
+    
     def isNeighbor (self, otherSegmentID):
+        """ Check if this segment is neighbors with the other segment based on its ID. """
         isNeighbor = False
         upstreamConnections = self.upStreamNode.neighbors
         downstreamConnections = self.downStreamNode.neighbors
@@ -139,8 +155,8 @@ class StreamSegment (object):
             return True
         return False
         
-    #gets the nearest site ID on THIS segment above 'distanceDownSegment' if it exists. return none otherwise 
     def getSiteAbove (self, distanceDownSegment):
+        """ gets the nearest site ID on THIS segment above 'distanceDownSegment' if it exists. """
         #list sites by order downstream to upstream
         reverseSortedSites = reversed(self.sites)
         #the first site we find in the above list that is farther upstream than 'distanceDownSegment' is a match
@@ -150,6 +166,9 @@ class StreamSegment (object):
         return None
     
     def getPointOnSegment (self, distDownstreamAlongSegment, useDetailPoints = False):
+        """ Gets the coordinates of a point on the segment based on the distDownstreamAlongSegment. 
+        
+        :param useDetailPoints: If true, returned point will be linearly interpolated between segment detail points. """
         percent = distDownstreamAlongSegment / self.length
         if useDetailPoints:
             floatDetailPointInd = percent * (len(self.detailPoints)-1)
@@ -169,7 +188,7 @@ class StreamSegment (object):
         return (pointX, pointY)
 
 class StreamGraph (object):
-
+    """ The primary datastructure behind ADONNIS. """
     def __init__(self, withheldSites = [], warningLog = None, assignBadSites = False):
         self.segments = {}
         self.nodes = []
@@ -183,9 +202,11 @@ class StreamGraph (object):
         self.currentAssignmentWarnings = []
         self.assignBadSites = assignBadSites
         self.currentSnapAssignments = {}
+    
     if __debug__:
         #visualize the graph using matplotlib
         def visualize(self, showSegInfo = False, customPoints = []):
+            """ Visualize the graph using matplotlib """
             sitesX = []
             sitesY = []
             for streamSeg in self.segments.values():
@@ -252,8 +273,8 @@ class StreamGraph (object):
 
             plt.show()
 
-    #expand the graph at x,y with queried data. Return true if successful
     def expandGraph (self, lat, lng):
+        """ Expand the graph at x,y with queried data. Return true if successful """
         if __debug__:
             print ("Expanding graph!")
         baseData = loadFromQuery(lat, lng)    
@@ -267,11 +288,13 @@ class StreamGraph (object):
     #do we want to assign bad sites to the graph? 
     #when we change this we have to refresh all snaps
     def setAssignBadSitesStatus (self, status):
+        """ Sets the status of whether sites with warnings are assigned. """
         self.assignBadSites = status
         self.refreshSiteSnaps();
 
     #safely remove a segment from the graph
     def removeSegment (self, segment, replacedBy = None):
+        """ Remove segment by segment reference. Optionally include a segment that replaces this segment. """
         segmentID = segment.segmentID
         if segmentID in self.segments:
             segment.upStreamNode.removeNeighbor(segment)
@@ -282,6 +305,7 @@ class StreamGraph (object):
     
     #add a segment to the graph
     def addSegment (self, upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName, detailPoints = []):
+        """ Add a segment to the graph. All info here comes from NHD plus HR. """
         newSegment = StreamSegment(upstreamNode, downstreamNode, segmentID, length, streamLevel, arbolateSum, streamName, detailPoints = detailPoints)    
         #add the new segment to the dictionary
         self.segments[segmentID] = newSegment
@@ -292,12 +316,16 @@ class StreamGraph (object):
         return newSegment
 
     def addNode (self, position):
+        """ Adds a node to the graph at position. """
         newNode = StreamNode(position, self.nextNodeID)
         self.nodes.append(newNode)
         self.nextNodeID += 1
         return newNode
 
     def addSiteSnaps (self, siteID, snapInfo):
+        """ Adds the given possible snaps to the list of possible snaps associated with the siteID.
+        
+        :param snapInfo: A list of GraphSite instances. """
         if siteID not in self.withheldSites:
             #snapInfo is a list of possible snaps. Each element is of type snap from SnapSites.py
             if siteID not in self.siteSnaps: 
@@ -306,12 +334,15 @@ class StreamGraph (object):
                 self.siteSnaps[siteID].extend(snapInfo)
 
     def addSite (self, segmentID, siteID, distDownstreamAlongSegment):
+        """ Add a site assignment to the graph """
         self.segments[segmentID].addSite(siteID, distDownstreamAlongSegment)
     
     def addGraphSite (self, graphSite):
+        """ Add a site assignment to the graph based on a GraphSite instance. """
         self.segments[graphSite.segmentID].addGraphSite(graphSite)
 
     def refreshSiteSnaps (self):
+        """ Refresh the snap assignments on the graph. """
         if __debug__:
             print("refreshing site snaps")
         assignmentInfo = getSiteSnapAssignment(self, assignBadSites=self.assignBadSites)
@@ -321,8 +352,11 @@ class StreamGraph (object):
         #since we reload assignments, we reload warnings stored
         self.currentAssignmentWarnings = warnings
 
-    #given a list of assignments (siteID, snapInfo), clear/update all segments
+    
     def assignSiteSnaps (self, snapAssignments):
+        """ Given a list of assignments, clear/update all site assignments.
+        
+        :param snapAssignments: A list of GraphSite instances. """
         #collections.namedtuple('Snap', 'featureObjectID snapDistance distAlongFeature')
         #start by removing old sites
         for segment in self.segments.values():
@@ -336,25 +370,28 @@ class StreamGraph (object):
             assignmentPoint = self.segments[assignment.segmentID].getPointOnSegment(assignment.distDownstreamAlongSegment, useDetailPoints=True)
             self.currentSnapAssignments[assignmentID] = assignmentPoint;
             
-    #has this graph ever contained this segment?
-    #used when adding new segments to prevent duplicates
+    
     def hasContainedSegment (self, segmentID):
+        """ Has this graph ever contained this segment?
+        
+        Used when adding new segments to prevent duplicates. """
         if segmentID in self.segments or segmentID in self.removedSegments:
             return True
         else:
             return False
 
-    #Get a list of nodes that have no downstream connection. A lot of these nodes will be outside of the safe zone, but they can be used to traverse 
-    #the entire graph since every node must be upstream from a sink
+    
     def getSinks (self):
+        """ Get a list of nodes that have no downstream connection. A lot of these nodes will be outside of the safe zone, but they can be used to traverse 
+        the entire graph since every node must be upstream from a sink. """
         sinks = []
         for node in self.nodes:
             if len(node.getCodedNeighbors(DOWNSTREAM)) == 0:
                 sinks.append(node)
         return sinks
     
-    #checks if a point is within a safe distance from the center of some query
     def pointWithinSafeDataBoundary (self, point):
+        """ Checks if a point is within a safe distance from the center of an added query """
         for boundary in self.safeDataBoundary:
             #square radius since fastMagDistance is the same as a regular distance except there is no sqrt applied
             if fastMagDist(point[0], point[1], boundary.point[0], boundary.point[1]) < boundary.radius*boundary.radius:
@@ -363,6 +400,7 @@ class StreamGraph (object):
 
     #removes loops in the graph
     def removeLoops (self):
+        """ Removes loops in the graph. """
         #close all loops upstream of 'sinkNode'
         #do a breadth first search from a sink
         #all nodes must be upstream of SOME sink. So, running BFS from all sinks covers all nodes
@@ -423,6 +461,7 @@ class StreamGraph (object):
         closeDownstreamJunctions()
 
     def getGeoJSON (self):
+        """ Get a GeoJson representation of the graph. """
         geojson = {
             "type": "FeatureCollection",
             "crs": {"type":"name","properties":{"name":"EPSG:4326"}},
@@ -446,6 +485,7 @@ class StreamGraph (object):
         return geojson
     #collapse redundant nodes with only two neighbors
     def cleanGraph (self):
+        """ Collapse redundant nodes that only have to neighbors. THIS IS CURRENTLY UNUSED. """
         queue = []
         for node in self.nodes:
             hasUpstream = len(node.getCodedNeighbors(UPSTREAM)) > 0
@@ -491,9 +531,8 @@ class StreamGraph (object):
                 
             self.nodes.remove(node)
 
-    
-    #get a segment from the graph or if it was deleted, get the segment that replaced it
     def getCleanedSegment (self, segmentID):
+        """ Get a segment from the graph or if it was deleted, get the segment that replaced it. """
         if segmentID in self.segments:
             return self.segments[segmentID]
         elif segmentID in self.removedSegments:
@@ -503,15 +542,17 @@ class StreamGraph (object):
 
     #use for testing to remove a site and re add it
     def removeSite (self, siteID):
+        """ Remove the assignment of a given siteID. Used in replacement testing. """
         for segment in self.segments.values():
             for site in segment.sites:
                 if site.siteID == siteID:
                     del segment.sites[site]
 
-    #Adds the geometry stored in the gdalData object
-    #gdalData: ref to a gdalData object
-    #guaranteedNetLineIndex a streamline feature that is definitely on the network we are interested in
+    
     def addGeom(self, baseData):
+        """ Adds the geometry stored in the baseData object to the graph. 
+        
+            This method builds the graph data structure. """
         lineLayer = baseData.lineLayer
         if __debug__:
             SnapSites.visualize(baseData, [])

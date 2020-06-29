@@ -2,14 +2,20 @@ import Helpers
 import GDALData
 import Failures
 
-#SITE_INFO_PATH = Path("siteInfo")
-# this should be replaced mostly with a sql database at some point.. 
 class SiteIDManager (object):
 
     def __init__(self):
          self.ids = {}# dict of huc codes
 
     def getNeighborIDs (self, siteID, huc):
+        """ Get the two nearest sequential neighbors to a siteID.
+
+        Upstream neighbor meaning the site with the next lower DSN number than the input ID. 
+        
+        :param siteID: The siteID.
+        :param huc: The 2 digit huc code that the site is within.
+        
+        :return: (upstream neighbor, downstream neighbor) """
         hucCode = huc[:2]
 
         loadResults = self.loadHucWeb(hucCode)
@@ -34,7 +40,16 @@ class SiteIDManager (object):
         #lower neighbor is lower in number, not in terms of downstream, vice versa
         return (upstreamNeighbor, downstreamNeighbor)   
 
+
     def getXNeighborIDs (self, siteID, huc, numNeighbors):
+        """ Get numNeighbors neighboring IDs above and below siteID
+    
+        :param siteID: The siteID.
+        :param huc: The 2 digit huc code that the site is within.
+        :param numNeighbors: The number of neighbors to get above and below siteID.
+
+        :return: A list of all site IDs within the range. """
+
         hucCode = huc[:2]
 
         loadResults = self.loadHucWeb(hucCode)
@@ -55,23 +70,11 @@ class SiteIDManager (object):
         upperIndex = min(numIds-1, matchIndex + numNeighbors)
 
         return self.ids[hucCode][minIndex:upperIndex]  
-
-    """ def loadPartCode (self, code):
-        sitesPath = Path(__file__).parent.absolute() / SITE_INFO_PATH / (str(code) + ".txt")
-        try:
-            sitesString = sitesPath.read_text()
-            siteList = sitesString.split("\n")
-            siteIDs = []
-            for site in siteList:
-                siteSplit = site.split("\t")
-                siteID = siteSplit[0]
-                siteIDs.append(siteID)
-            self.ids[code] = siteIDs
-            return True
-        except:
-            return False """
     
     def loadHucWeb (self, code):
+        """ Load all sites from a given huc code into the manager object.
+        
+        :param code: The HUC code being loaded. """
         if code in self.ids:
             return True
         ids = GDALData.loadHUCSites(code)

@@ -21,9 +21,11 @@ class WarningLog (object):
         self.warningInfo = {LOW_PRIORITY:[], MED_PRIORITY:[], HIGH_PRIORITY:[]}
 
     def resetWarnings (self, warningCode):
+        """ For a particular warningCode, reset all warnings associated with it. """
         self.warningInfo[warningCode] = []
 
     def addWarningTuple (self, warning):
+        """ Add a warning in the form of a Warning tuple. """
         priority = warning.priority
         message = warning.message
         responsibleSite = warning.responsibleSite
@@ -31,6 +33,7 @@ class WarningLog (object):
         self.addWarning(priority, message, responsibleSite, implicatedSites)
 
     def addWarning (self, priority, warningBody, responsibleSite = None, implicatedSites = None):
+        """ Add a warning without a warning tuple. """
         priorityClass = self.warningInfo[priority]
         warning = {"body":warningBody, "responsibleSite":responsibleSite, "implicatedSites":implicatedSites}
         priorityClass.append(warning)
@@ -40,6 +43,7 @@ class WarningLog (object):
             priorityDict[warningCode] = [warningBody] """
     
     def getFormattedMessage (self):
+        """ Get a formatted string representing the warning log. Used for debug printing. """
         output = self.basicInfo + "\n\n"
         for priority in self.warningInfo:
             numMessages = len(self.warningInfo[priority])
@@ -51,4 +55,5 @@ class WarningLog (object):
         return output
 
     def getJSONStruct (self):
+        """ Get a copy of the json representation of the warning log. """
         return self.warningInfo.copy()
