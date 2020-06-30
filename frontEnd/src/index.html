@@ -52,7 +52,7 @@
 
                                     <container>
                                         <div class="row">
-                                            <div class="col-7">
+                                            <div class="col-9">
                                                 <form>
                                                     <div class="row">
                                                         <div class="col">
@@ -72,10 +72,10 @@
                                             <div class="col">
                                                 <div class="btn-group" role="group">
                                                     <button type="button" class="btn btn-secondary" id="getShareLink">
-                                                        Share
+                                                        <i class="fa fa-share"></i>
                                                     </button>
                                                     <button type="button" class="btn btn-secondary" id="reloadButton">
-                                                        Reload
+                                                        <i class="fa fa-redo"></i>
                                                     </button>
                                                 </div>
                                             </div>
@@ -261,10 +261,13 @@
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div id="aboutModalBody" class="modal-body">
+                <div id="aboutModalBody" class="modal-body" style="height: 400px; overflow-y: auto;">
                     <ul class="nav nav-tabs" id="aboutModalTabs" role="tablist">
                         <li class="nav-item">
                             <a class="nav-link active" id="aboutTab" href="#aboutTabPane" data-toggle="tab" role="tab"><i class="fa fa-question-circle"></i>&nbsp;About the application</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="guideTab" href="#guideTabPane" data-toggle="tab" role="tab"><i class="fa fa-info-circle"></i>&nbsp;User Guide</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" id="disclaimerTab" href="#disclaimerTabPane" data-toggle="tab" role="tab"><i class="fa fa-exclamation-circle"></i>&nbsp;Disclaimer</a>
@@ -282,11 +285,60 @@
                             <a href="../docs/_build/html/index.html"> See the code documentation. </a>
                             
                             <br>
-                            
+
                             <p>Developed by Ian Scilipoti of the <a href="https://ny.water.usgs.gov">USGS New York Water Science Center</a>
                             <p>Icons from <a href="https://github.com/USGS-WiM/marker-creator">Marker Creator</a> developed by<a href="https://wim.usgs.gov"> USGS Web Informatics and Mapping</a><br><br>
                             <!-- Source code available <a href="https://github.com/marsmith/go2mapper">here.</a></p> -->
                             <span id="appVersion"></span>
+                        </div>
+                        <div role="tabpanel" class="tab-pane" id="guideTabPane"><br>
+                            <h3> Getting Started </h3>    
+
+                            <p> Begin by selecting a point on the map or entering a lat/lng in decimal degrees. The new site cursor will appear on the map in the location. Depending on how fast the NHD Plus HR server responds, blue lines may appear which highlight the streams around the lat/lng of the new site cursor. </p>
+
+                            <p> Next, you will be asked to confirm the location of the new site. Note that behind the scenes, the location of the new site will be snapped to the nearest stream found in the NHD Plus HR dataset. </p>
+
+                            <p> Once the point is confirmed you will see loading animation while the server processes this request. Getting a new site ID requires the automated querying of a lot of data in addition to complex algorithms to process said data. <b> This could take up to a few minutes! </b> </p>
+
+                            <p> Given a successful response, you will see a series of foldout tabs appear under the ADONNIS tab on the left. </p>
+
+                            <h3> Interpreting Results </h3>
+
+                            <p> Below is a description of the data that can be found under each tab of the results. </p>
+
+                            <h4> <b> SITE ID </b> </h4>
+
+                            <p> The site ID tab contains multiple pieces of information. Most importantly, the recommended ID is shown. The recommended ID will be in a box that may be green, yellow, or red. The color of the box indicates if the process went smoothly, contained warnings, or reached a high priority warning, respectively. More information about warnings and their meanings can be found below.</p>
+
+                            <p> Beneath the site ID, a grey box is shown. This contains a simple discription of the process that was used to generate the new ID. This process information can be used to confirm results if desired. </p>
+
+                            <h4> <b> SITE ID (Ignoring Incorrect Sites)</b> </h4>
+
+                            <p> This tab only appears when there are high priority warnings. The information displayed here is in the same format as the normal site ID tab. However, the site ID and story are based on a site ID calculations that ignores all preexisting sites that are deemed responsible for high priority warnings. </p>
+
+                            <p> In cases of high priority warnings it is recommended that the results from ADONNIS are verified. The secondary site ID displayed here may be seen as a better option in cases when many high priority warnings are found. </p>
+
+                            <h4> <b> Possible Names</b> </h4>
+
+                            <p> A list of possible names for the new site. Site names should be verified for uniqueness / shortened if necessary. The generated site names are based on the site naming convention. Road-river crossings tributary names are used as context to provide unique names. Names are listed in order of simplicity and ascending distance to the contextual reference. </p>
+                        
+                            <h4> <b> Warnings</b> </h4>
+
+                            <p> Here, a list of warnings that occured during the site ID generation. Much of the time, these errors concern conflicts in existing site ID numbers. </p>
+
+                            <p> ADONNIS is smart enough to make guesses regarding which sites may be the source of site ID numbering problems. Many warnings will point to a specific site that appears to be conflicting with many other sites. <p>
+
+                            <div class="alert alert-danger"> The ability for ADONNIS to understand site ID inconsistencies is contingent on the data provided by NHD Plus HR. Site IDs are based on a specific network traversal which depends on what streams are considered streams vs main branches. Thus, if NHD Plus HR has incorrect data, it can lead ADONNIS to show a warning when there may not be a real issue. It is suggested in this case that inconsistancies are taken up with the maintainers of NHD Plus. </div>
+
+                            <p> The above issue can be verified using the color coded stream data displayed on the map when results come in. Ensure that the stream levels is consistent with the general understanding of the stream structure of the area. </p>   
+                        
+                            <h3> Tips and Tricks </h3>
+
+                            <p> Site IDs can be highlighted on the map by hovering over the site ID links seen in stories and results tabs. </p>
+
+                            <p> Certain warnings have a button "Go" attached. This can be clicked to zoom to a view containing all implicated sites. </p>
+
+                            <p> The color coded streams displayed with the results can be hovered over to see a tooltip containing stream names. </p> 
                         </div>
                         <div role="tabpanel" class="tab-pane" id="disclaimerTabPane"><br>
                             <h4>USGS Software User Rights Notice</h4>

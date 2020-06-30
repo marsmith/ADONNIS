@@ -4,6 +4,35 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
+
+
+
+        {
+            "name": "Python: Current File w Coords",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": [
+                //"42.273,-73.959",
+                "41.31156412,-74.1469090",
+                "False"
+            ],
+            "env": {
+                "PYTHONOPTIMIZE": "y"
+            }            
+        },
+        {
+            "name": "Python: Current File Debug w Coords",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": [
+                //"42.273,-73.959",
+                "41.31156412,-74.1469090",
+                "False"
+            ]            
+        },
         {
             "name": "Python: Current File",
             "type": "python",

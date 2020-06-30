@@ -31,8 +31,11 @@ import { faBars } from '@fortawesome/free-solid-svg-icons/faBars';
 import { faInfo } from '@fortawesome/free-solid-svg-icons/faInfo';
 import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
 import { faMinus } from '@fortawesome/free-solid-svg-icons/faMinus';
+import { faRedo } from '@fortawesome/free-solid-svg-icons/faRedo';
+import { faShare } from '@fortawesome/free-solid-svg-icons/faShare';
 import { faExclamationCircle } from '@fortawesome/free-solid-svg-icons/faExclamationCircle';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons/faQuestionCircle';
+import { faInfoCircle } from '@fortawesome/free-solid-svg-icons/faInfoCircle';
 import { faCog } from '@fortawesome/free-solid-svg-icons/faCog';
 import { faTwitterSquare } from '@fortawesome/free-brands-svg-icons/faTwitterSquare';
 import { faFacebookSquare } from '@fortawesome/free-brands-svg-icons/faFacebookSquare';
@@ -43,7 +46,7 @@ import { faYoutubeSquare } from '@fortawesome/free-brands-svg-icons/faYoutubeSqu
 import { faInstagram } from '@fortawesome/free-brands-svg-icons/faInstagram';
 import { nativeTemplateEngine } from 'knockout';
 
-library.add(faBars, faPlus, faMinus, faInfo, faExclamationCircle, faCog, faQuestionCircle, faTwitterSquare, faFacebookSquare,faGooglePlusSquare, faGithubSquare, faFlickr, faYoutubeSquare, faInstagram );
+library.add(faBars, faPlus, faMinus, faInfo, faRedo, faShare, faExclamationCircle, faInfoCircle, faCog, faQuestionCircle, faTwitterSquare, faFacebookSquare,faGooglePlusSquare, faGithubSquare, faFlickr, faYoutubeSquare, faInstagram );
 dom.watch();
 
 //START user config variables
@@ -82,6 +85,7 @@ var cursorIconStyle = 'wmm-pin wmm-yellow wmm-icon-diamond wmm-icon-blue wmm-siz
 var cursorIcon;
 var siteIconStyle = 'wmm-pin wmm-altblue wmm-icon-diamond wmm-icon-blue wmm-size-25';
 var siteIcon;
+var highlightedIconStyle = 'wmm-pin wmm-red wmm-icon-noicon wmm-icon-white wmm-size-25';
 var highlightedIcon;
 var snappedCursorLatLng;
 var currentResultsIDs = []; //these are the ID(s) that are displayed as results. Keep track so we can hyperlink them properly
@@ -168,9 +172,10 @@ function initializeMap() {
   
   iconLegend.onAdd = function (theMap) {
       var div = L.DomUtil.create('div', 'info legendFixedWidth');
-      div.innerHTML += 'Existing Site <div class="' + siteIconStyle + '" style="transform: translate3d(100px, 0px, 0px)"><\div>';
-      div.innerHTML += '<br><br><br>New Site <div class="' + cursorIconStyle + '" style="transform: translate3d(100px, -10px, 0px)"><\div>';
-
+      div.innerHTML += '<br>Existing Site <div class="' + siteIconStyle + '" style="transform: translate3d(100px, -10px, 0px)"><\div>';
+      div.innerHTML += '<br><br>New Site <div class="' + cursorIconStyle + '" style="transform: translate3d(100px, -10px, 0px)"><\div>';
+      div.innerHTML += '<br><br>Highlighted <div class="' + highlightedIconStyle + '" style="transform: translate3d(100px, -10px, 0px)"><\div>';
+      
       return div;
   };
 
@@ -870,7 +875,7 @@ function stripIDHTMLFormat (inStr) {
 }
 
 function getSiteLinkHTML (siteID) {
-  var html = '<a href = "#0" class="' + idNumLinkClass + '">' + siteID + '</a>';
+  var html = '<a href = "javascript:void(0);" class="' + idNumLinkClass + '">' + siteID + '</a>';
   return html;
 }
 
