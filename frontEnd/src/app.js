@@ -33,6 +33,7 @@ import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
 import { faMinus } from '@fortawesome/free-solid-svg-icons/faMinus';
 import { faRedo } from '@fortawesome/free-solid-svg-icons/faRedo';
 import { faShare } from '@fortawesome/free-solid-svg-icons/faShare';
+import { faSearch } from '@fortawesome/free-solid-svg-icons/faSearch';
 import { faExclamationCircle } from '@fortawesome/free-solid-svg-icons/faExclamationCircle';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons/faExternalLinkAlt';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons/faQuestionCircle';
@@ -47,7 +48,7 @@ import { faYoutubeSquare } from '@fortawesome/free-brands-svg-icons/faYoutubeSqu
 import { faInstagram } from '@fortawesome/free-brands-svg-icons/faInstagram';
 import { nativeTemplateEngine } from 'knockout';
 
-library.add(faBars, faPlus, faMinus, faInfo, faRedo, faExternalLinkAlt, faShare, faExclamationCircle, faInfoCircle, faCog, faQuestionCircle, faTwitterSquare, faFacebookSquare,faGooglePlusSquare, faGithubSquare, faFlickr, faYoutubeSquare, faInstagram );
+library.add(faBars, faPlus, faMinus, faSearch, faInfo, faRedo, faExternalLinkAlt, faShare, faExclamationCircle, faInfoCircle, faCog, faQuestionCircle, faTwitterSquare, faFacebookSquare,faGooglePlusSquare, faGithubSquare, faFlickr, faYoutubeSquare, faInstagram );
 dom.watch();
 
 //START user config variables
@@ -104,6 +105,8 @@ $(document).ready(function () {
 
   initializeMap();
   initListeners();
+
+  
 
 });
 
@@ -261,6 +264,10 @@ function initListeners() {
     if (warningNumber != undefined && warningNumber != null) {
       displayWarningConflicts(lastQueryWarnings[warningNumber]);
     }
+  });
+
+  $("#showSearch").on("click", function(event){
+    $("#searchModal").modal("show");
   });
 
   $("#getShareLink").on("click", function(event){
