@@ -6,5 +6,7 @@ node_modules
 .vscode
 /frontend/dist
 /frontend/dist - Copy
-.vscode/settings.json
-.vscode/settings.json
+.vscode/launch.json
+/docs/_build/*
+/.vscode
+

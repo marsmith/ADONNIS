@@ -34,6 +34,7 @@ import { faMinus } from '@fortawesome/free-solid-svg-icons/faMinus';
 import { faRedo } from '@fortawesome/free-solid-svg-icons/faRedo';
 import { faShare } from '@fortawesome/free-solid-svg-icons/faShare';
 import { faExclamationCircle } from '@fortawesome/free-solid-svg-icons/faExclamationCircle';
+import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons/faExternalLinkAlt';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons/faQuestionCircle';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons/faInfoCircle';
 import { faCog } from '@fortawesome/free-solid-svg-icons/faCog';
@@ -46,7 +47,7 @@ import { faYoutubeSquare } from '@fortawesome/free-brands-svg-icons/faYoutubeSqu
 import { faInstagram } from '@fortawesome/free-brands-svg-icons/faInstagram';
 import { nativeTemplateEngine } from 'knockout';
 
-library.add(faBars, faPlus, faMinus, faInfo, faRedo, faShare, faExclamationCircle, faInfoCircle, faCog, faQuestionCircle, faTwitterSquare, faFacebookSquare,faGooglePlusSquare, faGithubSquare, faFlickr, faYoutubeSquare, faInstagram );
+library.add(faBars, faPlus, faMinus, faInfo, faRedo, faExternalLinkAlt, faShare, faExclamationCircle, faInfoCircle, faCog, faQuestionCircle, faTwitterSquare, faFacebookSquare,faGooglePlusSquare, faGithubSquare, faFlickr, faYoutubeSquare, faInstagram );
 dom.watch();
 
 //START user config variables
@@ -92,7 +93,7 @@ var currentResultsIDs = []; //these are the ID(s) that are displayed as results.
 var currentResultsLatLng;
 
 var idNumLinkClass = "idNum"
-var simulateBackendResponse = true;
+var simulateBackendResponse = false;
 //END global variables
 
 //instantiate map

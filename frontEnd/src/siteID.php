@@ -6,17 +6,15 @@ $lat = $_GET['lat'];
 $lng = $_GET['lng'];
 
 $theVarsStr = "$lat,$lng";
+$filename = "backEnd/SiteInfoCreator.py";
+$command = escapeshellcmd("python3 -O $filename $theVarsStr 2>&1");
 
-$command = escapeshellcmd("python -O ../../backEnd/SiteInfoCreator.py $theVarsStr 2>&1");
 $output = shell_exec($command);
 if ($output)
 {
     echo $output;
 } else {
-    $command = escapeshellcmd("conda activate adonnis & python -O ../../backEnd/SiteInfoCreator.py $theVarsStr 2>&1");
-    $output = shell_exec($command);
-    echo $output;
-}
-
+	echo "No backend response";
+} 
 
 ?>

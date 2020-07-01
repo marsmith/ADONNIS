@@ -51,7 +51,9 @@ module.exports = {
         new CopyPlugin([
             { from: './frontEnd/src/*.json', to: './', flatten: true },
             { from: './frontEnd/src/images', to: './images' },
-            { from: './frontEnd/src/*.php', to: './', flatten: true }
+            { from: './frontEnd/src/*.php', to: './', flatten: true },
+			{ from: './backEnd/*.py', to: './' },
+			{ from: './docs/_build/', to: './docs/',}
           ]),
         new webpack.ContextReplacementPlugin(
             /moment[/\\]locale$/,
